@@ -1,6 +1,6 @@
-# JustBet - Sports Betting Platform
+# JustBet - Auction Platform
 
-A modern sports betting platform built with Express.js and PostgreSQL.
+A modern auction bidding platform built with Express.js and PostgreSQL.
 
 ## Project Structure
 
