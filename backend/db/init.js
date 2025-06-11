@@ -13,9 +13,32 @@ const pool = new Pool({
 const enableUUID = async () => {
   try {
     await pool.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
-    console.log('UUID extension enabled');
   } catch (error) {
     console.error('Error enabling UUID extension:', error);
+    throw error;
+  }
+};
+
+// Add new columns to users table if they don't exist
+const updateUsersTable = async () => {
+  try {
+    // Check if is_verified column exists
+    const isVerifiedCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'is_verified'
+    `);
+
+    if (isVerifiedCheck.rows.length === 0) {
+      await pool.query(`
+        ALTER TABLE users 
+        ADD COLUMN is_verified BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN verification_token UUID,
+        ADD COLUMN verification_token_expires TIMESTAMP WITH TIME ZONE
+      `);
+    }
+  } catch (error) {
+    console.error('Error updating users table:', error);
     throw error;
   }
 };
@@ -34,13 +57,10 @@ const createInitialAdmin = async () => {
       
       // Create initial admin user
       await pool.query(
-        `INSERT INTO users (first_name, last_name, email, password, role)
-         VALUES ($1, $2, $3, $4, $5)`,
-        ['Admin', 'User', 'admin@justbet.com', hashedPassword, 'admin']
+        `INSERT INTO users (first_name, last_name, email, password, role, is_verified)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        ['Admin', 'User', 'admin@justbet.com', hashedPassword, 'admin', true]
       );
-      console.log('Initial admin user created');
-    } else {
-      console.log('Admin user already exists');
     }
   } catch (error) {
     console.error('Error creating admin user:', error);
@@ -71,11 +91,13 @@ const initDatabase = async () => {
           email VARCHAR(255) UNIQUE NOT NULL,
           password VARCHAR(255) NOT NULL,
           role VARCHAR(20) NOT NULL DEFAULT 'user',
+          is_verified BOOLEAN NOT NULL DEFAULT false,
+          verification_token UUID,
+          verification_token_expires TIMESTAMP WITH TIME ZONE,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      console.log('Users table created');
 
       // Create function to update updated_at timestamp
       await pool.query(`
@@ -96,15 +118,16 @@ const initDatabase = async () => {
           FOR EACH ROW
           EXECUTE FUNCTION update_updated_at_column();
       `);
-      console.log('Database schema initialized successfully');
+
+      // Create initial admin user only if table was just created
+      await createInitialAdmin();
     } else {
-      console.log('Users table already exists');
+      // Update existing table with new columns
+      await updateUsersTable();
     }
 
     // Always check and create admin user if it doesn't exist
     await createInitialAdmin();
-
-    console.log('Database initialization completed');
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
@@ -115,7 +138,6 @@ const initDatabase = async () => {
 const testConnection = async () => {
   try {
     const client = await pool.connect();
-    console.log('Database connection successful');
     client.release();
   } catch (error) {
     console.error('Database connection error:', error);

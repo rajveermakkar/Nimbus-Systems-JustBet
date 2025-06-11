@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { initDatabase, testConnection } = require('./db/init');
+const { verifyEmailService } = require('./services/emailService');
 const authRoutes = require('./routes/auth');
 
 const app = express();
@@ -10,12 +11,6 @@ const port = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  next();
-});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -33,16 +28,25 @@ app.use((err, req, res, next) => {
 // Initialize database and start server
 const startServer = async () => {
   try {
-    // Test database connection first
+    // Test database connection
     await testConnection();
+    console.log('Database: Connected');
     
     // Initialize database schema
     await initDatabase();
+    console.log('Database: Initialized');
+    
+    // Test email service connection
+    try {
+      await verifyEmailService();
+      console.log('Email Service: Connected');
+    } catch (emailError) {
+      console.log('Email Service: Not Available');
+    }
     
     // Start the server
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);
-      console.log(`Database: ${process.env.DB_NAME}@${process.env.DB_HOST}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
