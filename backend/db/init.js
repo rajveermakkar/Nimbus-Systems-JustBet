@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
 
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -28,11 +29,14 @@ const createInitialAdmin = async () => {
     );
 
     if (adminCheck.rows.length === 0) {
+      // Hash admin password
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      
       // Create initial admin user
       await pool.query(
         `INSERT INTO users (first_name, last_name, email, password, role)
          VALUES ($1, $2, $3, $4, $5)`,
-        ['Admin', 'User', 'admin@justbet.com', 'admin123', 'admin']
+        ['Admin', 'User', 'admin@justbet.com', hashedPassword, 'admin']
       );
       console.log('Initial admin user created');
     } else {
@@ -93,12 +97,12 @@ const initDatabase = async () => {
           EXECUTE FUNCTION update_updated_at_column();
       `);
       console.log('Database schema initialized successfully');
-
-      // Create initial admin user only if table was just created
-      await createInitialAdmin();
     } else {
       console.log('Users table already exists');
     }
+
+    // Always check and create admin user if it doesn't exist
+    await createInitialAdmin();
 
     console.log('Database initialization completed');
   } catch (error) {

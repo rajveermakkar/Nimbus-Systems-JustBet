@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcrypt');
 const { pool } = require('../db/init');
 
 router.post('/register', async (req, res) => {
@@ -25,10 +26,13 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Insert new user with default role 'user'
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Insert new user with hashed password
     const result = await pool.query(
       'INSERT INTO users (first_name, last_name, email, password, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, first_name, last_name, email, role',
-      [firstName, lastName, email, password, 'user']
+      [firstName, lastName, email, hashedPassword, 'user']
     );
 
     res.status(201).json({
