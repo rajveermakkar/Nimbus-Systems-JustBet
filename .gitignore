@@ -1,6 +1,9 @@
 # Node modules
 node_modules/
 
+#Github
+.gitignore
+
 # Logs
 logs
 *.log
@@ -38,8 +41,3 @@ coverage/
 # Others
 *.tgz
 *.zip
-
-#Cursor
-.cursor/
-.cursor/rules/
-.mdc
