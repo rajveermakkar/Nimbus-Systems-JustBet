@@ -1,0 +1,45 @@
+# Node modules
+node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build directories
+dist/
+build/
+
+# dotenv environment files
+.env
+.env.*
+
+# IDEs
+.vscode/
+.idea/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Database dumps
+*.dump.sql
+*.sql
+
+# Others
+*.tgz
+*.zip
+
+#Cursor
+.cursor/
+.cursor/rules/
+.mdc
