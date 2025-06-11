@@ -46,6 +46,21 @@ The server will automatically:
 - Create necessary tables if they don't exist
 - Create an initial admin user if no users exist
 
+## Security Details
+
+### Password Encryption (Bcrypt)
+- Uses bcrypt with 10 salt rounds
+- Hashed passwords are 60 characters long
+- Format: `$2b$10$[22 chars salt][31 chars hash]`
+- Example: `$2b$10$LQVDxJ5UxX5X5X5X5X5X5O5X5X5X5X5X5X5X5X5X5X5X5X5X5X`
+
+### User IDs (UUID)
+- Uses UUID v4 (random)
+- 32 hexadecimal characters
+- Format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+- Example: `123e4567-e89b-12d3-a456-426614174000`
+- Extremely low collision probability
+
 ## Git Workflow
 
 ### Branching Strategy
