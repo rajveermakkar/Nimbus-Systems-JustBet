@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../db/init');
 const { sendVerificationEmail } = require('../services/emailService');
@@ -202,6 +203,73 @@ router.get('/user-status', async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('User status check error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Login endpoint
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  // Basic validation
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    // Get user from database
+    const result = await pool.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const user = result.rows[0];
+
+    // Check if user is verified
+    if (!user.is_verified) {
+      return res.status(401).json({ 
+        error: 'Please verify your email before logging in',
+        isVerified: false,
+        email: user.email
+      });
+    }
+
+    // Compare password
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '30m' }
+    );
+
+    // Return user info and token
+    res.json({
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        role: user.role
+      },
+      token,
+      expiresIn: 1800
+    });
+  } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
