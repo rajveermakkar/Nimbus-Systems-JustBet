@@ -27,6 +27,7 @@ npm install
 ```env
 # Server Configuration
 PORT=3000
+NODE_ENV=development
 
 # Database Configuration
 DB_USER=your_db_user
@@ -34,6 +35,16 @@ DB_HOST=localhost
 DB_NAME=justbet
 DB_PASSWORD=your_db_password
 DB_PORT=5432
+
+# JWT Configuration
+JWT_SECRET=your_jwt_secret_key
+
+# Email Configuration
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your_smtp_username
+SMTP_PASS=your_smtp_password
+EMAIL_FROM=noreply@justbet.com
 ```
 
 4. Start the development server:
@@ -45,61 +56,6 @@ The server will automatically:
 - Connect to the database
 - Create necessary tables if they don't exist
 - Create an initial admin user if no users exist
-
-## Security Details
-
-### Password Encryption (Bcrypt)
-- Uses bcrypt with 10 salt rounds
-- Hashed passwords are 60 characters long
-- Format: `$2b$10$[22 chars salt][31 chars hash]`
-- Example: `$2b$10$LQVDxJ5UxX5X5X5X5X5X5O5X5X5X5X5X5X5X5X5X5X5X5X5X5X`
-
-### User IDs (UUID)
-- Uses UUID v4 (random)
-- 32 hexadecimal characters
-- Format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
-- Example: `123e4567-e89b-12d3-a456-426614174000`
-- Extremely low collision probability
-
-## Git Workflow
-
-### Branching Strategy
-
-1. Create a new branch for each task:
-```bash
-git checkout -b SCRUM-123-task-description
-```
-Example: `git checkout -b SCRUM-45-user-registration`
-
-2. Make your changes and commit them:
-```bash
-git add .
-git commit -m "SCRUM-123: Brief description of changes"
-```
-
-### Code Review Process
-
-1. Push your branch to remote:
-```bash
-git push -u origin SCRUM-123-task-description
-```
-
-2. Create a Pull Request (PR) on GitHub:
-   - Set the base branch to `main`
-   - Add a description of your changes
-   - Request reviews from team members
-
-3. Wait for code review:
-   - Address any review comments
-   - Make additional commits if needed
-
-4. After approval:
-   - Merge the PR into main
-
-### Best Practices
-
-- Keep commits focused and atomic
-- Write clear commit messages
 
 ## API Endpoints
 
@@ -119,6 +75,37 @@ Content-Type: application/json
 }
 ```
 
+#### Login
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "password123"
+}
+```
+
+#### Verify Email
+```http
+GET /api/auth/verify-email?token=<verification_token>
+```
+
+#### Resend Verification Email
+```http
+POST /api/auth/resend-verification
+Content-Type: application/json
+
+{
+  "email": "john@example.com"
+}
+```
+
+#### Check User Status
+```http
+GET /api/auth/user-status?email=john@example.com
+```
+
 ## Database Schema
 
 ### Users Table
@@ -130,6 +117,9 @@ CREATE TABLE users (
   email VARCHAR(255) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'user',
+  is_verified BOOLEAN DEFAULT false,
+  verification_token VARCHAR(255),
+  verification_token_expires TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -146,7 +136,7 @@ CREATE TABLE users (
 2. Error Handling:
    - Use try-catch blocks for async operations
    - Return appropriate HTTP status codes
-   - Log connections for Debugging
+   - Log errors for debugging
 
 ## License
 
