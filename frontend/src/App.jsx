@@ -5,7 +5,7 @@ import viteLogo from '/vite.svg'
 import './App.css'
 import Login from '../pages/Login';
 import Register from '../pages/Register';
-
+import ForgotPassword from '../pages/ForgotPassword';
 
 function App() {
   const [count, setCount] = useState(0)
