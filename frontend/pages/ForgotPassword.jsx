@@ -18,27 +18,30 @@ function ForgotPassword() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validate()) {
-      // Here you would typically make an API call to send the reset link
       setIsSubmitted(true);
     }
   };
 
   return (
-    <div className="login-bg">
-      <div className="login-card">
-        <div className="text-center mb-4">
-          <a href="/" className="flex items-center space-x-2">
+    <div className="h-screen w-screen flex items-center justify-center bg-gray-900">
+      <div className="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md text-white m-4">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <a
+            href="/login"
+            className="d-flex justify-content-center align-items-center gap-2 mb-2 text-decoration-none"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
+              width="60"
+              height="60"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="lucide lucide-gavel w-8 h-8 text-blue-500"
+              className="text-primary"
             >
               <path d="m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8"></path>
               <path d="m16 16 6-6"></path>
@@ -46,53 +49,67 @@ function ForgotPassword() {
               <path d="m9 7 8 8"></path>
               <path d="m21 11-8-8"></path>
             </svg>
-            <span className="text-xl font-bold text-white">JustBet</span>
+            <span className="fs-2 fw-bold text-white">JustBet</span>
           </a>
-          <div className="login-title">Forgot Password</div>
-          <div className="login-subtitle">Enter your email to reset password</div>
+          <h2 className="text-2xl font-semibold">Forgot Password</h2>
         </div>
 
+        {/* Form */}
         {!isSubmitted ? (
           <form onSubmit={handleSubmit} noValidate>
-            <div className="mb-3">
-              <label className="login-label">Email Address</label>
-              <div className="login-input-group">
-                <span>
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-                    <path
-                      d="M4 4h16v16H4V4zm0 0l8 8 8-8"
-                      stroke="#3B82F6"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
+            <div className="mb-4">
+              
+              <div className="flex items-center bg-gray-700 rounded-md px-3 py-2">
+                <svg
+                  width="20"
+                  height="20"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  className="text-blue-500 mr-2"
+                >
+                  <path
+                    d="M4 4h16v16H4V4zm0 0l8 8 8-8"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
                 <input
                   type="email"
-                  className="login-input"
+                  className="w-full bg-transparent focus:outline-none text-white placeholder-gray-400"
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              {errors.email && <div className="login-error">{errors.email}</div>}
+              {errors.email && (
+                <p className="text-sm text-red-400 mt-1">{errors.email}</p>
+              )}
             </div>
-            <button type="submit" className="login-btn">
+
+            <button
+              type="submit"
+              className="w-full py-2 bg-blue-600 hover:bg-blue-700 rounded-md font-medium transition"
+            >
               Send Reset Link
             </button>
           </form>
         ) : (
           <div className="text-center">
-            <div className="text-green-500 mb-4">
+            <p className="text-green-400 font-medium">
               Reset link has been sent to your email!
-            </div>
+            </p>
           </div>
         )}
 
-        <div className="login-footer">
+        {/* Footer */}
+        <div className="text-center mt-6 text-lg">
           Remember your password?{" "}
-          <Link to="/login" className="login-link">
+          <Link
+            to="/login"
+            className="text-blue-400 hover:underline font-medium"
+          >
             Sign in
           </Link>
         </div>
@@ -101,4 +118,4 @@ function ForgotPassword() {
   );
 }
 
-export default ForgotPassword; 
+export default ForgotPassword;

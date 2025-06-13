@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { Link } from "react-router-dom";
+import "bootstrap/dist/css/bootstrap.min.css";
 
 function Register() {
   const [form, setForm] = useState({
@@ -7,14 +8,9 @@ function Register() {
     lastName: "",
     email: "",
     password: "",
-    phone: "",
-    address: "",
-    bio: "",
-    dob: "",
-    profile: null,
+    confirmPassword: "",
   });
   const [errors, setErrors] = useState({});
-  const [profilePreview, setProfilePreview] = useState(null);
   const fileInputRef = useRef();
 
   const validate = () => {
@@ -27,75 +23,46 @@ function Register() {
     if (!form.password) newErrors.password = "Password is required";
     else if (form.password.length < 6)
       newErrors.password = "Password must be at least 6 characters";
-    if (!form.phone) newErrors.phone = "Phone number is required";
-    else if (!/^\d{10,15}$/.test(form.phone.replace(/\D/g, "")))
-      newErrors.phone = "Invalid phone number";
-    if (!form.address) newErrors.address = "Address is required";
-    if (!form.bio) newErrors.bio = "Bio is required";
-    if (!form.dob) newErrors.dob = "Date of birth is required";
-    if (!form.profile) newErrors.profile = "Profile image is required";
+    if (!form.confirmPassword)
+      newErrors.confirmPassword = "Please confirm your password";
+    else if (form.confirmPassword !== form.password)
+      newErrors.confirmPassword = "Passwords do not match";
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleChange = (e) => {
-    const { name, value, files } = e.target;
-    if (name === "profile") {
-      const file = files[0];
-      setForm({ ...form, profile: file });
-      if (file) {
-        const reader = new FileReader();
-        reader.onloadend = () => setProfilePreview(reader.result);
-        reader.readAsDataURL(file);
-      } else {
-        setProfilePreview(null);
-      }
-    } else {
-      setForm({ ...form, [name]: value });
-    }
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validate()) {
-      // handle registration logic
       alert("Registered!");
     }
   };
 
   return (
-    <div className="login-bg">
-      <div className="login-card">
+    <div className="h-screen w-screen flex items-center justify-center bg-gray-900">
+      <div className="bg-gray-800 text-white shadow-lg rounded-lg p-8 w-full max-w-xl m-4">
         <div className="text-center mb-4">
           <a
-            data-lov-id="src/components/Navigation.tsx:15:10"
-            data-lov-name="Link"
-            data-component-path="src/components/Navigation.tsx"
-            data-component-line="15"
-            data-component-file="Navigation.tsx"
-            data-component-name="Link"
-            data-component-content="%7B%22className%22%3A%22flex%20items-center%20space-x-2%22%7D"
-            class="flex items-center space-x-2"
-            href="/"
+            href="/login"
+            className="d-flex justify-content-center align-items-center gap-2 mb-2 text-decoration-none"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
+              width="60"
+              height="60"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="lucide lucide-gavel w-8 h-8 text-blue-500"
-              data-lov-id="src/components/Navigation.tsx:16:12"
-              data-lov-name="Gavel"
-              data-component-path="src/components/Navigation.tsx"
-              data-component-line="16"
-              data-component-file="Navigation.tsx"
-              data-component-name="Gavel"
-              data-component-content="%7B%22className%22%3A%22w-8%20h-8%20text-blue-500%22%7D"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-primary"
             >
               <path d="m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8"></path>
               <path d="m16 16 6-6"></path>
@@ -103,214 +70,200 @@ function Register() {
               <path d="m9 7 8 8"></path>
               <path d="m21 11-8-8"></path>
             </svg>
-            <span
-              data-lov-id="src/components/Navigation.tsx:17:12"
-              data-lov-name="span"
-              data-component-path="src/components/Navigation.tsx"
-              data-component-line="17"
-              data-component-file="Navigation.tsx"
-              data-component-name="span"
-              data-component-content="%7B%22text%22%3A%22JustBet%22%2C%22className%22%3A%22text-xl%20font-bold%20text-white%22%7D"
-              class="text-xl font-bold text-white"
-            >
-              JustBet
-            </span>
+            <span className="fs-2 fw-bold text-white">JustBet</span>
           </a>
-          <div className="login-title">Register</div>
-          <div className="login-subtitle">Create your account</div>
+          <h2 className="fw-bold fs-3">Register</h2>
+          <p className="mb-3 fs-5">Create your account</p>
         </div>
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="mb-3">
-            <label className="login-label">First Name</label>
-            <div className="login-input-group">
-              <input
-                type="text"
-                className="login-input"
-                name="firstName"
-                placeholder="Enter your first name"
-                value={form.firstName}
-                onChange={handleChange}
-              />
+
+        <form onSubmit={handleSubmit} className="form-horizontal text-lg" noValidate>
+          {/* Name Row */}
+          <div className="flex gap-4 mb-6">
+            {/* First Name */}
+            <div className="flex-1">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+                    <path
+                      d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"
+                      stroke="#3B82F6"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle
+                      cx="12"
+                      cy="7"
+                      r="4"
+                      stroke="#3B82F6"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  name="firstName"
+                  className={`w-full pl-10 pr-4 py-2 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.firstName ? "border border-red-500" : ""
+                  }`}
+                  placeholder="First name"
+                  value={form.firstName}
+                  onChange={handleChange}
+                />
+              </div>
+              {errors.firstName && (
+                <p className="text-sm text-red-400 mt-1">{errors.firstName}</p>
+              )}
             </div>
-            {errors.firstName && (
-              <div className="login-error">{errors.firstName}</div>
-            )}
-          </div>
-          <div className="mb-3">
-            <label className="login-label">Last Name</label>
-            <div className="login-input-group">
-              <input
-                type="text"
-                className="login-input"
-                name="lastName"
-                placeholder="Enter your last name"
-                value={form.lastName}
-                onChange={handleChange}
-              />
+
+            {/* Last Name */}
+            <div className="flex-1">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+                    <path
+                      d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"
+                      stroke="#3B82F6"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle
+                      cx="12"
+                      cy="7"
+                      r="4"
+                      stroke="#3B82F6"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  name="lastName"
+                  className={`w-full pl-10 pr-4 py-2 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.lastName ? "border border-red-500" : ""
+                  }`}
+                  placeholder="Last name"
+                  value={form.lastName}
+                  onChange={handleChange}
+                />
+              </div>
+              {errors.lastName && (
+                <p className="text-sm text-red-400 mt-1">{errors.lastName}</p>
+              )}
             </div>
-            {errors.lastName && (
-              <div className="login-error">{errors.lastName}</div>
-            )}
           </div>
-          <div className="mb-3">
-            <label className="login-label">Email Address</label>
-            <div className="login-input-group">
+
+          {/* Email */}
+          <div className="mb-6">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+                  <path
+                    d="M4 4h16v16H4V4zm0 0l8 8 8-8"
+                    stroke="#3B82F6"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
               <input
                 type="email"
-                className="login-input"
                 name="email"
+                className={`w-full pl-10 pr-4 py-2 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.email ? "border border-red-500" : ""
+                }`}
                 placeholder="Enter your email"
                 value={form.email}
                 onChange={handleChange}
               />
             </div>
-            {errors.email && <div className="login-error">{errors.email}</div>}
+            {errors.email && (
+              <p className="text-sm text-red-400 mt-1">{errors.email}</p>
+            )}
           </div>
-          <div className="mb-3">
-            <label className="login-label">Password</label>
-            <div className="login-input-group">
+
+          {/* Password */}
+          <div className="mb-6">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+                  <path
+                    d="M12 17a2 2 0 100-4 2 2 0 000 4zm6-6V9a6 6 0 10-12 0v2a2 2 0 00-2 2v5a2 2 0 002 2h12a2 2 0 002-2v-5a2 2 0 00-2-2z"
+                    stroke="#3B82F6"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
               <input
                 type="password"
-                className="login-input"
                 name="password"
+                className={`w-full pl-10 pr-4 py-2 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.password ? "border border-red-500" : ""
+                }`}
                 placeholder="Enter your password"
                 value={form.password}
                 onChange={handleChange}
               />
             </div>
             {errors.password && (
-              <div className="login-error">{errors.password}</div>
+              <p className="text-sm text-red-400 mt-1">{errors.password}</p>
             )}
           </div>
-          <div className="mb-3">
-            <label className="login-label">Phone Number</label>
-            <div className="login-input-group">
-              <input
-                type="tel"
-                className="login-input"
-                name="phone"
-                placeholder="Enter your phone number"
-                value={form.phone}
-                onChange={handleChange}
-              />
-            </div>
-            {errors.phone && <div className="login-error">{errors.phone}</div>}
-          </div>
-          <div className="mb-3">
-            <label className="login-label">Address</label>
-            <div className="login-input-group">
-              <input
-                type="text"
-                className="login-input"
-                name="address"
-                placeholder="Enter your address"
-                value={form.address}
-                onChange={handleChange}
-              />
-            </div>
-            {errors.address && (
-              <div className="login-error">{errors.address}</div>
-            )}
-          </div>
-          <div className="mb-3">
-            <label className="login-label">Profile Image</label>
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "50%",
-                  background: "#23242b",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "hidden",
-                  border: "2px solid #3B82F6",
-                }}
-              >
-                {profilePreview ? (
-                  <img
-                    src={profilePreview}
-                    alt="Profile Preview"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
+
+          {/* Confirm Password */}
+          <div className="mb-6">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+                  <path
+                    d="M12 17a2 2 0 100-4 2 2 0 000 4zm6-6V9a6 6 0 10-12 0v2a2 2 0 00-2 2v5a2 2 0 002 2h12a2 2 0 002-2v-5a2 2 0 00-2-2z"
+                    stroke="#3B82F6"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
-                ) : (
-                  <svg width="32" height="32" fill="none" viewBox="0 0 24 24">
-                    <circle
-                      cx="12"
-                      cy="8"
-                      r="4"
-                      stroke="#3B82F6"
-                      strokeWidth="2"
-                    />
-                    <path
-                      d="M4 20c0-2.21 3.582-4 8-4s8 1.79 8 4"
-                      stroke="#3B82F6"
-                      strokeWidth="2"
-                    />
-                  </svg>
-                )}
+                </svg>
               </div>
               <input
-                type="file"
-                accept="image/*"
-                name="profile"
-                ref={fileInputRef}
-                style={{ display: "none" }}
+                type="password"
+                name="confirmPassword"
+                className={`w-full pl-10 pr-4 py-2 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.confirmPassword ? "border border-red-500" : ""
+                }`}
+                placeholder="Confirm your password"
+                value={form.confirmPassword}
                 onChange={handleChange}
               />
-              <button
-                type="button"
-                className="login-btn"
-                style={{ width: 120, padding: "0.4rem 0" }}
-                onClick={() => fileInputRef.current.click()}
-              >
-                Upload
-              </button>
             </div>
-            {errors.profile && (
-              <div className="login-error">{errors.profile}</div>
+            {errors.confirmPassword && (
+              <p className="text-sm text-red-400 mt-1">{errors.confirmPassword}</p>
             )}
           </div>
-          <div className="mb-3">
-            <label className="login-label">Bio</label>
-            <div className="login-input-group">
-              <textarea
-                className="login-input"
-                name="bio"
-                placeholder="Tell us about yourself"
-                value={form.bio}
-                onChange={handleChange}
-                rows={2}
-                style={{ resize: "none" }}
-              />
-            </div>
-            {errors.bio && <div className="login-error">{errors.bio}</div>}
+
+          <div className="mb-6">
+            <button
+              type="submit"
+              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-md font-semibold transition"
+            >
+              Register
+            </button>
           </div>
-          <div className="mb-3">
-            <label className="login-label">Date of Birth</label>
-            <div className="login-input-group">
-              <input
-                type="date"
-                className="login-input"
-                name="dob"
-                value={form.dob}
-                onChange={handleChange}
-              />
-            </div>
-            {errors.dob && <div className="login-error">{errors.dob}</div>}
-          </div>
-          <button type="submit" className="login-btn">
-            Register
-          </button>
         </form>
-        <div className="login-footer">
+
+        <div className="text-center mt-3 text-lg">
           Already have an account?{" "}
-          <Link to="/login" className="login-link">
+          <Link
+            to="/login"
+            className="text-decoration-none fw-semibold text-primary"
+          >
             Sign in
           </Link>
         </div>
