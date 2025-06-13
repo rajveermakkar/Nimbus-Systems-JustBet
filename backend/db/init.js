@@ -14,7 +14,6 @@ const enableUUID = async () => {
   try {
     await pool.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
   } catch (error) {
-    console.error('Error enabling UUID extension:', error);
     throw error;
   }
 };
@@ -36,6 +35,23 @@ const updateUsersTable = async () => {
         ADD COLUMN verification_token UUID,
         ADD COLUMN verification_token_expires TIMESTAMP WITH TIME ZONE
       `);
+      console.log('Added verification columns to users table');
+    }
+
+    // FIXED: Separate check for reset token columns
+    const resetTokenCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'reset_token'
+    `);
+
+    if (resetTokenCheck.rows.length === 0) {
+      await pool.query(`
+        ALTER TABLE users 
+        ADD COLUMN reset_token UUID,
+        ADD COLUMN reset_token_expires TIMESTAMP WITH TIME ZONE
+      `);
+      console.log('Added reset token columns to users table');
     }
   } catch (error) {
     console.error('Error updating users table:', error);
@@ -61,6 +77,9 @@ const createInitialAdmin = async () => {
          VALUES ($1, $2, $3, $4, $5, $6)`,
         ['Admin', 'User', 'admin@justbet.com', hashedPassword, 'admin', true]
       );
+      console.log('Created initial admin user');
+    } else {
+      console.log('Admin user already exists');
     }
   } catch (error) {
     console.error('Error creating admin user:', error);
@@ -70,6 +89,8 @@ const createInitialAdmin = async () => {
 
 const initDatabase = async () => {
   try {
+    console.log('Initializing database...');
+    
     // First enable UUID extension
     await enableUUID();
     
@@ -82,7 +103,8 @@ const initDatabase = async () => {
     `);
 
     if (!tableCheck.rows[0].exists) {
-      // Create users table if it doesn't exist
+     
+      // Create users table if it doesn't exist (with ALL columns from the start)
       await pool.query(`
         CREATE TABLE users (
           id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -94,10 +116,13 @@ const initDatabase = async () => {
           is_verified BOOLEAN NOT NULL DEFAULT false,
           verification_token UUID,
           verification_token_expires TIMESTAMP WITH TIME ZONE,
+          reset_token UUID,
+          reset_token_expires TIMESTAMP WITH TIME ZONE,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
+      console.log('Users table created with all columns');
 
       // Create function to update updated_at timestamp
       await pool.query(`
@@ -109,6 +134,7 @@ const initDatabase = async () => {
         END;
         $$ language 'plpgsql';
       `);
+      console.log('Created update_updated_at function');
 
       // Create trigger to automatically update updated_at
       await pool.query(`
@@ -128,6 +154,8 @@ const initDatabase = async () => {
 
     // Always check and create admin user if it doesn't exist
     await createInitialAdmin();
+    
+    console.log('Database initialization complete!');
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
@@ -138,6 +166,7 @@ const initDatabase = async () => {
 const testConnection = async () => {
   try {
     const client = await pool.connect();
+    console.log('Database connection test successful');
     client.release();
   } catch (error) {
     console.error('Database connection error:', error);
@@ -149,4 +178,4 @@ module.exports = {
   pool,
   initDatabase,
   testConnection
-}; 
+};

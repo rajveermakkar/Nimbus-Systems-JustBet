@@ -66,7 +66,53 @@ const sendVerificationEmail = async (email, token) => {
   }
 };
 
+// Send password reset email
+const sendPasswordResetEmail = async (email, token) => {
+  try {
+    // Check if FRONTEND_URL is set
+    if (!process.env.FRONTEND_URL) {
+      throw new Error('FRONTEND_URL environment variable is not set');
+    }
+
+    // Ensure the URL ends without a trailing slash
+    const baseUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
+    const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+    
+    const mailOptions = {
+      from: `"JustBet" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: 'Reset your JustBet password',
+      html: `
+        <h1>Password Reset Request</h1>
+        <p>You requested to reset your password. Click the link below to set a new password:</p>
+        <a href="${resetUrl}" style="
+          display: inline-block;
+          padding: 10px 20px;
+          background-color: #4CAF50;
+          color: white;
+          text-decoration: none;
+          border-radius: 5px;
+          margin: 10px 0;
+        ">Reset Password</a>
+        <p>Or copy and paste this link in your browser:</p>
+        <p style="word-break: break-all;">${resetUrl}</p>
+        <p>This link will expire in 1 hour.</p>
+        <p>If you didn't request this password reset, please ignore this email and ensure your account is secure.</p>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Password reset email sent successfully!');
+    console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+    return info;
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   verifyEmailService,
-  sendVerificationEmail
+  sendVerificationEmail,
+  sendPasswordResetEmail
 }; 
