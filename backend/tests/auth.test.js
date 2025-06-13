@@ -328,4 +328,147 @@ describe('Auth Login', () => {
     expect(res.status).toBe(500);
     expect(res.body).toHaveProperty('error', 'Internal server error');
   });
+});
+
+describe('Password Reset', () => {
+  const api = request(app);
+  const mockUser = {
+    id: '1',
+    email: 'test@example.com',
+    is_verified: true
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.JWT_SECRET = 'test-secret';
+  });
+
+  describe('Forgot Password', () => {
+   
+
+    it('should return same message for non-existent email', async () => {
+      pool.query.mockResolvedValueOnce({ rows: [] });
+
+      const response = await api
+        .post('/api/auth/forgot-password')
+        .send({ email: 'nonexistent@example.com' });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        message: 'If your email is registered, you will receive a password reset link'
+      });
+    });
+
+    it('should reject unverified email', async () => {
+      pool.query.mockResolvedValueOnce({ 
+        rows: [{ ...mockUser, is_verified: false }] 
+      });
+
+      const response = await api
+        .post('/api/auth/forgot-password')
+        .send({ email: 'unverified@example.com' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        error: 'Please verify your email first before resetting password',
+        code: 'EMAIL_NOT_VERIFIED'
+      });
+    });
+
+    it('should handle missing email', async () => {
+      const response = await api
+        .post('/api/auth/forgot-password')
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        error: 'Email is required'
+      });
+    });
+  });
+
+  describe('Reset Password', () => {
+    it('should successfully reset password with valid token', async () => {
+      const mockToken = 'valid-reset-token';
+      pool.query.mockResolvedValueOnce({ 
+        rows: [{ id: '1', email: 'test@example.com' }] 
+      });
+      bcrypt.hash.mockResolvedValueOnce('new-hashed-password');
+
+      const response = await api
+        .post('/api/auth/reset-password')
+        .send({
+          token: mockToken,
+          newPassword: 'NewPassword123!',
+          confirmPassword: 'NewPassword123!'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        message: 'Password has been reset successfully',
+        success: true
+      });
+    });
+
+    it('should reject invalid or expired token', async () => {
+      pool.query.mockResolvedValueOnce({ rows: [] });
+
+      const response = await api
+        .post('/api/auth/reset-password')
+        .send({
+          token: 'invalid-token',
+          newPassword: 'NewPassword123!',
+          confirmPassword: 'NewPassword123!'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        error: 'Invalid or expired reset token'
+      });
+    });
+
+    it('should reject mismatched passwords', async () => {
+      const response = await api
+        .post('/api/auth/reset-password')
+        .send({
+          token: 'valid-token',
+          newPassword: 'NewPassword123!',
+          confirmPassword: 'DifferentPassword123!'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        error: 'Passwords do not match'
+      });
+    });
+
+    it('should reject password shorter than 8 characters', async () => {
+      const response = await api
+        .post('/api/auth/reset-password')
+        .send({
+          token: 'valid-token',
+          newPassword: 'short',
+          confirmPassword: 'short'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        error: 'Password must be at least 8 characters long'
+      });
+    });
+
+    it('should handle missing required fields', async () => {
+      const response = await api
+        .post('/api/auth/reset-password')
+        .send({
+          token: 'valid-token'
+          // Missing passwords
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        error: 'All fields are required'
+      });
+    });
+  });
 }); 
