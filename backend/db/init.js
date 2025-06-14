@@ -7,16 +7,10 @@ const pool = new Pool({
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
+  ssl: process.env.DB_SSL === 'true' ? {
+    rejectUnauthorized: false //for azure postgres server , not requrred for localhost
+  } : false
 });
-
-// Enable UUID extension
-const enableUUID = async () => {
-  try {
-    await pool.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
-  } catch (error) {
-    throw error;
-  }
-};
 
 // Add new columns to users table if they don't exist
 const updateUsersTable = async () => {
@@ -38,7 +32,7 @@ const updateUsersTable = async () => {
       console.log('Added verification columns to users table');
     }
 
-    // FIXED: Separate check for reset token columns
+    // Check for reset token columns
     const resetTokenCheck = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
@@ -91,9 +85,6 @@ const initDatabase = async () => {
   try {
     console.log('Initializing database...');
     
-    // First enable UUID extension
-    await enableUUID();
-    
     // Check if users table exists
     const tableCheck = await pool.query(`
       SELECT EXISTS (
@@ -103,11 +94,10 @@ const initDatabase = async () => {
     `);
 
     if (!tableCheck.rows[0].exists) {
-     
-      // Create users table if it doesn't exist (with ALL columns from the start)
+      // Create users table if it doesn't exist
       await pool.query(`
         CREATE TABLE users (
-          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           first_name VARCHAR(100) NOT NULL,
           last_name VARCHAR(100) NOT NULL,
           email VARCHAR(255) UNIQUE NOT NULL,
