@@ -4,19 +4,28 @@ const jwt = require('jsonwebtoken');
 const jwtauthMiddleware = (req, res, next) => {
   try {
     // Get token from cookie or header
-    const token = req.cookies.token || 
-                 (req.headers.authorization && req.headers.authorization.split(' ')[1]);
-
+    let token = req.cookies.token;
+    
+    // If no cookie, try header
     if (!token) {
-      return res.status(401).json({ error: 'Please login first' });
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'No token provided, please login again' });
+      }
+      token = authHeader.split(' ')[1];
     }
 
-    // Check if token is valid
-    const user = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = user;
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Add user info to request
+    req.user = decoded;
     next();
   } catch (error) {
-    return res.status(401).json({ error: 'Please login again' });
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    return res.status(401).json({ error: 'Invalid token' });
   }
 };
 
