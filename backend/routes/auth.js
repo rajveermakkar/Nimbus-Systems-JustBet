@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../db/init');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
+const jwtauthMiddleware = require('../middleware/jwtauth');
 
 // Resend verification email
 router.post('/resend-verification', async (req, res) => {
@@ -192,44 +193,44 @@ router.get('/user-status', async (req, res) => {
   }
 });
 
-// Login endpoint
+// Login user
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
+  // Check if email and password are provided
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
   try {
+    // Find user in database
     const result = await pool.query(
       'SELECT * FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
 
+    // If user not found
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const user = result.rows[0];
 
+    // Check if email is verified
     if (!user.is_verified) {
       return res.status(401).json({ 
-        error: 'Please verify your email before logging in',
-        isVerified: false,
+        error: 'Please verify your email first',
         email: user.email
       });
     }
 
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    // Check if password is correct
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    if (!process.env.JWT_SECRET) {
-      console.error('JWT_SECRET is not configured');
-      return res.status(500).json({ error: 'Server configuration error' });
-    }
-
+    // Create token
     const token = jwt.sign(
       { 
         userId: user.id,
@@ -240,6 +241,14 @@ router.post('/login', async (req, res) => {
       { expiresIn: '30m' }
     );
 
+    // Set cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      sameSite: 'strict',
+      maxAge: 30 * 60 * 1000 // 30 minutes
+    });
+
+    // Send response
     res.json({
       message: 'Login successful',
       user: {
@@ -248,13 +257,11 @@ router.post('/login', async (req, res) => {
         lastName: user.last_name,
         email: user.email,
         role: user.role
-      },
-      token,
-      expiresIn: 1800
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong' });
   }
 });
 
@@ -385,6 +392,50 @@ router.post('/reset-password', async (req, res) => {
     res.status(500).json({ 
       error: 'Internal server error'
     });
+  }
+});
+
+// Logout user
+router.post('/logout', (req, res) => {
+  // Remove cookie
+  res.clearCookie('token', {
+    httpOnly: true,
+    sameSite: 'strict'
+  });
+  
+  res.json({ message: 'Logged out successfully' });
+});
+
+// Get user profile
+router.get('/profile', jwtauthMiddleware, async (req, res) => {
+  try {
+    // Get user from database
+    const result = await pool.query(
+      'SELECT id, first_name, last_name, email, role, created_at FROM users WHERE id = $1',
+      [req.user.userId]
+    );
+
+    // If user not found
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.rows[0];
+    
+    // Send user data
+    res.json({
+      user: {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.created_at
+      }
+    });
+  } catch (error) {
+    console.error('Profile error:', error);
+    res.status(500).json({ error: 'Something went wrong' });
   }
 });
 

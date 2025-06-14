@@ -27,7 +27,6 @@ npm install
 ```env
 # Server Configuration
 PORT=3000
-NODE_ENV=development
 
 # Database Configuration
 DB_USER=your_db_user
@@ -83,6 +82,33 @@ Content-Type: application/json
 {
   "email": "john@example.com",
   "password": "password123"
+}
+```
+Response will include an HTTP-only cookie named 'token'
+
+#### Logout
+```http
+POST /api/auth/logout
+```
+Clears the authentication cookie
+
+#### Get User Profile
+```http
+GET /api/auth/profile
+```
+Requires authentication cookie
+
+Response:
+```json
+{
+  "user": {
+    "id": "uuid",
+    "firstName": "test",
+    "lastName": "user",
+    "email": "test@test.com",
+    "role": "user",
+    "createdAt": "2024-03-21T12:00:00Z"
+  }
 }
 ```
 
