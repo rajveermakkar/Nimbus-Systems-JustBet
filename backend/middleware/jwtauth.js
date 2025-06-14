@@ -1,27 +1,32 @@
 const jwt = require('jsonwebtoken');
 
-const jwtauthMiddleware = (req, res, next) => {
+// Simple middleware to check if user is logged in
+function checkAuth(req, res, next) {
   try {
-    // Get token from header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
+    // First try to get token from cookie
+    let token = req.cookies.token;
+
+    // If no cookie, try to get from Authorization header
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+      }
     }
 
-    const token = authHeader.split(' ')[1];
-    
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Add user info to request
-    req.user = decoded;
+    // If no token found
+    if (!token) {
+      return res.status(401).json({ error: 'Please login first' });
+    }
+
+    // Check if token is valid
+    const user = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = user;
     next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired' });
-    }
-    return res.status(401).json({ error: 'Invalid token' });
+    // If token is invalid or expired
+    return res.status(401).json({ error: 'Please login again' });
   }
-};
+}
 
-module.exports = jwtauthMiddleware; 
+module.exports = { checkAuth }; 
