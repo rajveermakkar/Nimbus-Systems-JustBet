@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../db/init');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
-const { checkAuth } = require('../middleware/jwtauth');
+const jwtauthMiddleware = require('../middleware/jwtauth');
 
 // Resend verification email
 router.post('/resend-verification', async (req, res) => {
@@ -407,7 +407,7 @@ router.post('/logout', (req, res) => {
 });
 
 // Get user profile
-router.get('/profile', checkAuth, async (req, res) => {
+router.get('/profile', jwtauthMiddleware, async (req, res) => {
   try {
     // Get user from database
     const result = await pool.query(
