@@ -1,5 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
 
 function Register() {
   const [form, setForm] = useState({
@@ -21,8 +23,8 @@ function Register() {
     else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email))
       newErrors.email = "Invalid email";
     if (!form.password) newErrors.password = "Password is required";
-    else if (form.password.length < 6)
-      newErrors.password = "Password must be at least 6 characters";
+    else if (form.password.length < 8)
+      newErrors.password = "Password must be at least 8 characters";
     if (!form.confirmPassword)
       newErrors.confirmPassword = "Please confirm your password";
     else if (form.confirmPassword !== form.password)
@@ -42,7 +44,7 @@ function Register() {
     if (!validate()) return;
 
     try {
-      const response = await fetch("http://localhost:3000/api/auth/register", {
+      const response = await fetch(`${backendUrl}/api/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -57,12 +59,13 @@ function Register() {
       });
 
       const data = await response.json();
+      console.log(data);
 
       if (response.ok) {
         alert("Registration successful! Please log in.");
         navigate("/login");
       } else {
-        setErrors({ form: data.message || "Registration failed" });
+        setErrors({ form: data.error || data.message || "Registration failed" });
       }
     } catch (error) {
       setErrors({ form: "Network error. Please try again." });
