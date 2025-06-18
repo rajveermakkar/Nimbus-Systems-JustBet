@@ -9,7 +9,7 @@ const generateToken = (user) => {
       isApproved: user.is_approved
     },
     process.env.JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: '30m' }
   );
 };
 

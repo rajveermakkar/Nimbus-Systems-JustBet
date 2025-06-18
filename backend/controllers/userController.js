@@ -209,7 +209,7 @@ const userController = {
   // Get user profile
   async getProfile(req, res) {
     try {
-      const user = await User.findById(req.user.userId);
+      const user = await User.findById(req.user.id);
       if (!user) {
         return errorResponse(res, 404, 'User not found');
       }

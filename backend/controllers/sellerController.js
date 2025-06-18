@@ -10,9 +10,7 @@ const sellerController = {
         businessName,
         businessDescription,
         businessAddress,
-        businessPhone,
-        businessWebsite,
-        businessDocuments
+        businessPhone
       } = req.body;
 
       // Validate required business fields
@@ -36,9 +34,7 @@ const sellerController = {
         businessName,
         businessDescription,
         businessAddress,
-        businessPhone,
-        businessWebsite,
-        businessDocuments
+        businessPhone
       };
 
       const updatedUser = await User.updateRoleAndApproval(userId, 'seller', false, businessDetails);
@@ -54,9 +50,7 @@ const sellerController = {
             businessName: updatedUser.business_name,
             businessDescription: updatedUser.business_description,
             businessAddress: updatedUser.business_address,
-            businessPhone: updatedUser.business_phone,
-            businessWebsite: updatedUser.business_website,
-            businessDocuments: updatedUser.business_documents
+            businessPhone: updatedUser.business_phone
           }
         },
         token
@@ -89,9 +83,7 @@ const sellerController = {
           businessName: user.business_name,
           businessDescription: user.business_description,
           businessAddress: user.business_address,
-          businessPhone: user.business_phone,
-          businessWebsite: user.business_website,
-          businessDocuments: user.business_documents
+          businessPhone: user.business_phone
         } : null,
         token
       });
