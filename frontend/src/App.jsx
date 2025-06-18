@@ -11,6 +11,9 @@ import AdminDashboard from '../pages/AdminDashboard';
 import NotAuthorized from '../pages/NotAuthorized';
 import ProtectedRoute from '../pages/ProtectedRoute';
 import Home from '../pages/Home';
+import ResetPassword from '../pages/ResetPassword';
+import VerifyEmail from '../pages/VerifyEmail';
+import ResendVerification from '../pages/ResendVerification';
 
 function App() {
   const [count, setCount] = useState(0)
@@ -22,6 +25,9 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/resend-verification" element={<ResendVerification />} />
         <Route path="/dashboard" element={<UserDashboard />} />
         <Route path="/admin/dashboard" element={
           <ProtectedRoute requiredRole="admin">

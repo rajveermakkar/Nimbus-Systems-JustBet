@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import formImage from "./assets/forgot-password.png";
 import AuthCard from "../src/components/AuthCard";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -15,10 +14,9 @@ function useIsMobile() {
   return isMobile;
 }
 
-function ForgotPassword() {
+function ResendVerification() {
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState({});
-  const [isSubmitted, setIsSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const isMobile = useIsMobile();
@@ -39,7 +37,7 @@ function ForgotPassword() {
     setErrors({});
     setSuccessMsg("");
     try {
-      const response = await fetch(`${backendUrl}/api/auth/forgot-password`, {
+      const response = await fetch(`${backendUrl}/api/auth/resend-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -47,10 +45,9 @@ function ForgotPassword() {
       const data = await response.json();
       setLoading(false);
       if (response.ok) {
-        setIsSubmitted(true);
-        setSuccessMsg("Reset link has been sent to your email!");
+        setSuccessMsg("Verification email sent! Please check your inbox.");
       } else {
-        setErrors({ form: data.error || data.message || "Failed to send reset link" });
+        setErrors({ form: data.error || data.message || "Failed to send verification email" });
       }
     } catch (err) {
       setLoading(false);
@@ -58,7 +55,7 @@ function ForgotPassword() {
     }
   };
 
-  const form = !isSubmitted ? (
+  const form = (
     <form onSubmit={handleSubmit} noValidate className="space-y-4 w-full mt-2">
       <input
         type="email"
@@ -77,79 +74,36 @@ function ForgotPassword() {
         className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
         disabled={loading}
       >
-        {loading ? "Sending..." : "Send Reset Link"}
+        {loading ? "Sending..." : "Resend Verification Email"}
       </button>
     </form>
-  ) : null;
+  );
 
-  const afterSubmit = isSubmitted && (
-    <div className="text-center mt-4">
+  const footer = (
+    <div className="text-center mt-6 text-sm w-full">
       <Link
         to="/login"
-        className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
+        className="text-blue-300 hover:underline font-medium"
       >
         Back to Login
       </Link>
     </div>
   );
 
-  const footer = (
-    <>
-      {afterSubmit}
-      <div className="text-center mt-6 text-sm w-full">
-        Remember your password?{' '}
-        <Link
-          to="/login"
-          className="text-blue-300 hover:underline font-medium"
-        >
-          Sign in
-        </Link>
-      </div>
-    </>
-  );
-
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">
-      {isMobile ? (
-        <AuthCard
-          icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
-          title="Forgot your password?"
-          subtitle="Enter your email and we'll send you a link to reset your password."
-          error={errors.form}
-          success={successMsg}
-          footer={footer}
-        >
-          {form}
-        </AuthCard>
-      ) : (
-        <div className="w-full max-w-3xl bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex animate-fade-in">
-          {/* Left side image */}
-          <div className="w-1/2 flex items-center justify-center bg-gradient-to-b from-[#23235b] to-[#63e] p-6">
-            <img
-              src={formImage}
-              alt="Reset Password Visual"
-              className="object-contain drop-shadow-xl"
-              style={{ maxWidth: '220px', maxHeight: '220px', width: '100%', height: 'auto', margin: '0 auto' }}
-            />
-          </div>
-          {/* Right side form */}
-          <div className="w-1/2 flex flex-col justify-center p-12">
-            <AuthCard
-              icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
-              title="Forgot your password?"
-              subtitle="Enter your email and we'll send you a link to reset your password."
-              error={errors.form}
-              success={successMsg}
-              footer={footer}
-              plain={true}
-            >
-              {form}
-            </AuthCard>
-          </div>
-        </div>
-      )}
+      <AuthCard
+        icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+        title="Resend Verification Email"
+        subtitle="Enter your email to receive a new verification link."
+        error={errors.form}
+        success={successMsg}
+        footer={footer}
+      >
+        {form}
+      </AuthCard>
     </div>
   );
 }
 
-export default ForgotPassword;
+export default ResendVerification; 

@@ -1,7 +1,20 @@
 import React, { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import AuthCard from "../src/components/AuthCard";
+import registerImage from "./assets/register.png";
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
+// Reminder: Add a route for ResetPassword.jsx in your router, e.g. /reset-password?token=...
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  React.useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return isMobile;
+}
 
 function Register() {
   const [form, setForm] = useState({
@@ -14,6 +27,7 @@ function Register() {
   const [errors, setErrors] = useState({});
   const fileInputRef = useRef();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const validate = () => {
     const newErrors = {};
@@ -72,117 +86,244 @@ function Register() {
     }
   };
 
-  return (
-    <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">
-      <div className="w-full max-w-sm mx-auto bg-white/10 backdrop-blur-xl rounded-xl shadow-xl p-8 border border-white/20 flex flex-col animate-fade-in" style={{minWidth: 320}}>
-        <div className="flex flex-col items-center mb-6">
-          <i className="fa-solid fa-user-plus text-3xl text-white mb-2"></i>
-          <h2 className="text-2xl font-bold text-white mb-1 tracking-tight text-center">Create your account</h2>
-          <p className="text-gray-200 text-sm text-center">Join our community!</p>
-        </div>
-        <form onSubmit={handleSubmit} noValidate className="w-full space-y-4">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="firstName">First Name</label>
-              <input
-                type="text"
-                name="firstName"
-                id="firstName"
-                className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.firstName ? "border-red-500" : ""}`}
-                placeholder="First name"
-                value={form.firstName}
-                onChange={handleChange}
-                autoComplete="given-name"
-              />
-              {errors.firstName && (
-                <p className="text-xs text-red-400 mt-1">{errors.firstName}</p>
-              )}
-            </div>
-            <div className="flex-1">
-              <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="lastName">Last Name</label>
-              <input
-                type="text"
-                name="lastName"
-                id="lastName"
-                className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.lastName ? "border-red-500" : ""}`}
-                placeholder="Last name"
-                value={form.lastName}
-                onChange={handleChange}
-                autoComplete="family-name"
-              />
-              {errors.lastName && (
-                <p className="text-xs text-red-400 mt-1">{errors.lastName}</p>
-              )}
-            </div>
-          </div>
-          <div>
-            <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="email">Email</label>
-            <input
-              type="email"
-              name="email"
-              id="email"
-              className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.email ? "border-red-500" : ""}`}
-              placeholder="Email address"
-              value={form.email}
-              onChange={handleChange}
-              autoComplete="email"
-            />
-            {errors.email && (
-              <p className="text-xs text-red-400 mt-1">{errors.email}</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="password">Password</label>
-            <input
-              type="password"
-              name="password"
-              id="password"
-              className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
-              placeholder="Password"
-              value={form.password}
-              onChange={handleChange}
-              autoComplete="new-password"
-            />
-            {errors.password && (
-              <p className="text-xs text-red-400 mt-1">{errors.password}</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              type="password"
-              name="confirmPassword"
-              id="confirmPassword"
-              className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
-              placeholder="Confirm password"
-              value={form.confirmPassword}
-              onChange={handleChange}
-              autoComplete="new-password"
-            />
-            {errors.confirmPassword && (
-              <p className="text-xs text-red-400 mt-1">{errors.confirmPassword}</p>
-            )}
-          </div>
-          {errors.form && (
-            <p className="text-sm text-red-400 text-center">{errors.form}</p>
+  const formFields = (
+    <form onSubmit={handleSubmit} noValidate className="w-full space-y-4">
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="firstName">First Name</label>
+          <input
+            type="text"
+            name="firstName"
+            id="firstName"
+            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.firstName ? "border-red-500" : ""}`}
+            placeholder="First name"
+            value={form.firstName}
+            onChange={handleChange}
+            autoComplete="given-name"
+          />
+          {errors.firstName && (
+            <p className="text-xs text-red-400 mt-1">{errors.firstName}</p>
           )}
-          <button
-            type="submit"
-            className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
-          >
-            Register
-          </button>
-        </form>
-        <div className="text-center mt-6 text-sm w-full">
-          <span className="text-white">Already have an account?</span>{' '}
-          <Link
-            to="/login"
-            className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
-          >
-            Sign in
-          </Link>
+        </div>
+        <div className="flex-1">
+          <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="lastName">Last Name</label>
+          <input
+            type="text"
+            name="lastName"
+            id="lastName"
+            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.lastName ? "border-red-500" : ""}`}
+            placeholder="Last name"
+            value={form.lastName}
+            onChange={handleChange}
+            autoComplete="family-name"
+          />
+          {errors.lastName && (
+            <p className="text-xs text-red-400 mt-1">{errors.lastName}</p>
+          )}
         </div>
       </div>
+      <div>
+        <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="email">Email</label>
+        <input
+          type="email"
+          name="email"
+          id="email"
+          className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.email ? "border-red-500" : ""}`}
+          placeholder="Email address"
+          value={form.email}
+          onChange={handleChange}
+          autoComplete="email"
+        />
+        {errors.email && (
+          <p className="text-xs text-red-400 mt-1">{errors.email}</p>
+        )}
+      </div>
+      <div>
+        <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="password">Password</label>
+        <input
+          type="password"
+          name="password"
+          id="password"
+          className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
+          placeholder="Password"
+          value={form.password}
+          onChange={handleChange}
+          autoComplete="new-password"
+        />
+        {errors.password && (
+          <p className="text-xs text-red-400 mt-1">{errors.password}</p>
+        )}
+      </div>
+      <div>
+        <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="confirmPassword">Confirm Password</label>
+        <input
+          type="password"
+          name="confirmPassword"
+          id="confirmPassword"
+          className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
+          placeholder="Confirm password"
+          value={form.confirmPassword}
+          onChange={handleChange}
+          autoComplete="new-password"
+        />
+        {errors.confirmPassword && (
+          <p className="text-xs text-red-400 mt-1">{errors.confirmPassword}</p>
+        )}
+      </div>
+      {errors.form && (
+        <p className="text-sm text-red-400 text-center">{errors.form}</p>
+      )}
+      <button
+        type="submit"
+        className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
+      >
+        Register
+      </button>
+    </form>
+  );
+
+  const footer = (
+    <div className="text-center mt-6 text-sm w-full">
+      <span className="text-white">Already have an account?</span>{' '}
+      <Link
+        to="/login"
+        className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
+      >
+        Sign in
+      </Link>
+    </div>
+  );
+
+  return (
+    <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">
+      {isMobile ? (
+        <AuthCard
+          icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+          title="Create your account"
+          subtitle="Join our community!"
+          error={errors.form}
+          footer={footer}
+        >
+          {formFields}
+        </AuthCard>
+      ) : (
+        <div className="w-full max-w-4xl my-6 mx-2 bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex animate-fade-in">
+          {/* Left side image */}
+          <div className="w-1/2 flex items-center justify-center bg-gradient-to-b from-[#23235b] to-[#63e] p-6">
+            <img
+              src={registerImage}
+              alt="Register Visual"
+              className="object-contain drop-shadow-xl"
+              style={{ maxWidth: '300px', maxHeight: '250px', width: '100%', height: 'auto', margin: '0 auto' }}
+            />
+          </div>
+          {/* Right side form */}
+          <div className="w-1/2 flex flex-col justify-center py-2 px-8">
+            <AuthCard
+              icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+              title="Create your account"
+              subtitle="Join our community!"
+              error={errors.form}
+              footer={footer}
+              plain={true}
+            >
+              <form onSubmit={handleSubmit} noValidate className="w-full space-y-3">
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="firstName">First Name</label>
+                    <input
+                      type="text"
+                      name="firstName"
+                      id="firstName"
+                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.firstName ? "border-red-500" : ""}`}
+                      placeholder="First name"
+                      value={form.firstName}
+                      onChange={handleChange}
+                      autoComplete="given-name"
+                    />
+                    {errors.firstName && (
+                      <p className="text-xs text-red-400 mt-1">{errors.firstName}</p>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="lastName">Last Name</label>
+                    <input
+                      type="text"
+                      name="lastName"
+                      id="lastName"
+                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.lastName ? "border-red-500" : ""}`}
+                      placeholder="Last name"
+                      value={form.lastName}
+                      onChange={handleChange}
+                      autoComplete="family-name"
+                    />
+                    {errors.lastName && (
+                      <p className="text-xs text-red-400 mt-1">{errors.lastName}</p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="email">Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    id="email"
+                    className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.email ? "border-red-500" : ""}`}
+                    placeholder="Email address"
+                    value={form.email}
+                    onChange={handleChange}
+                    autoComplete="email"
+                  />
+                  {errors.email && (
+                    <p className="text-xs text-red-400 mt-1">{errors.email}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="password">Password</label>
+                  <input
+                    type="password"
+                    name="password"
+                    id="password"
+                    className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
+                    placeholder="Password"
+                    value={form.password}
+                    onChange={handleChange}
+                    autoComplete="new-password"
+                  />
+                  {errors.password && (
+                    <p className="text-xs text-red-400 mt-1">{errors.password}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="confirmPassword">Confirm Password</label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    id="confirmPassword"
+                    className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
+                    placeholder="Confirm password"
+                    value={form.confirmPassword}
+                    onChange={handleChange}
+                    autoComplete="new-password"
+                  />
+                  {errors.confirmPassword && (
+                    <p className="text-xs text-red-400 mt-1">{errors.confirmPassword}</p>
+                  )}
+                </div>
+                {errors.form && (
+                  <p className="text-sm text-red-400 text-center">{errors.form}</p>
+                )}
+                <button
+                  type="submit"
+                  className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
+                >
+                  Register
+                </button>
+              </form>
+            </AuthCard>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
