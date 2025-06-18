@@ -93,7 +93,12 @@ const userController = {
 
       // Generate token
       const token = jwt.sign(
-        { userId: user.id, email: user.email, role: user.role },
+        { 
+          id: user.id, 
+          email: user.email, 
+          role: user.role,
+          isApproved: user.is_approved 
+        },
         process.env.JWT_SECRET,
         { expiresIn: '30m' }
       );
@@ -107,12 +112,15 @@ const userController = {
 
       res.json({
         message: 'Login successful',
+        token,
+        expiresIn: '30m',
         user: {
           id: user.id,
           firstName: user.first_name,
           lastName: user.last_name,
           email: user.email,
-          role: user.role
+          role: user.role,
+          isApproved: user.is_approved
         }
       });
     } catch (error) {
