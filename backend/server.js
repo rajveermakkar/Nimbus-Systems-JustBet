@@ -5,6 +5,8 @@ const cookieParser = require('cookie-parser');
 const { initDatabase, testConnection } = require('./db/init');
 const { verifyEmailService } = require('./services/emailService');
 const authRoutes = require('./routes/auth');
+const sellerRoutes = require('./routes/sellerRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -19,6 +21,8 @@ app.use(cookieParser());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/seller', sellerRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/', (req, res) => {
   res.send('Welcome to JustBet!');
