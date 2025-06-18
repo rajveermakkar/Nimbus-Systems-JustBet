@@ -6,6 +6,11 @@ import './App.css'
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import ForgotPassword from '../pages/ForgotPassword';
+import UserDashboard from '../pages/UserDashboard';
+import AdminDashboard from '../pages/AdminDashboard';
+import NotAuthorized from '../pages/NotAuthorized';
+import ProtectedRoute from '../pages/ProtectedRoute';
+import Home from '../pages/Home';
 
 function App() {
   const [count, setCount] = useState(0)
@@ -13,9 +18,17 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/dashboard" element={<UserDashboard />} />
+        <Route path="/admin/dashboard" element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/not-authorized" element={<NotAuthorized />} />
       </Routes>
     </BrowserRouter>
   )
