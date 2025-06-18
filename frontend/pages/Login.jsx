@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import formImage from "./assets/auction_online.jpg";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -17,50 +18,82 @@ function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validate()) {
-      alert("Logged in!");
+    if (!validate()) return;
+
+    try {
+      const response = await fetch("http://localhost:3000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Important if backend uses cookies
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Login successful
+        alert("Logged in!");
+        // Optionally, redirect or store token/cookie
+      } else {
+        setErrors({ form: data.message || "Login failed" });
+      }
+    } catch (error) {
+      setErrors({ form: "Network error. Please try again." });
     }
   };
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-gray-900">
-      <div className="bg-gray-800 text-white shadow-lg rounded-lg px-12 py-10 w-full max-w-2xl m-4">
-        <div className="text-center mb-4">
-          <a
-            href="/login"
-            className="d-flex justify-content-center align-items-center gap-2 mb-2 text-decoration-none"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="60"
-              height="60"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-primary"
-            >
-              <path d="m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8"></path>
-              <path d="m16 16 6-6"></path>
-              <path d="m8 8 6-6"></path>
-              <path d="m9 7 8 8"></path>
-              <path d="m21 11-8-8"></path>
-            </svg>
-            <span className="fs-2 fw-bold text-white">JustBet</span>
-          </a>
-
-          <h2 className="text-2xl font-semibold">Welcome Back</h2>
-          <p className="text-gray-400">Sign in to your account</p>
+    <div className="h-screen w-screen flex items-center justify-center px-5 py-10 [background:radial-gradient(125%_125%_at_50%_10%,#000_40%,#63e_100%)]">
+      <div className="flex w-full h-4/5 max-w-6xl bg-white/10 backdrop-blur-sm text-white shadow-lg rounded-lg overflow-hidden">
+        
+        {/* Left Image Section */}
+        <div className="hidden lg:block w-1/2">
+          <img
+            src={formImage}
+            alt="Login Visual"
+            className="object-cover w-full h-full"
+          />
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="flex flex-col gap-6">
-            {/* Email Row */}
+        {/* Right Form Section */}
+        <div className="flex-1 px-10 py-10">
+          <div className="text-center mb-6">
+            <a href="/login" className="flex justify-center items-center gap-2 mb-2 text-decoration-none">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="60"
+                height="60"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-primary"
+              >
+                <path d="m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8"></path>
+                <path d="m16 16 6-6"></path>
+                <path d="m8 8 6-6"></path>
+                <path d="m9 7 8 8"></path>
+                <path d="m21 11-8-8"></path>
+              </svg>
+              <span className="text-3xl font-bold text-white">JustBet</span>
+            </a>
+            <h2 className="text-2xl font-semibold mt-2">Welcome Back</h2>
+            <p className="text-gray-400">Sign in to your account</p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
+            {errors.form && (
+              <p className="text-sm text-red-400 mb-2 text-center">{errors.form}</p>
+            )}
+
+            {/* Email */}
             <div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -89,7 +122,7 @@ function Login() {
               )}
             </div>
 
-            {/* Password Row */}
+            {/* Password */}
             <div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -127,11 +160,11 @@ function Login() {
                   onChange={(e) => setRemember(e.target.checked)}
                   className="form-checkbox h-4 w-4 text-blue-500 mr-2"
                 />
-                <span className="ml-1 text-lg">Remember me</span>
+                <span> Remember me</span>
               </label>
               <Link
                 to="/forgot-password"
-                className="text-lg text-blue-400 hover:underline"
+                className="text-blue-400 hover:underline text-lg"
               >
                 Forgot password?
               </Link>
@@ -146,18 +179,18 @@ function Login() {
                 Sign In
               </button>
             </div>
-          </div>
-        </form>
+          </form>
 
-        {/* Footer */}
-        <div className="text-center mt-6 text-lg">
-          Don't have an account?{" "}
-          <Link
-            to="/register"
-            className="text-blue-400 hover:underline font-medium"
-          >
-            Sign up
-          </Link>
+          {/* Footer */}
+          <div className="text-center mt-6 text-lg">
+            Don't have an account?{" "}
+            <Link
+              to="/register"
+              className="text-blue-400 hover:underline font-medium"
+            >
+              Sign up
+            </Link>
+          </div>
         </div>
       </div>
     </div>
