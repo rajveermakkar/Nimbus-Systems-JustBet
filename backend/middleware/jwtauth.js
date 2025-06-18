@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 // Middleware to check if user is logged in
-const jwtauthMiddleware = (req, res, next) => {
+const jwtauthMiddleware = async (req, res, next) => {
   try {
     // Get token from cookie or header
     let token = req.cookies.token;
@@ -17,9 +18,22 @@ const jwtauthMiddleware = (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Decoded JWT:', decoded); // Debug log
 
-    // Add user info to request
-    req.user = decoded;
+    // Get latest user data to ensure role and approval status are current
+    const user = await User.findById(decoded.id);
+    console.log('User fetched from DB:', user); // Debug log
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Add user info to request with current role and approval status
+    req.user = {
+      ...decoded,
+      role: user.role,
+      isApproved: user.is_approved
+    };
+    
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
