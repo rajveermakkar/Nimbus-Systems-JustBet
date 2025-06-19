@@ -24,7 +24,7 @@ const jwtauthMiddleware = async (req, res, next) => {
     const user = await User.findById(decoded.id);
     console.log('User fetched from DB:', user); // Debug log
     if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
     // Add user info to request with current role and approval status
@@ -38,6 +38,9 @@ const jwtauthMiddleware = async (req, res, next) => {
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Token expired' });
+    }
+    if (error.message && error.message.toLowerCase().includes('database')) {
+      return res.status(500).json({ error: 'Something went wrong' });
     }
     return res.status(401).json({ error: 'Invalid token' });
   }

@@ -79,12 +79,16 @@ POST /auth/register
 Content-Type: application/json
 
 {
-  "firstName": "John",
-  "lastName": "Doe",
-  "email": "john@example.com",
-  "password": "password123"
+  "firstName": "Rajveer",
+  "lastName": "Singh",
+  "email": "rajveer@example.com",
+  "password": "password123",
+  "confirmPassword": "password123"
+<<<<<<< HEAD
 }
 ```
+=======
+>>>>>>> ed8592012267f1811bd4574cd5974875932d2f7a
 
 **Response:**
 ```json
@@ -102,7 +106,7 @@ Content-Type: application/json
 
 #### Verify Email
 ```http
-GET /auth/verify?token=<verification_token>
+GET /auth/verify-email?token=<verification_token>
 ```
 
 **Response:**
@@ -118,7 +122,7 @@ POST /auth/login
 Content-Type: application/json
 
 {
-  "email": "john@example.com",
+  "email": "rajveer@example.com",
   "password": "password123"
 }
 ```
@@ -185,9 +189,7 @@ Content-Type: application/json
   "businessName": "John's Shop",
   "businessDescription": "We sell amazing products",
   "businessAddress": "123 Main Street, City, State 12345",
-  "businessPhone": "1234567890",
-  "businessWebsite": "https://johnsshop.com",
-  "businessDocuments": "https://example.com/documents.pdf"
+  "businessPhone": "1234567890"
 }
 ```
 
@@ -339,7 +341,7 @@ curl -X POST http://localhost:3000/auth/register \
 
 ### 2. Verify Email
 ```bash
-curl -X GET "http://localhost:3000/auth/verify?token=your-verification-token"
+curl -X GET "http://localhost:3000/auth/verify-email?token=your-verification-token"
 ```
 
 ### 3. Login User
