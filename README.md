@@ -84,11 +84,6 @@ Content-Type: application/json
   "email": "rajveer@example.com",
   "password": "password123",
   "confirmPassword": "password123"
-<<<<<<< HEAD
-}
-```
-=======
->>>>>>> ed8592012267f1811bd4574cd5974875932d2f7a
 
 **Response:**
 ```json
@@ -518,7 +513,6 @@ router.use(roleAuth(['admin']));
 
 ## Notes
 
-- Replace `YOUR_JWT_TOKEN`, `ADMIN_JWT_TOKEN`, `USER_ID_HERE` with actual values from responses
 - The verification token will be sent to the email address provided during registration
 - All timestamps are in ISO format
 - JWT tokens expire after 30 minutes
