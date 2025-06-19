@@ -47,6 +47,27 @@ const updateUsersTable = async () => {
       `);
       console.log('Added reset token columns to users table');
     }
+
+    // Check for business-related columns
+    const businessColumnsCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'business_name'
+    `);
+
+    if (businessColumnsCheck.rows.length === 0) {
+      await pool.query(`
+        ALTER TABLE users 
+        ADD COLUMN business_name VARCHAR(255),
+        ADD COLUMN business_description TEXT,
+        ADD COLUMN business_address TEXT,
+        ADD COLUMN business_phone VARCHAR(50),
+        ADD COLUMN business_website VARCHAR(255),
+        ADD COLUMN business_documents TEXT,
+        ADD COLUMN is_approved BOOLEAN DEFAULT false
+      `);
+      console.log('Added business-related columns to users table');
+    }
   } catch (error) {
     console.error('Error updating users table:', error);
     throw error;
@@ -102,12 +123,19 @@ const initDatabase = async () => {
           last_name VARCHAR(100) NOT NULL,
           email VARCHAR(255) UNIQUE NOT NULL,
           password VARCHAR(255) NOT NULL,
-          role VARCHAR(20) NOT NULL DEFAULT 'user',
+          role VARCHAR(20) NOT NULL DEFAULT 'buyer',
           is_verified BOOLEAN NOT NULL DEFAULT false,
           verification_token UUID,
           verification_token_expires TIMESTAMP WITH TIME ZONE,
           reset_token UUID,
           reset_token_expires TIMESTAMP WITH TIME ZONE,
+          business_name VARCHAR(255),
+          business_description TEXT,
+          business_address TEXT,
+          business_phone VARCHAR(50),
+          business_website VARCHAR(255),
+          business_documents TEXT,
+          is_approved BOOLEAN DEFAULT false,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );

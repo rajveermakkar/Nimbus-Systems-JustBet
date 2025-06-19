@@ -3,14 +3,14 @@ const bcrypt = require('bcrypt');
 
 const User = {
   // Create a new user
-  async create({ firstName, lastName, email, password, role = 'user' }) {
+  async create({ firstName, lastName, email, password, role = 'buyer', isApproved = false }) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const query = `
-      INSERT INTO users (first_name, last_name, email, password, role)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, first_name, last_name, email, role, created_at
+      INSERT INTO users (first_name, last_name, email, password, role, is_approved)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, first_name, last_name, email, role, is_approved, created_at
     `;
-    const result = await pool.query(query, [firstName, lastName, email.toLowerCase(), hashedPassword, role]);
+    const result = await pool.query(query, [firstName, lastName, email.toLowerCase(), hashedPassword, role, isApproved]);
     return result.rows[0];
   },
 
@@ -101,6 +101,49 @@ const User = {
     `;
     const result = await pool.query(query, [token]);
     return result.rows[0];
+  },
+
+  // Update user role and approval status with business details
+  async updateRoleAndApproval(userId, role, isApproved, businessDetails = null) {
+    const query = `
+      UPDATE users 
+      SET role = $1,
+          is_approved = $2,
+          business_name = $3,
+          business_description = $4,
+          business_address = $5,
+          business_phone = $6,
+          business_website = $7,
+          business_documents = $8
+      WHERE id = $9
+      RETURNING id, email, role, is_approved, business_name, business_description, 
+                business_address, business_phone, business_website, business_documents
+    `;
+    const result = await pool.query(query, [
+      role, 
+      isApproved, 
+      businessDetails?.businessName || null,
+      businessDetails?.businessDescription || null,
+      businessDetails?.businessAddress || null,
+      businessDetails?.businessPhone || null,
+      businessDetails?.businessWebsite || null,
+      businessDetails?.businessDocuments || null,
+      userId
+    ]);
+    return result.rows[0];
+  },
+
+  // Get all pending seller approvals with business details
+  async getPendingSellers() {
+    const query = `
+      SELECT id, first_name, last_name, email, role, is_approved, created_at,
+             business_name, business_description, business_address, 
+             business_phone, business_website, business_documents
+      FROM users
+      WHERE role = 'seller' AND is_approved = false
+    `;
+    const result = await pool.query(query);
+    return result.rows;
   }
 };
 
