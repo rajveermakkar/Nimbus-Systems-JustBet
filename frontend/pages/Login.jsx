@@ -1,7 +1,8 @@
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import formImage from "./assets/auction_online.jpg";
+import AuthCard from "../src/components/AuthCard";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -16,92 +17,6 @@ function useIsMobile() {
   return isMobile;
 }
 
-// login form UI
-function LoginFormContent({
-  email,
-  setEmail,
-  password,
-  setPassword,
-  remember,
-  setRemember,
-  errors,
-  loading,
-  handleSubmit
-}) {
-  return (
-    <>
-      {/* Logo and title */}
-      <div className="flex flex-col items-center gap-2 mb-6 select-none">
-        <i className="fa-solid fa-gavel text-3xl text-white"></i>
-        <span className="text-2xl font-bold text-white tracking-wide">JustBet</span>
-      </div>
-      <h2 className="text-xl font-semibold text-white text-center mb-1">Welcome Back</h2>
-      <p className="text-gray-300 text-base text-center mb-4">Sign in to your account</p>
-      {/* Show error message if there is one */}
-      <div style={{ minHeight: '24px' }}>
-        {errors.form ? (
-          <p className="text-sm text-red-400 mb-2 text-center">{errors.form}</p>
-        ) : null}
-      </div>
-      {/* The login form */}
-      <form onSubmit={handleSubmit} noValidate className="space-y-4 w-full">
-        {/* Email input */}
-        <input
-          type="email"
-          className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.email ? "border-red-500" : ""}`}
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        {/* Password input */}
-        <input
-          type="password"
-          className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.password ? "border-red-500" : ""}`}
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        {/* Remember me and forgot password */}
-        <div className="flex items-center justify-between text-sm mt-2">
-          <label className="flex items-center font-medium leading-tight gap-1">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-              className="form-checkbox h-4 w-4 text-blue-500 align-middle"
-            />
-            <span className="align-middle text-white">Remember me</span>
-          </label>
-          <Link
-            to="/forgot-password"
-            className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
-          >
-            Forgot password?
-          </Link>
-        </div>
-        {/* Submit button */}
-        <button
-          type="submit"
-          className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
-          disabled={loading}
-        >
-          {loading ? "Signing In..." : "Sign In"}
-        </button>
-      </form>
-      {/* Link to register page */}
-      <div className="text-center mt-6 text-sm w-full">
-        <span className="text-white">Don't have an account?</span>{' '}
-        <Link
-          to="/register"
-          className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
-        >
-          Sign up
-        </Link>
-      </div>
-    </>
-  );
-}
-
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -110,6 +25,8 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const [showVerifiedToast, setShowVerifiedToast] = useState(false);
 
   // On mount, check if user wanted to remember their email
   useEffect(() => {
@@ -119,6 +36,14 @@ function Login() {
       setRemember(true);
     }
   }, []);
+
+  // Show toast if redirected from email verification
+  useEffect(() => {
+    if (location.state && location.state.verified) {
+      setShowVerifiedToast(true);
+      setTimeout(() => setShowVerifiedToast(false), 2000);
+    }
+  }, [location.state]);
 
   // Simple validation for email and password
   const validate = () => {
@@ -186,25 +111,84 @@ function Login() {
     }
   };
 
+  const form = (
+    <form onSubmit={handleSubmit} noValidate className="space-y-4 w-full">
+      <input
+        type="email"
+        className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.email ? "border-red-500" : ""}`}
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <input
+        type="password"
+        className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.password ? "border-red-500" : ""}`}
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <div className="flex items-center justify-between text-sm mt-2">
+        <label className="flex items-center font-medium leading-tight gap-1">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            className="form-checkbox h-4 w-4 text-blue-500 align-middle"
+          />
+          <span className="align-middle text-white">Remember me</span>
+        </label>
+        <Link
+          to="/forgot-password"
+          className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
+        >
+          Forgot password?
+        </Link>
+      </div>
+      <button
+        type="submit"
+        className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
+        disabled={loading}
+      >
+        {loading ? "Signing In..." : "Sign In"}
+      </button>
+    </form>
+  );
+
+  const footer = (
+    <div className="text-center mt-6 text-sm w-full">
+      <span className="text-white">Don't have an account?</span>{' '}
+      <Link
+        to="/register"
+        className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
+      >
+        Sign up
+      </Link>
+    </div>
+  );
+
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">
-      {isMobile ? (
-        // Mobile layout
-        <div className="w-full max-w-sm mx-auto bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 p-6 animate-fade-in">
-          <LoginFormContent
-            email={email}
-            setEmail={setEmail}
-            password={password}
-            setPassword={setPassword}
-            remember={remember}
-            setRemember={setRemember}
-            errors={errors}
-            loading={loading}
-            handleSubmit={handleSubmit}
-          />
+      {showVerifiedToast && (
+        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded shadow-lg z-50 animate-fade-in">
+          Email verified successfully!
         </div>
+      )}
+      {isMobile ? (
+        <AuthCard
+          icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+          title="Welcome Back"
+          subtitle="Sign in to your account"
+          error={errors.form}
+          footer={footer}
+        >
+          {errors.form === "Please verify your email first" && (
+            <div className="text-center mb-2">
+              <a href="/resend-verification" className="text-blue-300 hover:underline font-medium">Resend verification email</a>
+            </div>
+          )}
+          {form}
+        </AuthCard>
       ) : (
-        // Desktop layout
         <div className="w-full max-w-4xl bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex">
           {/* Left side image */}
           <div className="w-1/2">
@@ -216,17 +200,21 @@ function Login() {
           </div>
           {/* Right side form */}
           <div className="w-1/2 flex flex-col justify-center p-12"> 
-            <LoginFormContent
-              email={email}
-              setEmail={setEmail}
-              password={password}
-              setPassword={setPassword}
-              remember={remember}
-              setRemember={setRemember}
-              errors={errors}
-              loading={loading}
-              handleSubmit={handleSubmit}
-            />
+            <AuthCard
+              icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+              title="Welcome Back"
+              subtitle="Sign in to your account"
+              error={errors.form}
+              footer={footer}
+              plain={true}
+            >
+              {errors.form === "Please verify your email first" && (
+                <div className="text-center mb-2">
+                  <a href="/resend-verification" className="text-blue-300 hover:underline font-medium">Resend verification email</a>
+                </div>
+              )}
+              {form}
+            </AuthCard>
           </div>
         </div>
       )}
