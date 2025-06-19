@@ -66,9 +66,9 @@ POST /api/auth/register
 Content-Type: application/json
 
 {
-  "firstName": "John",
-  "lastName": "Doe",
-  "email": "john@example.com",
+  "firstName": "Rajveer",
+  "lastName": "Singh",
+  "email": "rajveer@example.com",
   "password": "password123",
   "confirmPassword": "password123"
 }
@@ -80,7 +80,7 @@ POST /api/auth/login
 Content-Type: application/json
 
 {
-  "email": "john@example.com",
+  "email": "rajveer@example.com",
   "password": "password123"
 }
 ```
@@ -123,13 +123,13 @@ POST /api/auth/resend-verification
 Content-Type: application/json
 
 {
-  "email": "john@example.com"
+  "email": "rajveer@example.com"
 }
 ```
 
 #### Check User Status
 ```http
-GET /api/auth/user-status?email=john@example.com
+GET /api/auth/user-status?email=rajveer@example.com
 ```
 
 ## Database Schema
