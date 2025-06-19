@@ -79,18 +79,11 @@ POST /auth/register
 Content-Type: application/json
 
 {
-<<<<<<< HEAD
   "firstName": "Rajveer",
   "lastName": "Singh",
   "email": "rajveer@example.com",
   "password": "password123",
   "confirmPassword": "password123"
-=======
-  "firstName": "John",
-  "lastName": "Doe",
-  "email": "john@example.com",
-  "password": "password123"
->>>>>>> main
 }
 ```
 
@@ -157,9 +150,6 @@ Authorization: Bearer <JWT_TOKEN>
 **Response:**
 ```json
 {
-<<<<<<< HEAD
-  "email": "rajveer@example.com"
-=======
   "user": {
     "id": "uuid-here",
     "firstName": "John",
@@ -168,18 +158,13 @@ Authorization: Bearer <JWT_TOKEN>
     "role": "buyer",
     "createdAt": "2024-01-01T00:00:00.000Z"
   }
->>>>>>> main
 }
 ```
 
 #### Logout
 ```http
-<<<<<<< HEAD
-GET /api/auth/user-status?email=rajveer@example.com
-=======
 POST /auth/logout
 Authorization: Bearer <JWT_TOKEN>
->>>>>>> main
 ```
 
 **Response:**
@@ -355,7 +340,7 @@ curl -X POST http://localhost:3000/auth/register \
 
 ### 2. Verify Email
 ```bash
-curl -X GET "http://localhost:3000/auth/verify?token=your-verification-token"
+curl -X GET "http://localhost:3000/auth/verify-email?token=your-verification-token"
 ```
 
 ### 3. Login User

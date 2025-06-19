@@ -520,7 +520,7 @@ describe('Role-Based Authentication', () => {
       expect(res.body.user.email).toBe(adminUser.email);
       expect(jwt.sign).toHaveBeenCalledWith(
         expect.objectContaining({
-          userId: adminUser.id,
+          id: adminUser.id,
           email: adminUser.email,
           role: 'admin'
         }),
@@ -546,7 +546,7 @@ describe('Role-Based Authentication', () => {
       expect(res.body.user.email).toBe(regularUser.email);
       expect(jwt.sign).toHaveBeenCalledWith(
         expect.objectContaining({
-          userId: regularUser.id,
+          id: regularUser.id,
           email: regularUser.email,
           role: 'user'
         }),
@@ -591,7 +591,7 @@ describe('Role-Based Authentication', () => {
     beforeEach(() => {
       jwt.verify.mockImplementation((token) => {
         if (token === validToken) {
-          return { userId: '1', email: 'test@example.com', role: 'user' };
+          return { id: '1', email: 'test@example.com', role: 'user' };
         } else if (token === expiredToken) {
           const error = new Error('Token expired');
           error.name = 'TokenExpiredError';
@@ -684,9 +684,9 @@ describe('Role-Based Authentication', () => {
     beforeEach(() => {
       jwt.verify.mockImplementation((token) => {
         if (token === userToken) {
-          return { userId: '1', email: 'nirlep@example.com', role: 'user' };
+          return { id: '1', email: 'nirlep@example.com', role: 'user' };
         } else if (token === adminToken) {
-          return { userId: '2', email: 'admin@example.com', role: 'admin' };
+          return { id: '2', email: 'admin@example.com', role: 'admin' };
         }
         throw new Error('Invalid token');
       });
