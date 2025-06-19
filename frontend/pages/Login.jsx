@@ -1,12 +1,126 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import '@fortawesome/fontawesome-free/css/all.min.css';
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import formImage from "./assets/auction_online.jpg";
+
+const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+// ook checks if the screen is mobile size
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return isMobile;
+}
+
+// login form UI
+function LoginFormContent({
+  email,
+  setEmail,
+  password,
+  setPassword,
+  remember,
+  setRemember,
+  errors,
+  loading,
+  handleSubmit
+}) {
+  return (
+    <>
+      {/* Logo and title */}
+      <div className="flex flex-col items-center gap-2 mb-6 select-none">
+        <i className="fa-solid fa-gavel text-3xl text-white"></i>
+        <span className="text-2xl font-bold text-white tracking-wide">JustBet</span>
+      </div>
+      <h2 className="text-xl font-semibold text-white text-center mb-1">Welcome Back</h2>
+      <p className="text-gray-300 text-base text-center mb-4">Sign in to your account</p>
+      {/* Show error message if there is one */}
+      <div style={{ minHeight: '24px' }}>
+        {errors.form ? (
+          <p className="text-sm text-red-400 mb-2 text-center">{errors.form}</p>
+        ) : null}
+      </div>
+      {/* The login form */}
+      <form onSubmit={handleSubmit} noValidate className="space-y-4 w-full">
+        {/* Email input */}
+        <input
+          type="email"
+          className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.email ? "border-red-500" : ""}`}
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        {/* Password input */}
+        <input
+          type="password"
+          className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.password ? "border-red-500" : ""}`}
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        {/* Remember me and forgot password */}
+        <div className="flex items-center justify-between text-sm mt-2">
+          <label className="flex items-center font-medium leading-tight gap-1">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="form-checkbox h-4 w-4 text-blue-500 align-middle"
+            />
+            <span className="align-middle text-white">Remember me</span>
+          </label>
+          <Link
+            to="/forgot-password"
+            className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
+          >
+            Forgot password?
+          </Link>
+        </div>
+        {/* Submit button */}
+        <button
+          type="submit"
+          className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
+          disabled={loading}
+        >
+          {loading ? "Signing In..." : "Sign In"}
+        </button>
+      </form>
+      {/* Link to register page */}
+      <div className="text-center mt-6 text-sm w-full">
+        <span className="text-white">Don't have an account?</span>{' '}
+        <Link
+          to="/register"
+          className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
+        >
+          Sign up
+        </Link>
+      </div>
+    </>
+  );
+}
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
+  // On mount, check if user wanted to remember their email
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem("rememberedEmail");
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+      setRemember(true);
+    }
+  }, []);
+
+  // Simple validation for email and password
   const validate = () => {
     const newErrors = {};
     if (!email) newErrors.email = "Email is required";
@@ -17,149 +131,105 @@ function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validate()) {
-      alert("Logged in!");
+    if (!validate()) {
+      setErrors({ form: "Email and password are required." });
+      return;
+    }
+    setLoading(true);
+    setErrors({});
+    try {
+      const response = await fetch(`${backendUrl}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      setLoading(false);
+      if (response.ok) {
+        // Save email if remember me is checked
+        if (remember) {
+          localStorage.setItem("rememberedEmail", email);
+        } else {
+          localStorage.removeItem("rememberedEmail");
+        }
+        try {
+          // Fetch user profile after login
+          const profileRes = await fetch(`${backendUrl}/api/auth/profile`, {
+            credentials: "include",
+          });
+          if (profileRes.ok) {
+            const profileData = await profileRes.json();
+            localStorage.setItem("justbetUser", JSON.stringify(profileData.user));
+            // Redirect based on user role
+            if (profileData.user.role === "admin") {
+              navigate("/admin/dashboard");
+            } else {
+              navigate("/dashboard");
+            }
+          } else {
+            setErrors({ form: "Login succeeded but failed to fetch user profile." });
+          }
+        } catch (profileErr) {
+          setErrors({ form: "Login succeeded but failed to fetch user profile." });
+        }
+      } else {
+        setErrors({ form: data.error || "Login failed" });
+      }
+    } catch (error) {
+      setLoading(false);
+      setErrors({ form: "Network error. Please try again." });
     }
   };
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-gray-900">
-      <div className="bg-gray-800 text-white shadow-lg rounded-lg px-12 py-10 w-full max-w-2xl m-4">
-        <div className="text-center mb-4">
-          <a
-            href="/login"
-            className="d-flex justify-content-center align-items-center gap-2 mb-2 text-decoration-none"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="60"
-              height="60"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-primary"
-            >
-              <path d="m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8"></path>
-              <path d="m16 16 6-6"></path>
-              <path d="m8 8 6-6"></path>
-              <path d="m9 7 8 8"></path>
-              <path d="m21 11-8-8"></path>
-            </svg>
-            <span className="fs-2 fw-bold text-white">JustBet</span>
-          </a>
-
-          <h2 className="text-2xl font-semibold">Welcome Back</h2>
-          <p className="text-gray-400">Sign in to your account</p>
+    <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">
+      {isMobile ? (
+        // Mobile layout
+        <div className="w-full max-w-sm mx-auto bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 p-6 animate-fade-in">
+          <LoginFormContent
+            email={email}
+            setEmail={setEmail}
+            password={password}
+            setPassword={setPassword}
+            remember={remember}
+            setRemember={setRemember}
+            errors={errors}
+            loading={loading}
+            handleSubmit={handleSubmit}
+          />
         </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="flex flex-col gap-6">
-            {/* Email Row */}
-            <div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-                    <path
-                      d="M4 4h16v16H4V4zm0 0l8 8 8-8"
-                      stroke="#3B82F6"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <input
-                  type="email"
-                  className={`w-full pl-10 pr-4 py-2 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.email ? "border border-red-500" : ""
-                  }`}
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              {errors.email && (
-                <p className="text-sm text-red-400 mt-1">{errors.email}</p>
-              )}
-            </div>
-
-            {/* Password Row */}
-            <div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-                    <path
-                      d="M12 17a2 2 0 100-4 2 2 0 000 4zm6-6V9a6 6 0 10-12 0v2a2 2 0 00-2 2v5a2 2 0 002 2h12a2 2 0 002-2v-5a2 2 0 00-2-2z"
-                      stroke="#3B82F6"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <input
-                  type="password"
-                  className={`w-full pl-10 pr-4 py-2 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.password ? "border border-red-500" : ""
-                  }`}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              {errors.password && (
-                <p className="text-sm text-red-400 mt-1">{errors.password}</p>
-              )}
-            </div>
-
-            {/* Remember & Forgot */}
-            <div className="flex items-center justify-between">
-              <label className="inline-flex items-center text-lg">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  className="form-checkbox h-4 w-4 text-blue-500 mr-2"
-                />
-                <span className="ml-1 text-lg">Remember me</span>
-              </label>
-              <Link
-                to="/forgot-password"
-                className="text-lg text-blue-400 hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            {/* Submit Button */}
-            <div className="text-center">
-              <button
-                type="submit"
-                className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition"
-              >
-                Sign In
-              </button>
-            </div>
+      ) : (
+        // Desktop layout
+        <div className="w-full max-w-4xl bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex">
+          {/* Left side image */}
+          <div className="w-1/2">
+            <img
+              src={formImage}
+              alt="Login Visual"
+              className="object-cover w-full h-full"
+            />
           </div>
-        </form>
-
-        {/* Footer */}
-        <div className="text-center mt-6 text-lg">
-          Don't have an account?{" "}
-          <Link
-            to="/register"
-            className="text-blue-400 hover:underline font-medium"
-          >
-            Sign up
-          </Link>
+          {/* Right side form */}
+          <div className="w-1/2 flex flex-col justify-center p-12"> 
+            <LoginFormContent
+              email={email}
+              setEmail={setEmail}
+              password={password}
+              setPassword={setPassword}
+              remember={remember}
+              setRemember={setRemember}
+              errors={errors}
+              loading={loading}
+              handleSubmit={handleSubmit}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

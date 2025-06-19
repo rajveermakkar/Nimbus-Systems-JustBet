@@ -10,13 +10,13 @@ const User = {
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id, first_name, last_name, email, role, is_approved, created_at
     `;
-    const result = await pool.query(query, [firstName, lastName, email, hashedPassword, role, isApproved]);
+    const result = await pool.query(query, [firstName, lastName, email.toLowerCase(), hashedPassword, role, isApproved]);
     return result.rows[0];
   },
 
   // Find user by email
   async findByEmail(email) {
-    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
     return result.rows[0];
   },
 
