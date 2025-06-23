@@ -82,6 +82,10 @@ function Login() {
         } else {
           localStorage.removeItem("rememberedEmail");
         }
+        
+        // Store token in localStorage
+        localStorage.setItem("justbetToken", data.token);
+        
         try {
           // Fetch user profile after login
           const profileRes = await fetch(`${backendUrl}/api/auth/profile`, {
