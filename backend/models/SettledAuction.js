@@ -38,6 +38,36 @@ const SettledAuction = {
   async findPending() {
     const result = await pool.query("SELECT * FROM settled_auctions WHERE status = 'pending'");
     return result.rows;
+  },
+
+  // Update auction fields by ID
+  async updateAuction(id, fields, wasApproved = false) {
+    const allowed = ['title', 'description', 'image_url', 'start_time', 'end_time', 'starting_price', 'reserve_price'];
+    const updates = [];
+    const values = [];
+    let idx = 1;
+    for (const key of allowed) {
+      if (fields[key] !== undefined) {
+        updates.push(`${key} = $${idx}`);
+        values.push(fields[key]);
+        idx++;
+      }
+    }
+    // If auction was previously approved, set is_approved=false and status='pending'
+    if (wasApproved && updates.length > 0) {
+      updates.push(`is_approved = false`);
+      updates.push(`status = 'pending'`);
+    }
+    if (updates.length === 0) return null;
+    values.push(id);
+    const query = `
+      UPDATE settled_auctions
+      SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $${idx}
+      RETURNING *
+    `;
+    const result = await pool.query(query, values);
+    return result.rows[0];
   }
 };
 

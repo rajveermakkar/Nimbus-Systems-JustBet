@@ -1,5 +1,7 @@
 const SettledAuction = require('../models/SettledAuction');
 const { pool } = require('../db/init');
+const multer = require('multer');
+const { uploadImageToAzure } = require('../services/azureBlobService');
 
 // function for a seller create a new auction listing
 async function createAuction(req, res) {
@@ -51,10 +53,8 @@ async function createAuction(req, res) {
       startingPrice: Number(startingPrice),
       reservePrice: reserve !== null ? Number(reserve) : null
     });
-    // Respond with the created auction
     res.status(201).json(auction);
   } catch (error) {
-    // Log and return server error
     console.error('Error creating auction:', error);
     res.status(500).json({ message: 'Server error' });
   }
@@ -83,15 +83,81 @@ async function approveAuction(req, res) {
       return res.status(403).json({ message: 'Only admins can approve auctions.' });
     }
     const { id } = req.params;
-    // Approve the auction in the database
     const auction = await SettledAuction.approveAuction(id);
     if (!auction) {
       return res.status(404).json({ message: 'Auction not found.' });
     }
     res.json(auction);
   } catch (error) {
-    // Log and return server error
     console.error('Error approving auction:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// Multer setup for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
+// POST /api/auctions/upload-image
+async function uploadAuctionImage(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const url = await uploadImageToAzure(req.file);
+    res.json({ url });
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Image upload failed' });
+  }
+}
+
+// GET /api/auctions/approved - public endpoint to get all approved auctions
+async function getAllApprovedAuctions(req, res) {
+  try {
+    const auctions = await SettledAuction.findByStatus('approved');
+    res.json(auctions);
+  } catch (error) {
+    console.error('Error fetching approved auctions:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// PATCH /api/auctions/:id - update auction
+async function updateAuction(req, res) {
+  try {
+    const user = req.user;
+    if (!user || user.role !== 'seller') {
+      return res.status(403).json({ message: 'Only sellers can update auctions.' });
+    }
+    const { id } = req.params;
+    // Find auction and check ownership
+    const auction = await SettledAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ message: 'Auction not found.' });
+    }
+    if (auction.seller_id !== user.id) {
+      return res.status(403).json({ message: 'You can only update your own auctions.' });
+    }
+    // Only allow updates if not approved yet
+    // if (auction.is_approved) {
+    //   return res.status(400).json({ message: 'Cannot edit an approved auction.' });
+    // }
+    
+    const fields = req.body;
+    // If auction was approved, re-approval must be needed for editing
+    const updated = await SettledAuction.updateAuction(id, fields, auction.is_approved);
+    if (!updated) {
+      return res.status(400).json({ message: 'No valid fields to update.' });
+    }
+    let msg = 'Auction updated.';
+    if (auction.is_approved) {
+      msg = 'Auction updated. Changes require admin re-approval.';
+    }
+    res.json({ auction: updated, message: msg });
+  } catch (error) {
+    console.error('Error updating auction:', error);
     res.status(500).json({ message: 'Server error' });
   }
 }
@@ -99,5 +165,10 @@ async function approveAuction(req, res) {
 module.exports = {
   createAuction,
   listPendingAuctions,
-  approveAuction
-}; 
+  approveAuction,
+  getAllApprovedAuctions,
+  updateAuction
+};
+
+module.exports.upload = upload.single('image');
+module.exports.uploadAuctionImage = uploadAuctionImage; 
