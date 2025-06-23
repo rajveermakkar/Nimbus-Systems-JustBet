@@ -1,17 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import SellerRequestForm from "../src/components/SellerRequestForm";
 import SellerStatus from "../src/components/SellerStatus";
+import { UserContext } from "../src/context/UserContext";
 
 function UserDashboard() {
-  const user = JSON.parse(localStorage.getItem("justbetUser") || "{}");
+  const { user, setUser } = useContext(UserContext);
   const navigate = useNavigate();
   const [showSellerForm, setShowSellerForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   function handleLogout() {
-    localStorage.removeItem("justbetUser");
+    setUser(null);
     navigate("/login");
   }
 
@@ -35,16 +36,12 @@ function UserDashboard() {
       const data = await response.json();
 
       if (response.ok) {
-        // Update user data in localStorage
+        // Update user data in context
         const updatedUser = { ...user, ...data.user };
-        localStorage.setItem("justbetUser", JSON.stringify(updatedUser));
+        setUser(updatedUser);
         localStorage.setItem("justbetToken", data.token);
-        
         setMessage({ type: 'success', text: 'Seller request submitted successfully! Please wait for admin approval.' });
         setShowSellerForm(false);
-        
-        // Refresh the page to update the UI
-        window.location.reload();
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to submit seller request' });
       }
@@ -77,18 +74,14 @@ function UserDashboard() {
       const data = await response.json();
 
       if (response.ok) {
-        // Update user data in localStorage with proper field mapping
+        // Update user data in context with proper field mapping
         const updatedUser = { 
           ...user, 
           isApproved: data.isApproved,
           businessDetails: data.businessDetails
         };
-        localStorage.setItem("justbetUser", JSON.stringify(updatedUser));
+        setUser(updatedUser);
         localStorage.setItem("justbetToken", data.token);
-        
-        // Force page reload to update the UI
-        window.location.reload();
-        
         return data;
       } else {
         throw new Error(data.error || 'Failed to check status');
@@ -115,7 +108,7 @@ function UserDashboard() {
     }
 
     // If user is a seller, show status
-    if (user.role === 'seller') {
+    if (user && user.role === 'seller') {
       return (
         <SellerStatus
           user={user}
@@ -126,7 +119,7 @@ function UserDashboard() {
     }
 
     // If user is a buyer, show the option to become a seller
-    if (user.role === 'buyer') {
+    if (user && user.role === 'buyer') {
       return (
         <div className="flex flex-col items-center justify-center h-[80vh] max-w-4xl mx-auto px-6">
           <div className="text-center mb-8">
@@ -182,8 +175,8 @@ function UserDashboard() {
     return (
       <div className="flex flex-col items-center justify-center h-[80vh]">
         <h1 className="text-3xl font-bold mb-4">User Dashboard</h1>
-        <p>Welcome, {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : "User"}!</p>
-        <p>Your role: {user.role}</p>
+        <p>Welcome, {user && user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : "User"}!</p>
+        <p>Your role: {user && user.role}</p>
       </div>
     );
   }
@@ -198,8 +191,8 @@ function UserDashboard() {
         </div>
         <div className="flex items-center gap-4">
           <span className="font-medium">
-            {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : "Guest"}
-            {user.role ? ` (${user.role})` : ""}
+            {user && user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : "Guest"}
+            {user && user.role ? ` (${user.role})` : ""}
           </span>
           <button
             onClick={handleLogout}
