@@ -169,31 +169,6 @@ const initDatabase = async () => {
     // Always check and create admin user if it doesn't exist
     await createInitialAdmin();
     
-    // Check if auctions table exists
-    const auctionTableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'auctions'
-      );
-    `);
-
-    if (!auctionTableCheck.rows[0].exists) {
-      // Create auctions table if it doesn't exist
-      await pool.query(`
-        CREATE TABLE auctions (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          title VARCHAR(255) NOT NULL,
-          description TEXT,
-          start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-          end_time TIMESTAMP WITH TIME ZONE NOT NULL,
-          status VARCHAR(20) NOT NULL DEFAULT 'scheduled',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
-      `);
-      console.log('Auctions table created');
-    }
-
     // Check if settled_auctions table exists
     const settledAuctionsTableCheck = await pool.query(`
       SELECT EXISTS (

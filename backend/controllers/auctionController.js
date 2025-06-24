@@ -186,12 +186,11 @@ async function getMyAuctions(req, res) {
 }
 
 // --- Auction Countdown Logic (from your branch) ---
-const Auction = require('../models/Auction');
 
 // GET /api/auctions/:id/countdown
 async function getAuctionCountdown(req, res) {
   const { id } = req.params;
-  const auction = await Auction.findById(id);
+  const auction = await SettledAuction.findById(id);
   if (!auction) return res.status(404).json({ error: 'Auction not found' });
 
   const now = new Date();
@@ -219,14 +218,36 @@ async function getAuctionCountdown(req, res) {
   });
 }
 
-// GET /api/auctions
-async function getAllAuctions(req, res) {
+// GET /api/auctions/live - get all live auctions
+async function getLiveAuctions(req, res) {
   try {
-    const result = await pool.query('SELECT * FROM auctions ORDER BY created_at DESC');
-    res.json(result.rows);
+    const auctions = await SettledAuction.findLiveAuctions();
+    res.json(auctions);
   } catch (error) {
-    console.error('Error fetching auctions:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching live auctions:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// GET /api/auctions/ended - get all ended auctions
+async function getEndedAuctions(req, res) {
+  try {
+    const auctions = await SettledAuction.findEndedAuctions();
+    res.json(auctions);
+  } catch (error) {
+    console.error('Error fetching ended auctions:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// GET /api/auctions/upcoming - get all upcoming auctions
+async function getUpcomingAuctions(req, res) {
+  try {
+    const auctions = await SettledAuction.findUpcomingAuctions();
+    res.json(auctions);
+  } catch (error) {
+    console.error('Error fetching upcoming auctions:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 }
 
@@ -238,8 +259,10 @@ module.exports = {
   getAllApprovedAuctions,
   updateAuction,
   getAuctionCountdown,
-  getAllAuctions,
-  getMyAuctions
+  getMyAuctions,
+  getLiveAuctions,
+  getEndedAuctions,
+  getUpcomingAuctions
 };
 
 module.exports.upload = upload.single('image'); 

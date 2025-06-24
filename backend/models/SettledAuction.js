@@ -74,6 +74,39 @@ const SettledAuction = {
   async findBySeller(sellerId) {
     const result = await pool.query('SELECT * FROM settled_auctions WHERE seller_id = $1', [sellerId]);
     return result.rows;
+  },
+
+  // Get live auctions (approved and currently active)
+  async findLiveAuctions() {
+    const result = await pool.query(`
+      SELECT * FROM settled_auctions 
+      WHERE status = 'approved' 
+      AND start_time <= CURRENT_TIMESTAMP 
+      AND end_time > CURRENT_TIMESTAMP
+      ORDER BY end_time ASC
+    `);
+    return result.rows;
+  },
+
+  // Get ended auctions
+  async findEndedAuctions() {
+    const result = await pool.query(`
+      SELECT * FROM settled_auctions 
+      WHERE end_time <= CURRENT_TIMESTAMP
+      ORDER BY end_time DESC
+    `);
+    return result.rows;
+  },
+
+  // Get upcoming auctions (approved but not started yet)
+  async findUpcomingAuctions() {
+    const result = await pool.query(`
+      SELECT * FROM settled_auctions 
+      WHERE status = 'approved' 
+      AND start_time > CURRENT_TIMESTAMP
+      ORDER BY start_time ASC
+    `);
+    return result.rows;
   }
 };
 
