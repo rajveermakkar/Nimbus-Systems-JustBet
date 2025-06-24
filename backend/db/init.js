@@ -216,6 +216,53 @@ const initDatabase = async () => {
       `);
     }
 
+    // Check if live_auctions table exists
+    const liveAuctionsTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'live_auctions'
+      );
+    `);
+
+    if (!liveAuctionsTableCheck.rows[0].exists) {
+      await pool.query(`
+        CREATE TABLE live_auctions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          seller_id UUID NOT NULL REFERENCES users(id),
+          title VARCHAR(255) NOT NULL,
+          description TEXT,
+          image_url TEXT,
+          start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+          end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+          starting_price NUMERIC(12,2) NOT NULL,
+          reserve_price NUMERIC(12,2),
+          max_participants INTEGER NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      console.log('live_auctions table created');
+
+      // Create function to update updated_at timestamp for live_auctions
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_live_auctions_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = CURRENT_TIMESTAMP;
+          RETURN NEW;
+        END;
+        $$ language 'plpgsql';
+      `);
+      await pool.query(`
+        DROP TRIGGER IF EXISTS update_live_auctions_updated_at ON live_auctions;
+        CREATE TRIGGER update_live_auctions_updated_at
+          BEFORE UPDATE ON live_auctions
+          FOR EACH ROW
+          EXECUTE FUNCTION update_live_auctions_updated_at_column();
+      `);
+    }
+
     // Check if bids table exists
     const bidsTableCheck = await pool.query(`
       SELECT EXISTS (
