@@ -66,3 +66,4 @@
 - All POST/PATCH endpoints that require authentication must include a valid JWT token in the `Authorization: Bearer <token>` header.
 - For image upload endpoints, use `multipart/form-data` with a file field named `image`.
 - For creating or updating auctions, required fields are specified in the body. Refer to the endpoint description for details.
+

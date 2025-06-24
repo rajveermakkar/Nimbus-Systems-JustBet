@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const liveAuctionController = require('../controllers/liveAuctionController');
 
-// Public: Get approved live auctions only
+// Public endpoint to Get approved live auctions 
 router.get('/', liveAuctionController.getLiveAuctionsByStatus);
 
 module.exports = router; 

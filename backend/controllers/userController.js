@@ -3,6 +3,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
+const RefreshToken = require('../models/RefreshToken');
+const crypto = require('crypto');
 
 // Validation helpers
 const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -10,6 +12,19 @@ const validatePassword = (password) => password.length >= 8;
 
 // Error response helper
 const errorResponse = (res, status, message) => res.status(status).json({ error: message });
+
+// === SESSION CONFIGURATION ===
+// How long a user session (JWT) lasts, in minutes
+const SESSION_DURATION_MINUTES = 60; // 1 hour
+// How long before expiry to show the warning modal (frontend only)
+const SESSION_WARNING_MINUTES = 10; // 10 minutes before expiry
+// How long before expiry to show the toast extension (frontend only)
+// (Set TOAST_WARNING_MINUTES = 5 in frontend)
+// How long the refresh token lasts, in minutes
+const REFRESH_TOKEN_DURATION_MINUTES = 1440; // 1 day
+const SESSION_DURATION_MS = SESSION_DURATION_MINUTES * 60 * 1000;
+const REFRESH_TOKEN_DURATION_MS = REFRESH_TOKEN_DURATION_MINUTES * 60 * 1000;
+const SESSION_DURATION_STR = `${SESSION_DURATION_MINUTES}m`;
 
 const userController = {
   // Register new user
@@ -67,6 +82,14 @@ const userController = {
   // Login user
   async login(req, res) {
     try {
+      // Block login if already logged in (valid refresh token cookie)
+      const existingRefresh = req.cookies && req.cookies.refreshToken;
+      if (existingRefresh) {
+        const found = await RefreshToken.findByToken(existingRefresh);
+        if (found && new Date(found.expires_at) > new Date()) {
+          return errorResponse(res, 400, 'Already logged in. Please logout first.');
+        }
+      }
       const { email, password } = req.body;
 
       // Validate input
@@ -100,20 +123,29 @@ const userController = {
           isApproved: user.is_approved 
         },
         process.env.JWT_SECRET,
-        { expiresIn: '30m' }
+        { expiresIn: SESSION_DURATION_STR }
       );
-
-      // Set cookie
+      // Invalidate previous refresh tokens for this user
+      await RefreshToken.deleteByUser(user.id);
+      // Generate new refresh token
+      const refreshToken = crypto.randomBytes(40).toString('hex');
+      const refreshExpires = new Date(Date.now() + REFRESH_TOKEN_DURATION_MS);
+      await RefreshToken.create({ userId: user.id, token: refreshToken, expiresAt: refreshExpires });
+      // Set cookies
       res.cookie('token', token, {
         httpOnly: true,
         sameSite: 'strict',
-        maxAge: 30 * 60 * 1000
+        maxAge: SESSION_DURATION_MS
       });
-
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        sameSite: 'strict',
+        maxAge: REFRESH_TOKEN_DURATION_MS
+      });
       res.json({
         message: 'Login successful',
         token,
-        expiresIn: '30m',
+        expiresIn: SESSION_DURATION_STR,
         user: {
           id: user.id,
           firstName: user.first_name,
@@ -231,12 +263,86 @@ const userController = {
   },
 
   // Logout user
-  logout(req, res) {
-    res.clearCookie('token', {
-      httpOnly: true,
-      sameSite: 'strict'
-    });
-    res.json({ message: 'Logged out successfully' });
+  async logout(req, res) {
+    try {
+      const refreshToken = req.cookies && req.cookies.refreshToken;
+      if (refreshToken) {
+        await RefreshToken.deleteByToken(refreshToken);
+      }
+      res.clearCookie('token', {
+        httpOnly: true,
+        sameSite: 'strict',
+        path: '/',
+      });
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        sameSite: 'strict',
+        path: '/',
+      });
+      res.json({ message: 'Logged out successfully' });
+    } catch (error) {
+      res.clearCookie('token', { httpOnly: true, sameSite: 'strict', path: '/' });
+      res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'strict', path: '/' });
+      res.status(500).json({ error: 'Logout failed' });
+    }
+  },
+
+  // Refresh access token using refresh token
+  async refreshToken(req, res) {
+    try {
+      const refreshToken = req.cookies && req.cookies.refreshToken;
+      if (!refreshToken) {
+        return errorResponse(res, 401, 'No refresh token provided');
+      }
+      const found = await RefreshToken.findByToken(refreshToken);
+      if (!found || new Date(found.expires_at) < new Date()) {
+        // Invalidate cookie if expired/invalid
+        await RefreshToken.deleteByToken(refreshToken);
+        res.clearCookie('token', { httpOnly: true, sameSite: 'strict' });
+        res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'strict' });
+        return errorResponse(res, 401, 'Refresh token expired or invalid, please log in again');
+      }
+      // Get user
+      const user = await User.findById(found.user_id);
+      if (!user) {
+        await RefreshToken.deleteByToken(refreshToken);
+        res.clearCookie('token', { httpOnly: true, sameSite: 'strict' });
+        res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'strict' });
+        return errorResponse(res, 401, 'User not found');
+      }
+      // Issue new access token
+      const token = jwt.sign(
+        { 
+          id: user.id, 
+          email: user.email, 
+          role: user.role,
+          isApproved: user.is_approved 
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: SESSION_DURATION_STR }
+      );
+      res.cookie('token', token, {
+        httpOnly: true,
+        sameSite: 'strict',
+        maxAge: SESSION_DURATION_MS
+      });
+      res.json({
+        message: 'Token refreshed',
+        token,
+        expiresIn: SESSION_DURATION_STR,
+        user: {
+          id: user.id,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          email: user.email,
+          role: user.role,
+          isApproved: user.is_approved
+        }
+      });
+    } catch (error) {
+      console.error('Refresh token error:', error);
+      errorResponse(res, 500, 'Something went wrong');
+    }
   }
 };
 

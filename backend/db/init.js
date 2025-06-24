@@ -284,6 +284,26 @@ const initDatabase = async () => {
       console.log('bids table created');
     }
     
+    // Check if refresh_tokens table exists
+    const refreshTokensTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'refresh_tokens'
+      );
+    `);
+    if (!refreshTokensTableCheck.rows[0].exists) {
+      await pool.query(`
+        CREATE TABLE refresh_tokens (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          token TEXT NOT NULL,
+          expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      console.log('refresh_tokens table created');
+    }
+    
     console.log('Database initialization complete!');
   } catch (error) {
     console.error('Error initializing database:', error);

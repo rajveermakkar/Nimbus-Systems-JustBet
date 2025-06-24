@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 
 // type: 'success' | 'error' | 'info'
-function Toast({ message, type = 'info', onClose, duration = 3000 }) {
+function Toast({ message, type = 'info', onClose, duration = 3000, actionLabel, onAction }) {
   useEffect(() => {
     if (!duration) return;
     const timer = setTimeout(() => {
@@ -40,12 +40,20 @@ function Toast({ message, type = 'info', onClose, duration = 3000 }) {
 
   return (
     <div
-      className={`fixed top-6 right-6 z-50 max-w-md w-full shadow-2xl rounded-2xl ${bgColor} flex items-center px-4 py-3 animate-toast-pop backdrop-blur-md`}
+      className={`fixed top-20 right-6 z-50 max-w-md w-full shadow-2xl rounded-2xl ${bgColor} flex items-center px-4 py-3 animate-toast-pop backdrop-blur-md`}
       style={{ transition: 'transform 0.2s cubic-bezier(.4,2,.6,1), opacity 0.2s', transform: 'translateY(0)', opacity: 1 }}
       role="alert"
     >
       <span className="mr-3 flex-shrink-0 flex items-center justify-center">{icon}</span>
       <span className={`flex-1 text-sm font-semibold ${textColor}`} style={{lineHeight: '1.5'}}>{message}</span>
+      {actionLabel && onAction && (
+        <button
+          onClick={onAction}
+          className="ml-3 rounded-lg px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition"
+        >
+          {actionLabel}
+        </button>
+      )}
       <button
         onClick={onClose}
         className="ml-3 rounded-full p-1.5 hover:bg-purple-200/40 focus:outline-none focus:ring-2 focus:ring-purple-300 text-purple-100"

@@ -49,7 +49,6 @@ router.get('/live-auction', jwtauth, roleAuth('seller'), async (req, res) => {
       sellerOnly: true,
       res
     });
-    // If the controller handles the response, return
     if (res.headersSent) return;
     res.json(auctions);
   } catch (error) {

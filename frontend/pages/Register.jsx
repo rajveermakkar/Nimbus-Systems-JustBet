@@ -1,7 +1,8 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useContext, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthCard from "../src/components/AuthCard";
 import registerImage from "./assets/register.png";
+import { UserContext } from "../src/context/UserContext";
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 function useIsMobile() {
@@ -26,6 +27,22 @@ function Register({ showToast }) {
   const fileInputRef = useRef();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { user } = useContext(UserContext);
+  const hasRedirected = useRef(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && user.token && !hasRedirected.current) {
+      hasRedirected.current = true;
+      // If coming from registration, show registration message, else show already logged in
+      if (window.history.state && window.history.state.usr && window.history.state.usr.fromRegister) {
+        showToast && showToast('Registration successful! Please log in.', 'success');
+      } else {
+        showToast && showToast('You are already logged in.', 'info');
+      }
+      navigate('/dashboard');
+    }
+  }, [user, navigate, showToast]);
 
   const validate = () => {
     const newErrors = {};
