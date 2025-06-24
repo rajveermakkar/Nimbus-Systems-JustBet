@@ -6,22 +6,20 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/e
 const RefreshToken = require('../models/RefreshToken');
 const crypto = require('crypto');
 
-// Validation helpers
 const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const validatePassword = (password) => password.length >= 8;
 
-// Error response helper
 const errorResponse = (res, status, message) => res.status(status).json({ error: message });
 
-// === SESSION CONFIGURATION ===
+// SESSION CONFIGURATION
 // How long a user session (JWT) lasts, in minutes
 const SESSION_DURATION_MINUTES = 60; // 1 hour
 // How long before expiry to show the warning modal (frontend only)
 const SESSION_WARNING_MINUTES = 10; // 10 minutes before expiry
-// How long before expiry to show the toast extension (frontend only)
-// (Set TOAST_WARNING_MINUTES = 5 in frontend)
 // How long the refresh token lasts, in minutes
 const REFRESH_TOKEN_DURATION_MINUTES = 1440; // 1 day
+
+//conveting to seconds then miiiseconds
 const SESSION_DURATION_MS = SESSION_DURATION_MINUTES * 60 * 1000;
 const REFRESH_TOKEN_DURATION_MS = REFRESH_TOKEN_DURATION_MINUTES * 60 * 1000;
 const SESSION_DURATION_STR = `${SESSION_DURATION_MINUTES}m`;
