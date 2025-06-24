@@ -1,8 +1,9 @@
 import '@fortawesome/fontawesome-free/css/all.min.css';
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import formImage from "./assets/auction_online.jpg";
 import AuthCard from "../src/components/AuthCard";
+import { UserContext } from "../src/context/UserContext";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -17,7 +18,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-function Login() {
+function Login({ showToast }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -26,7 +27,7 @@ function Login() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const location = useLocation();
-  const [showVerifiedToast, setShowVerifiedToast] = useState(false);
+  const { setUser } = useContext(UserContext);
 
   // On mount, check if user wanted to remember their email
   useEffect(() => {
@@ -40,10 +41,9 @@ function Login() {
   // Show toast if redirected from email verification
   useEffect(() => {
     if (location.state && location.state.verified) {
-      setShowVerifiedToast(true);
-      setTimeout(() => setShowVerifiedToast(false), 2000);
+      showToast && showToast("Email verified successfully!", "success");
     }
-  }, [location.state]);
+  }, [location.state, showToast]);
 
   // Simple validation for email and password
   const validate = () => {
@@ -82,6 +82,7 @@ function Login() {
         } else {
           localStorage.removeItem("rememberedEmail");
         }
+        localStorage.setItem("justbetToken", data.token);
         try {
           // Fetch user profile after login
           const profileRes = await fetch(`${backendUrl}/api/auth/profile`, {
@@ -89,25 +90,49 @@ function Login() {
           });
           if (profileRes.ok) {
             const profileData = await profileRes.json();
-            localStorage.setItem("justbetUser", JSON.stringify(profileData.user));
-            // Redirect based on user role
-            if (profileData.user.role === "admin") {
+            if (profileData.user.role === "seller") {
+              // Fetch latest seller status
+              const statusRes = await fetch(`${backendUrl}/api/seller/status`, {
+                credentials: "include",
+              });
+              if (statusRes.ok) {
+                const statusData = await statusRes.json();
+                const updatedUser = {
+                  ...profileData.user,
+                  isApproved: statusData.isApproved,
+                  businessDetails: statusData.businessDetails,
+                };
+                setUser(updatedUser);
+              } else {
+                setUser(profileData.user);
+              }
+              showToast && showToast("Login successful! Redirecting...", "success");
+              navigate("/dashboard");
+            } else if (profileData.user.role === "admin") {
+              setUser(profileData.user);
+              showToast && showToast("Login successful! Redirecting...", "success");
               navigate("/admin/dashboard");
             } else {
+              setUser(profileData.user);
+              showToast && showToast("Login successful! Redirecting...", "success");
               navigate("/dashboard");
             }
           } else {
             setErrors({ form: "Login succeeded but failed to fetch user profile." });
+            showToast && showToast("Login succeeded but failed to fetch user profile.", "error");
           }
         } catch (profileErr) {
           setErrors({ form: "Login succeeded but failed to fetch user profile." });
+          showToast && showToast("Login succeeded but failed to fetch user profile.", "error");
         }
       } else {
         setErrors({ form: data.error || "Login failed" });
+        showToast && showToast(data.error || "Login failed", "error");
       }
     } catch (error) {
       setLoading(false);
       setErrors({ form: "Network error. Please try again." });
+      showToast && showToast("Network error. Please try again.", "error");
     }
   };
 
@@ -168,11 +193,6 @@ function Login() {
 
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">
-      {showVerifiedToast && (
-        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded shadow-lg z-50 animate-fade-in">
-          Email verified successfully!
-        </div>
-      )}
       {isMobile ? (
         <AuthCard
           icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
@@ -189,17 +209,18 @@ function Login() {
           {form}
         </AuthCard>
       ) : (
-        <div className="w-full max-w-4xl bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex">
+        <div className="w-full max-w-3xl my-4 mx-1 bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex scale-90">
           {/* Left side image */}
-          <div className="w-1/2">
+          <div className="w-1/2 flex items-center justify-center bg-gradient-to-b from-[#23235b] to-[#63e] p-6">
             <img
               src={formImage}
               alt="Login Visual"
-              className="object-cover w-full h-full"
+              className="object-contain drop-shadow-xl"
+              style={{ maxWidth: '300px', maxHeight: '250px', width: '100%', height: 'auto', margin: '0 auto' }}
             />
           </div>
           {/* Right side form */}
-          <div className="w-1/2 flex flex-col justify-center p-12"> 
+          <div className="w-1/2 flex flex-col justify-center py-8 px-8">
             <AuthCard
               icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
               title="Welcome Back"

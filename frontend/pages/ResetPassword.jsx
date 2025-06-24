@@ -15,7 +15,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-function ResetPassword() {
+function ResetPassword({ showToast }) {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const [password, setPassword] = useState("");
@@ -51,14 +51,17 @@ function ResetPassword() {
       const data = await response.json();
       setLoading(false);
       if (response.ok) {
-        setSuccessMsg("Password reset successful! You can now log in.");
+        setSuccessMsg("");
+        showToast && showToast("Password reset successful! You can now log in.", "success");
         setTimeout(() => navigate("/login"), 2000);
       } else {
         setErrors({ form: data.error || data.message || "Failed to reset password" });
+        showToast && showToast(data.error || data.message || "Failed to reset password", "error");
       }
     } catch (err) {
       setLoading(false);
       setErrors({ form: "Network error. Please try again." });
+      showToast && showToast("Network error. Please try again.", "error");
     }
   };
 
@@ -122,7 +125,7 @@ function ResetPassword() {
           title="Reset Password"
           subtitle="Enter your new password below"
           error={errors.form || errors.password || errors.confirmPassword}
-          success={successMsg}
+          success={""}
           footer={footer}
         >
           {form}
@@ -145,7 +148,7 @@ function ResetPassword() {
               title="Reset Password"
               subtitle="Enter your new password below"
               error={errors.form || errors.password || errors.confirmPassword}
-              success={successMsg}
+              success={""}
               footer={footer}
               plain={true}
             >

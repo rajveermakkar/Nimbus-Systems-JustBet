@@ -15,7 +15,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-function ForgotPassword() {
+function ForgotPassword({ showToast }) {
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState({});
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -48,13 +48,16 @@ function ForgotPassword() {
       setLoading(false);
       if (response.ok) {
         setIsSubmitted(true);
-        setSuccessMsg("Reset link has been sent to your email!");
+        setSuccessMsg("");
+        showToast && showToast("Reset link has been sent to your email!", "success");
       } else {
         setErrors({ form: data.error || data.message || "Failed to send reset link" });
+        showToast && showToast(data.error || data.message || "Failed to send reset link", "error");
       }
     } catch (err) {
       setLoading(false);
       setErrors({ form: "Network error. Please try again." });
+      showToast && showToast("Network error. Please try again.", "error");
     }
   };
 
@@ -116,7 +119,7 @@ function ForgotPassword() {
           title="Forgot your password?"
           subtitle="Enter your email and we'll send you a link to reset your password."
           error={errors.form}
-          success={successMsg}
+          success={""}
           footer={footer}
         >
           {form}
@@ -139,7 +142,7 @@ function ForgotPassword() {
               title="Forgot your password?"
               subtitle="Enter your email and we'll send you a link to reset your password."
               error={errors.form}
-              success={successMsg}
+              success={""}
               footer={footer}
               plain={true}
             >

@@ -62,8 +62,6 @@ const updateUsersTable = async () => {
         ADD COLUMN business_description TEXT,
         ADD COLUMN business_address TEXT,
         ADD COLUMN business_phone VARCHAR(50),
-        ADD COLUMN business_website VARCHAR(255),
-        ADD COLUMN business_documents TEXT,
         ADD COLUMN is_approved BOOLEAN DEFAULT false
       `);
       console.log('Added business-related columns to users table');
@@ -133,8 +131,6 @@ const initDatabase = async () => {
           business_description TEXT,
           business_address TEXT,
           business_phone VARCHAR(50),
-          business_website VARCHAR(255),
-          business_documents TEXT,
           is_approved BOOLEAN DEFAULT false,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -196,27 +192,36 @@ const initDatabase = async () => {
         );
       `);
       console.log('Auctions table created');
+    }
 
-      // Create function to update updated_at timestamp for auctions
-      await pool.query(`
-        CREATE OR REPLACE FUNCTION update_auctions_updated_at_column()
-        RETURNS TRIGGER AS $$
-        BEGIN
-          NEW.updated_at = CURRENT_TIMESTAMP;
-          RETURN NEW;
-        END;
-        $$ language 'plpgsql';
-      `);
-      console.log('Created update_auctions_updated_at function');
+    // Check if settled_auctions table exists
+    const settledAuctionsTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'settled_auctions'
+      );
+    `);
 
-      // Create trigger to automatically update updated_at for auctions
+    if (!settledAuctionsTableCheck.rows[0].exists) {
+      // Create settled_auctions table if it doesn't exist
       await pool.query(`
-        DROP TRIGGER IF EXISTS update_auctions_updated_at ON auctions;
-        CREATE TRIGGER update_auctions_updated_at
-          BEFORE UPDATE ON auctions
-          FOR EACH ROW
-          EXECUTE FUNCTION update_auctions_updated_at_column();
+        CREATE TABLE settled_auctions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          seller_id UUID NOT NULL,
+          title VARCHAR(255) NOT NULL,
+          description TEXT,
+          image_url TEXT,
+          start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+          end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+          starting_price NUMERIC(12,2) NOT NULL,
+          reserve_price NUMERIC(12,2),
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          is_approved BOOLEAN DEFAULT false,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
       `);
+      console.log('SettledAuctions table created');
     }
     
     console.log('Database initialization complete!');
