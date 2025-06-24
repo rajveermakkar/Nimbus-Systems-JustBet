@@ -68,6 +68,12 @@ const SettledAuction = {
     `;
     const result = await pool.query(query, values);
     return result.rows[0];
+  },
+
+  // Get all auctions for a specific seller
+  async findBySeller(sellerId) {
+    const result = await pool.query('SELECT * FROM settled_auctions WHERE seller_id = $1', [sellerId]);
+    return result.rows;
   }
 };
 

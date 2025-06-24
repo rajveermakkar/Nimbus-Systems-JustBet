@@ -26,11 +26,19 @@ async function createAuction(req, res) {
 
     const start = new Date(startTime);
     const end = new Date(endTime);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Set to start of today
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return res.status(400).json({ message: 'Invalid date format for start or end time.' });
+      return res.status(400).json({ message: 'Invalid date format for start or end date.' });
     }
-    if (start >= end) {
-      return res.status(400).json({ message: 'Start time must be before end time.' });
+    if (start < now) {
+      return res.status(400).json({ message: 'Start date must be today or in the future.' });
+    }
+    if (end <= start) {
+      return res.status(400).json({ message: 'End date must be after the start date.' });
+    }
+    if (end < new Date()) {
+      return res.status(400).json({ message: 'End date must be in the future.' });
     }
 
     let reserve = reservePrice;

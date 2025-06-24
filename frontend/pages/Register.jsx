@@ -14,7 +14,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-function Register() {
+function Register({ showToast }) {
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -74,7 +74,7 @@ function Register() {
       console.log(data);
 
       if (response.ok) {
-        alert("Registration successful! Please log in.");
+        showToast && showToast("Registration successful! Please log in.", "success");
         navigate("/login");
       } else {
         setErrors({ form: data.error || data.message || "Registration failed" });
@@ -205,7 +205,7 @@ function Register() {
           {formFields}
         </AuthCard>
       ) : (
-        <div className="w-full max-w-4xl my-6 mx-2 bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex animate-fade-in">
+        <div className="w-full max-w-3xl my-1 mx-1 bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex scale-90 animate-fade-in">
           {/* Left side image */}
           <div className="w-1/2 flex items-center justify-center bg-gradient-to-b from-[#23235b] to-[#63e] p-6">
             <img
@@ -216,7 +216,7 @@ function Register() {
             />
           </div>
           {/* Right side form */}
-          <div className="w-1/2 flex flex-col justify-center py-2 px-8">
+          <div className="w-1/2 flex flex-col justify-center py-8 px-8">
             <AuthCard
               icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
               title="Create your account"
