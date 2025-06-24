@@ -170,12 +170,28 @@ async function updateAuction(req, res) {
   }
 }
 
+// GET /api/seller/auctions - get all auctions for the current seller
+async function getMyAuctions(req, res) {
+  try {
+    const user = req.user;
+    if (!user || user.role !== 'seller') {
+      return res.status(403).json({ message: 'Only sellers can view their own listings.' });
+    }
+    const auctions = await SettledAuction.findBySeller(user.id);
+    res.json(auctions);
+  } catch (error) {
+    console.error('Error fetching seller auctions:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
 module.exports = {
   createAuction,
   listPendingAuctions,
   approveAuction,
   getAllApprovedAuctions,
-  updateAuction
+  updateAuction,
+  getMyAuctions
 };
 
 module.exports.upload = upload.single('image');

@@ -5,7 +5,7 @@ const jwtauthMiddleware = require('../middleware/jwtauth');
 const auctionController = require('../controllers/auctionController');
 const jwtauth = require('../middleware/jwtauth');
 const roleAuth = require('../middleware/roleAuth');
-const { upload, uploadAuctionImage, getAllApprovedAuctions, updateAuction } = require('../controllers/auctionController');
+const { upload, uploadAuctionImage, getAllApprovedAuctions, updateAuction, getMyAuctions } = require('../controllers/auctionController');
 
 // All routes require authentication
 router.use(jwtauthMiddleware);
@@ -27,5 +27,8 @@ router.get('/auctions/approved', getAllApprovedAuctions);
 
 // Update auction (seller only)
 router.patch('/auctions/:id', jwtauth, roleAuth('seller'), updateAuction);
+
+// Get all auctions for the current seller
+router.get('/auctions', jwtauth, roleAuth('seller'), getMyAuctions);
 
 module.exports = router; 

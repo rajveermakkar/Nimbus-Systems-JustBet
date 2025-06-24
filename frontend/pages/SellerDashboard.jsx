@@ -21,11 +21,11 @@ function SellerDashboard() {
       const res = await fetch(`${apiUrl}/api/seller/auctions`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error("Failed to fetch listings");
       const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to fetch listings");
       setListings(data);
     } catch (err) {
-      setError("Could not load listings.");
+      setError(err.message || "Failed to fetch listings");
     } finally {
       setLoading(false);
     }
@@ -47,6 +47,10 @@ function SellerDashboard() {
                 <i className="fa-solid fa-plus mr-2"></i>
                 Create Listing
               </Button>
+              <Button variant="secondary" size="sm" onClick={handleViewListings}>
+                <i className="fa-solid fa-list mr-2"></i>
+                View All Listings
+              </Button>
             </div>
           </>
         ) : (
@@ -58,24 +62,22 @@ function SellerDashboard() {
       </div>
       {showListings && (
         <div className="w-full max-w-3xl mx-auto mt-4">
+          <h2 className="text-xl font-bold mb-4 text-left">Your Listings</h2>
           {loading && <div className="text-white/70">Loading...</div>}
           {error && <div className="text-red-400 mb-2">{error}</div>}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {listings.map(listing => (
-              <div key={listing.id} className="bg-white/10 border border-white/20 rounded-lg p-4 text-left">
-                <div className="font-bold text-lg mb-1">{listing.title}</div>
-                <div className="text-xs text-white/60 mb-2">{listing.status || (listing.is_approved ? 'approved' : 'pending')}</div>
-                <div className="mb-2">{listing.description}</div>
-                {listing.image_url && (
-                  <img src={listing.image_url} alt={listing.title} className="w-full max-h-40 object-cover rounded mb-2" />
-                )}
-                <div className="text-sm text-white/80">Start: {listing.start_time ? new Date(listing.start_time).toLocaleString() : '-'}</div>
-                <div className="text-sm text-white/80">End: {listing.end_time ? new Date(listing.end_time).toLocaleString() : '-'}</div>
-                <div className="text-sm text-white/80">Starting Price: ${listing.starting_price}</div>
-                {listing.reserve_price && <div className="text-sm text-white/80">Reserve Price: ${listing.reserve_price}</div>}
+              <div key={listing.id} className="bg-white/10 rounded-lg p-4 border border-white/20 text-white">
+                <h3 className="font-semibold text-lg mb-1">{listing.title}</h3>
+                <img src={listing.image_url} alt={listing.title} className="w-full h-32 object-cover rounded mb-2" />
+                <div className="text-xs text-white/70 mb-1">{listing.description}</div>
+                <div className="text-xs">Start: {new Date(listing.start_time).toLocaleString()}</div>
+                <div className="text-xs">End: {new Date(listing.end_time).toLocaleString()}</div>
+                <div className="text-xs">Starting Price: ${listing.starting_price}</div>
+                {listing.reserve_price && <div className="text-xs">Reserve Price: ${listing.reserve_price}</div>}
+                <div className="text-xs mt-1">Status: {listing.is_approved ? <span className="text-green-400">Approved</span> : <span className="text-yellow-300">Pending</span>}</div>
               </div>
             ))}
-            {(!loading && listings.length === 0) && <div className="col-span-2 text-center text-white/60">No listings found.</div>}
           </div>
         </div>
       )}
