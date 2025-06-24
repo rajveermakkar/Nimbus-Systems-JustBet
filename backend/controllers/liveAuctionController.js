@@ -131,6 +131,46 @@ async function getAdminLiveAuctions(req, res) {
   }
 }
 
+// Restart a live auction that didn't meet reserve price (seller only)
+async function restartLiveAuction(req, res) {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+    
+    // Check if user is the seller
+    const auction = await LiveAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ message: 'Live auction not found.' });
+    }
+    if (auction.seller_id !== user.id) {
+      return res.status(403).json({ message: 'You can only restart your own live auctions.' });
+    }
+    
+    // Check if auction has a result and didn't meet reserve
+    const LiveAuctionResult = require('../models/LiveAuctionResult');
+    const result = await LiveAuctionResult.findByAuctionId(id);
+    
+    if (!result) {
+      return res.status(400).json({ message: 'Auction has not ended yet.' });
+    }
+    
+    if (result.status === 'won') {
+      return res.status(400).json({ message: 'Cannot restart an auction that already has a winner.' });
+    }
+    
+    // Reset auction status to approved (ready for bidding)
+    const updated = await LiveAuction.updateAuction(id, { status: 'approved' });
+    
+    res.json({ 
+      auction: updated, 
+      message: 'Live auction restarted successfully. Bidding is now open again.' 
+    });
+  } catch (error) {
+    console.error('Error restarting live auction:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
 module.exports = {
   createLiveAuction,
   getLiveAuctionsByStatus,
@@ -138,5 +178,6 @@ module.exports = {
   upload: upload.single('image'),
   uploadAuctionImage,
   approveLiveAuction,
-  getAdminLiveAuctions
+  getAdminLiveAuctions,
+  restartLiveAuction
 }; 

@@ -42,7 +42,7 @@ const SettledAuction = {
 
   // Update auction fields by ID
   async updateAuction(id, fields, wasApproved = false) {
-    const allowed = ['title', 'description', 'image_url', 'start_time', 'end_time', 'starting_price', 'reserve_price'];
+    const allowed = ['title', 'description', 'image_url', 'start_time', 'end_time', 'starting_price', 'reserve_price', 'current_highest_bid', 'current_highest_bidder_id', 'bid_count', 'min_bid_increment'];
     const updates = [];
     const values = [];
     let idx = 1;

@@ -2,6 +2,7 @@ const SettledAuction = require('../models/SettledAuction');
 const { pool } = require('../db/init');
 const multer = require('multer');
 const { uploadImageToAzure } = require('../services/azureBlobService');
+const Bid = require('../models/Bid');
 
 // function for a seller create a new auction listing
 async function createAuction(req, res) {
@@ -185,13 +186,146 @@ async function getMyAuctions(req, res) {
   }
 }
 
+// Place a bid on a settled auction
+async function placeBid(req, res) {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+    const { amount } = req.body;
+
+    // Validate bid amount
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ message: 'Valid bid amount is required.' });
+    }
+
+    const bidAmount = Number(amount);
+
+    // Get auction details
+    const auction = await SettledAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ message: 'Auction not found.' });
+    }
+
+    // Check if auction is approved and active
+    if (!auction.is_approved || auction.status !== 'approved') {
+      return res.status(400).json({ message: 'Auction is not open for bidding.' });
+    }
+
+    // Check if auction has ended
+    const now = new Date();
+    const endTime = new Date(auction.end_time);
+    if (now > endTime) {
+      return res.status(400).json({ message: 'Auction has ended.' });
+    }
+
+    // Check if auction has started
+    const startTime = new Date(auction.start_time);
+    if (now < startTime) {
+      return res.status(400).json({ message: 'Auction has not started yet.' });
+    }
+
+    // Determine minimum bid amount
+    const currentBid = auction.current_highest_bid || auction.starting_price;
+    const minIncrement = auction.min_bid_increment || 1;
+    const minBidAmount = currentBid + minIncrement;
+
+    if (bidAmount < minBidAmount) {
+      return res.status(400).json({ 
+        message: `Bid must be at least $${minBidAmount.toFixed(2)}` 
+      });
+    }
+
+    // Check reserve price if set
+    if (auction.reserve_price && bidAmount < Number(auction.reserve_price)) {
+      return res.status(400).json({ 
+        message: `Bid must meet the reserve price of $${Number(auction.reserve_price).toFixed(2)}` 
+      });
+    }
+
+    // Store the bid
+    const bid = await Bid.create({
+      auctionId: id,
+      userId: user.id,
+      amount: bidAmount
+    });
+
+    // Update auction with new highest bid
+    const updatedAuction = await SettledAuction.updateAuction(id, {
+      current_highest_bid: bidAmount,
+      current_highest_bidder_id: user.id,
+      bid_count: (auction.bid_count || 0) + 1
+    });
+
+    res.json({
+      message: 'Bid placed successfully',
+      bid: bid,
+      auction: updatedAuction
+    });
+
+  } catch (error) {
+    console.error('Error placing bid:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// Get all bids for a settled auction
+async function getBids(req, res) {
+  try {
+    const { id } = req.params;
+
+    // Check if auction exists
+    const auction = await SettledAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ message: 'Auction not found.' });
+    }
+
+    // Get bids
+    const bids = await Bid.findByAuctionId(id);
+    res.json(bids);
+
+  } catch (error) {
+    console.error('Error fetching bids:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// Get auction with current bid information
+async function getAuctionWithBids(req, res) {
+  try {
+    const { id } = req.params;
+
+    // Get auction
+    const auction = await SettledAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ message: 'Auction not found.' });
+    }
+
+    // Get recent bids (last 10)
+    const bids = await Bid.findByAuctionId(id);
+    const recentBids = bids.slice(0, 10);
+
+    res.json({
+      auction: auction,
+      recentBids: recentBids,
+      totalBids: bids.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching auction with bids:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
 module.exports = {
   createAuction,
   listPendingAuctions,
   approveAuction,
   getAllApprovedAuctions,
   updateAuction,
-  getMyAuctions
+  getMyAuctions,
+  placeBid,
+  getBids,
+  getAuctionWithBids
 };
 
 module.exports.upload = upload.single('image');
