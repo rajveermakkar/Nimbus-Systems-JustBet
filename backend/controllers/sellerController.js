@@ -70,24 +70,35 @@ const sellerController = {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      console.log('Seller status check for user:', {
+        id: user.id,
+        role: user.role,
+        is_approved: user.is_approved,
+        business_name: user.business_name
+      });
+
       // Generate new token with current status
       const token = generateToken(user);
 
-      res.json({
+      const response = {
         role: user.role,
         isApproved: user.is_approved,
         status: user.role === 'seller' 
           ? (user.is_approved ? 'approved' : 'pending')
           : 'not_requested',
-        businessDetails: user.role === 'seller' ? {
+        businessDetails: user.role === 'seller' && user.business_name ? {
           businessName: user.business_name,
           businessDescription: user.business_description,
           businessAddress: user.business_address,
           businessPhone: user.business_phone
         } : null,
         token
-      });
+      };
+
+      console.log('Sending response:', response);
+      res.json(response);
     } catch (error) {
+      console.error('Error in getSellerRequestStatus:', error);
       res.status(500).json({ error: 'Error fetching seller request status' });
     }
   }

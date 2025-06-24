@@ -4,8 +4,6 @@ import AuthCard from "../src/components/AuthCard";
 import registerImage from "./assets/register.png";
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
-// Reminder: Add a route for ResetPassword.jsx in your router, e.g. /reset-password?token=...
-
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   React.useEffect(() => {

@@ -112,12 +112,10 @@ const User = {
           business_name = $3,
           business_description = $4,
           business_address = $5,
-          business_phone = $6,
-          business_website = $7,
-          business_documents = $8
-      WHERE id = $9
+          business_phone = $6
+      WHERE id = $7
       RETURNING id, email, role, is_approved, business_name, business_description, 
-                business_address, business_phone, business_website, business_documents
+                business_address, business_phone
     `;
     const result = await pool.query(query, [
       role, 
@@ -126,8 +124,6 @@ const User = {
       businessDetails?.businessDescription || null,
       businessDetails?.businessAddress || null,
       businessDetails?.businessPhone || null,
-      businessDetails?.businessWebsite || null,
-      businessDetails?.businessDocuments || null,
       userId
     ]);
     return result.rows[0];
@@ -138,7 +134,7 @@ const User = {
     const query = `
       SELECT id, first_name, last_name, email, role, is_approved, created_at,
              business_name, business_description, business_address, 
-             business_phone, business_website, business_documents
+             business_phone
       FROM users
       WHERE role = 'seller' AND is_approved = false
     `;

@@ -30,7 +30,7 @@ function App() {
         <Route path="/resend-verification" element={<ResendVerification />} />
         <Route path="/dashboard" element={<UserDashboard />} />
         <Route path="/admin/dashboard" element={
-          <ProtectedRoute requiredRole="admin">
+          <ProtectedRoute allowedRoles={['admin']}>
             <AdminDashboard />
           </ProtectedRoute>
         } />

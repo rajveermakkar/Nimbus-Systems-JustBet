@@ -1,8 +1,9 @@
 import '@fortawesome/fontawesome-free/css/all.min.css';
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import formImage from "./assets/auction_online.jpg";
 import AuthCard from "../src/components/AuthCard";
+import { UserContext } from "../src/context/UserContext";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -27,6 +28,7 @@ function Login() {
   const isMobile = useIsMobile();
   const location = useLocation();
   const [showVerifiedToast, setShowVerifiedToast] = useState(false);
+  const { setUser } = useContext(UserContext);
 
   // On mount, check if user wanted to remember their email
   useEffect(() => {
@@ -82,6 +84,7 @@ function Login() {
         } else {
           localStorage.removeItem("rememberedEmail");
         }
+        localStorage.setItem("justbetToken", data.token);
         try {
           // Fetch user profile after login
           const profileRes = await fetch(`${backendUrl}/api/auth/profile`, {
@@ -89,11 +92,28 @@ function Login() {
           });
           if (profileRes.ok) {
             const profileData = await profileRes.json();
-            localStorage.setItem("justbetUser", JSON.stringify(profileData.user));
-            // Redirect based on user role
-            if (profileData.user.role === "admin") {
+            if (profileData.user.role === "seller") {
+              // Fetch latest seller status
+              const statusRes = await fetch(`${backendUrl}/api/seller/status`, {
+                credentials: "include",
+              });
+              if (statusRes.ok) {
+                const statusData = await statusRes.json();
+                const updatedUser = {
+                  ...profileData.user,
+                  isApproved: statusData.isApproved,
+                  businessDetails: statusData.businessDetails,
+                };
+                setUser(updatedUser);
+              } else {
+                setUser(profileData.user);
+              }
+              navigate("/dashboard");
+            } else if (profileData.user.role === "admin") {
+              setUser(profileData.user);
               navigate("/admin/dashboard");
             } else {
+              setUser(profileData.user);
               navigate("/dashboard");
             }
           } else {
