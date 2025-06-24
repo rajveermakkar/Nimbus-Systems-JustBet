@@ -173,6 +173,52 @@ const initDatabase = async () => {
     // Always check and create admin user if it doesn't exist
     await createInitialAdmin();
     
+    // Check if auctions table exists
+    const auctionTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'auctions'
+      );
+    `);
+
+    if (!auctionTableCheck.rows[0].exists) {
+      // Create auctions table if it doesn't exist
+      await pool.query(`
+        CREATE TABLE auctions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          title VARCHAR(255) NOT NULL,
+          description TEXT,
+          start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+          end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'scheduled',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      console.log('Auctions table created');
+
+      // Create function to update updated_at timestamp for auctions
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_auctions_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = CURRENT_TIMESTAMP;
+          RETURN NEW;
+        END;
+        $$ language 'plpgsql';
+      `);
+      console.log('Created update_auctions_updated_at function');
+
+      // Create trigger to automatically update updated_at for auctions
+      await pool.query(`
+        DROP TRIGGER IF EXISTS update_auctions_updated_at ON auctions;
+        CREATE TRIGGER update_auctions_updated_at
+          BEFORE UPDATE ON auctions
+          FOR EACH ROW
+          EXECUTE FUNCTION update_auctions_updated_at_column();
+      `);
+    }
+    
     console.log('Database initialization complete!');
   } catch (error) {
     console.error('Error initializing database:', error);
