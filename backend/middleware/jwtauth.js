@@ -46,4 +46,21 @@ const jwtauthMiddleware = async (req, res, next) => {
   }
 };
 
+// Helper for Socket.IO: verify token and return user (no req/res)
+async function verifySocketToken(token) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) return null;
+    return {
+      ...decoded,
+      role: user.role,
+      isApproved: user.is_approved
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
 module.exports = jwtauthMiddleware; 
+module.exports.verifySocketToken = verifySocketToken; 

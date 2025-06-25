@@ -56,4 +56,7 @@ router.get('/live-auction', jwtauth, roleAuth('seller'), async (req, res) => {
   }
 });
 
+// Restart a live auction (seller only)
+router.post('/live-auction/:id/restart', jwtauth, roleAuth('seller'), liveAuctionController.restartLiveAuction);
+
 module.exports = router; 

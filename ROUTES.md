@@ -16,6 +16,9 @@
 
 ### Auctions (Settled)
 - **GET /api/auctions/approved** — Get all approved settled auctions (public marketplace view).
+- **GET /api/auctions/:id** — Get auction with current bid information (public).
+- **POST /api/auctions/:id/bid** — Place a bid on a settled auction (authenticated users only). Body: `{ amount }`
+- **GET /api/auctions/:id/bids** — Get all bids for a settled auction (authenticated users only).
 
 ### Auctions (Live)
 - **GET /api/live-auction?status=approved** — Get all approved live auctions (public live events view).
@@ -38,6 +41,7 @@
 - **POST /api/seller/live-auction/upload-image** — Upload image for live auction. Form-data: `image` (file)
 - **PATCH /api/seller/live-auction/:id** — Update a live auction (only by owner).
 - **GET /api/seller/live-auction** — Get all live auctions created by the seller.
+- **POST /api/seller/live-auction/:id/restart** — Restart a live auction that didn't meet reserve price (only by owner).
 
 ---
 

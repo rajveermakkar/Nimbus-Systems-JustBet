@@ -169,6 +169,7 @@ const initDatabase = async () => {
     // Always check and create admin user if it doesn't exist
     await createInitialAdmin();
     
+
     // Check if settled_auctions table exists
     const settledAuctionsTableCheck = await pool.query(`
       SELECT EXISTS (
@@ -189,6 +190,10 @@ const initDatabase = async () => {
           end_time TIMESTAMP WITH TIME ZONE NOT NULL,
           starting_price NUMERIC(12,2) NOT NULL,
           reserve_price NUMERIC(12,2),
+          current_highest_bid NUMERIC(12,2),
+          current_highest_bidder_id UUID REFERENCES users(id),
+          bid_count INTEGER DEFAULT 0,
+          min_bid_increment NUMERIC(12,2) DEFAULT 1,
           status VARCHAR(20) NOT NULL DEFAULT 'pending',
           is_approved BOOLEAN DEFAULT false,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -214,6 +219,24 @@ const initDatabase = async () => {
           FOR EACH ROW
           EXECUTE FUNCTION update_settled_auctions_updated_at_column();
       `);
+    }
+
+    // Always check and add bidding columns to settled_auctions if they don't exist
+    const biddingColumnsCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'settled_auctions' AND column_name = 'current_highest_bid'
+    `);
+
+    if (biddingColumnsCheck.rows.length === 0) {
+      await pool.query(`
+        ALTER TABLE settled_auctions 
+        ADD COLUMN current_highest_bid NUMERIC(12,2),
+        ADD COLUMN current_highest_bidder_id UUID REFERENCES users(id),
+        ADD COLUMN bid_count INTEGER DEFAULT 0,
+        ADD COLUMN min_bid_increment NUMERIC(12,2) DEFAULT 1
+      `);
+      console.log('Added bidding columns to settled_auctions table');
     }
 
     // Check if live_auctions table exists
@@ -263,17 +286,20 @@ const initDatabase = async () => {
       `);
     }
 
-    // Check if bids table exists
-    const bidsTableCheck = await pool.query(`
+    // Check if settled_auction_bids table exists (renamed from bids)
+    const settledAuctionBidsTableCheck = await pool.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
-        WHERE table_name = 'bids'
+        WHERE table_name = 'settled_auction_bids'
       );
     `);
 
-    if (!bidsTableCheck.rows[0].exists) {
+    if (!settledAuctionBidsTableCheck.rows[0].exists) {
+      // Drop old bids table if it exists
+      await pool.query('DROP TABLE IF EXISTS bids CASCADE');
+      
       await pool.query(`
-        CREATE TABLE bids (
+        CREATE TABLE settled_auction_bids (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           auction_id UUID NOT NULL REFERENCES settled_auctions(id),
           user_id UUID NOT NULL REFERENCES users(id),
@@ -281,7 +307,7 @@ const initDatabase = async () => {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      console.log('bids table created');
+      console.log('settled_auction_bids table created');
     }
     
     // Check if refresh_tokens table exists
@@ -302,6 +328,50 @@ const initDatabase = async () => {
         );
       `);
       console.log('refresh_tokens table created');
+    }
+    
+    // Check if live_auction_bids table exists
+    const liveAuctionBidsTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'live_auction_bids'
+      );
+    `);
+
+    if (!liveAuctionBidsTableCheck.rows[0].exists) {
+      await pool.query(`
+        CREATE TABLE live_auction_bids (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          auction_id UUID NOT NULL REFERENCES live_auctions(id),
+          user_id UUID NOT NULL REFERENCES users(id),
+          amount NUMERIC(12,2) NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      console.log('live_auction_bids table created');
+    }
+    
+    // Check if live_auction_results table exists
+    const liveAuctionResultsTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'live_auction_results'
+      );
+    `);
+
+    if (!liveAuctionResultsTableCheck.rows[0].exists) {
+      await pool.query(`
+        CREATE TABLE live_auction_results (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          auction_id UUID NOT NULL REFERENCES live_auctions(id),
+          winner_id UUID REFERENCES users(id),
+          final_bid NUMERIC(12,2),
+          reserve_met BOOLEAN NOT NULL,
+          status VARCHAR(20) NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      console.log('live_auction_results table created');
     }
     
     console.log('Database initialization complete!');
