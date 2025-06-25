@@ -131,8 +131,7 @@ router.get('/user/:id', jwtauthMiddleware, async (req, res) => {
 
     res.json({ user: result.rows[0] });
   } catch (error) {
-    console.error('Get user by ID error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

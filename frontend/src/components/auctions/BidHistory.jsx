@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import auctionService from '../../services/auctionService';
+import { UserContext } from '../../context/UserContext';
 
 function BidHistory({ auctionId, type = 'settled', bids: propBids }) {
   const [bids, setBids] = useState(propBids || []);
   const [loading, setLoading] = useState(!propBids);
   const [error, setError] = useState(null);
+  const { user } = useContext(UserContext);
 
   // Format price
   const formatPrice = (price) => {
@@ -83,13 +85,30 @@ function BidHistory({ auctionId, type = 'settled', bids: propBids }) {
       <h3 className="text-lg font-semibold mb-4">Bid History</h3>
       <div className="space-y-3 max-h-64 overflow-y-auto">
         {bids.map((bid, index) => (
-          <div key={bid.id || index} className="flex justify-between items-center p-3 bg-white/5 rounded">
-            <div>
-              <div className="font-semibold text-white">
-                {bid.first_name && bid.last_name 
-                  ? `${bid.first_name} ${bid.last_name}` 
-                  : bid.email || 'Anonymous'
-                }
+          <div 
+            key={bid.id || index} 
+            className={`flex justify-between items-center p-3 rounded ${
+              index === 0 ? 'bg-green-900/20 border border-green-500/30' : 'bg-white/5'
+            }`}
+          >
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-white">
+                  {bid.first_name && bid.last_name 
+                    ? `${bid.first_name} ${bid.last_name}` 
+                    : bid.email || 'Anonymous'
+                  }
+                </span>
+                {index === 0 && (
+                  <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                    Highest
+                  </span>
+                )}
+                {index === 0 && (bid.user_id === user?.id || bid.email === user?.email) && (
+                  <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                    You
+                  </span>
+                )}
               </div>
               <div className="text-xs text-gray-400">{formatDate(bid.created_at)}</div>
             </div>
