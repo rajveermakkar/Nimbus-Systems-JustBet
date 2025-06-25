@@ -23,11 +23,11 @@ router.post('/auctions', jwtauth, roleAuth('seller'), auctionController.createAu
 // Upload auction image (seller only)
 router.post('/auctions/upload-image', jwtauth, roleAuth('seller'), upload, uploadAuctionImage);
 
-// Public: Get all approved auctions
-router.get('/auctions/approved', getAllApprovedAuctions);
-
 // Update auction (seller only)
 router.patch('/auctions/:id', jwtauth, roleAuth('seller'), updateAuction);
+
+// Get a single settled auction by ID (seller only)
+router.get('/auctions/:id', jwtauth, roleAuth('seller'), auctionController.getAuctionByIdForSeller);
 
 // Get all auctions for the current seller
 router.get('/auctions', jwtauth, roleAuth('seller'), getMyAuctions);
@@ -39,24 +39,18 @@ router.post('/live-auction', jwtauth, roleAuth('seller'), liveAuctionController.
 router.post('/live-auction/upload-image', jwtauth, roleAuth('seller'), liveAuctionController.upload, liveAuctionController.uploadAuctionImage);
 // Update a live auction
 router.patch('/live-auction/:id', jwtauth, roleAuth('seller'), liveAuctionController.updateLiveAuction);
+// Get a single live auction by ID (seller only)
+router.get('/live-auction/:id', jwtauth, roleAuth('seller'), liveAuctionController.getLiveAuctionByIdForSeller);
 // Get all live auctions for the current seller
-router.get('/live-auction', jwtauth, roleAuth('seller'), async (req, res) => {
-  // This returns all live auctions created by the current seller
-  try {
-    const auctions = await liveAuctionController.getLiveAuctionsByStatus({
-      query: { status: undefined },
-      user: req.user,
-      sellerOnly: true,
-      res
-    });
-    if (res.headersSent) return;
-    res.json(auctions);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+router.get('/live-auction', jwtauth, roleAuth('seller'), liveAuctionController.getLiveAuctionsForSeller);
 
 // Restart a live auction (seller only)
 router.post('/live-auction/:id/restart', jwtauth, roleAuth('seller'), liveAuctionController.restartLiveAuction);
+
+// Get seller analytics and auction results
+router.get('/analytics', jwtauth, roleAuth('seller'), sellerController.getSellerAnalytics);
+
+// Get auction results (winners, final bids, etc.)
+router.get('/auction-results', jwtauth, roleAuth('seller'), sellerController.getAuctionResults);
 
 module.exports = router; 

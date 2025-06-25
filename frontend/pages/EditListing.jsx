@@ -1,20 +1,25 @@
-import React, { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Button from "../src/components/Button";
 
-function CreateListing({ showToast }) {
+function EditListing({ showToast }) {
+  const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const auctionTypeFromURL = searchParams.get('type'); // 'live' or 'settled'
+  
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [imageFiles, setImageFiles] = useState([]);
   const [startingPrice, setStartingPrice] = useState("");
   const [reservePrice, setReservePrice] = useState("");
-  const [auctionType, setAuctionType] = useState("live"); // "live" or "settled"
+  const [auctionType, setAuctionType] = useState(auctionTypeFromURL || "live"); // Use URL param as default
   const [duration, setDuration] = useState(""); // For live auctions
-  const [startTime, setStartTime] = useState(""); // For settled auctions
+  const [startTime, setStartTime] = useState(""); // For both types
   const [endTime, setEndTime] = useState(""); // For settled auctions
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
   const fileInputRef = useRef();
   const navigate = useNavigate();
 
@@ -36,6 +41,107 @@ function CreateListing({ showToast }) {
     return endTime.toISOString().slice(0, 16);
   };
 
+  // Fetch auction data
+  const fetchAuction = async () => {
+    try {
+      setFetching(true);
+      const token = localStorage.getItem("justbetToken");
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      
+      // Try the correct endpoint first based on URL parameter
+      if (auctionTypeFromURL === 'settled') {
+        // Try settled auction first
+        let res = await fetch(`${apiUrl}/api/seller/auctions/${id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          setAuctionType("settled");
+          populateForm(data, "settled");
+          return;
+        }
+        
+        // If settled fails, try live auction
+        res = await fetch(`${apiUrl}/api/seller/live-auction/${id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.max_participants) {
+            setAuctionType("live");
+            populateForm(data, "live");
+            return;
+          }
+        }
+      } else {
+        // Try live auction first (default)
+        let res = await fetch(`${apiUrl}/api/seller/live-auction/${id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          // Check if it's actually a live auction by looking for max_participants
+          if (data.max_participants) {
+            setAuctionType("live");
+            populateForm(data, "live");
+            return;
+          }
+        }
+        
+        // If not live auction or doesn't have max_participants, try settled auction
+        res = await fetch(`${apiUrl}/api/seller/auctions/${id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          setAuctionType("settled");
+          populateForm(data, "settled");
+          return;
+        }
+      }
+      
+      throw new Error('Auction not found');
+    } catch (err) {
+      setError('Failed to load auction. Please try again.');
+      console.error('Error fetching auction:', err);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  // Populate form with auction data
+  const populateForm = (auction, type) => {
+    setTitle(auction.title || "");
+    setDescription(auction.description || "");
+    setImageUrl(auction.image_url || "");
+    setStartingPrice(auction.starting_price?.toString() || "");
+    setReservePrice(auction.reserve_price?.toString() || "");
+    setStartTime(auction.start_time ? new Date(auction.start_time).toISOString().slice(0, 16) : "");
+    
+    if (type === "settled") {
+      setEndTime(auction.end_time ? new Date(auction.end_time).toISOString().slice(0, 16) : "");
+    } else {
+      // Calculate duration for live auctions
+      if (auction.start_time && auction.end_time) {
+        const start = new Date(auction.start_time);
+        const end = new Date(auction.end_time);
+        const durationMs = end.getTime() - start.getTime();
+        const durationMinutes = Math.round(durationMs / (1000 * 60));
+        setDuration(durationMinutes.toString());
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (id) {
+      fetchAuction();
+    }
+  }, [id]);
+
   // Only allow one: imageUrl or imageFiles
   function handleImageUrlChange(e) {
     setImageUrl(e.target.value);
@@ -44,6 +150,7 @@ function CreateListing({ showToast }) {
       if (fileInputRef.current) fileInputRef.current.value = null;
     }
   }
+  
   function handleImageFilesChange(e) {
     setImageFiles([...e.target.files]);
     if (e.target.files.length > 0) setImageUrl("");
@@ -97,6 +204,7 @@ function CreateListing({ showToast }) {
       let finalImageUrl = imageUrl;
       const token = localStorage.getItem("justbetToken");
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      
       // If user uploaded an image, upload it to backend first
       if (imageFiles.length > 0) {
         const formData = new FormData();
@@ -110,7 +218,8 @@ function CreateListing({ showToast }) {
         if (!uploadRes.ok || !uploadData.url) throw new Error(uploadData.error || "Image upload failed");
         finalImageUrl = uploadData.url;
       }
-      // Now create the listing
+      
+      // Calculate times
       let finalStartTime, finalEndTime;
       
       if (auctionType === "live") {
@@ -123,11 +232,11 @@ function CreateListing({ showToast }) {
       
       // Choose the correct endpoint based on auction type
       const endpoint = auctionType === "live" 
-        ? `${apiUrl}/api/seller/live-auction`
-        : `${apiUrl}/api/seller/auctions`;
+        ? `${apiUrl}/api/seller/live-auction/${id}`
+        : `${apiUrl}/api/seller/auctions/${id}`;
       
       const res = await fetch(endpoint, {
-        method: "POST",
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           'Authorization': `Bearer ${token}`
@@ -140,21 +249,34 @@ function CreateListing({ showToast }) {
           reservePrice,
           startTime: finalStartTime,
           endTime: finalEndTime,
-          maxParticipants: auctionType === "live" ? 50 : undefined // Add maxParticipants for live auctions
+          maxParticipants: auctionType === "live" ? 50 : undefined
         })
       });
+      
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.message || "Failed to create listing");
+        throw new Error(data.message || "Failed to update listing");
       }
+      
       setLoading(false);
-      showToast && showToast("Listing created successfully!", "success");
+      showToast && showToast("Listing updated successfully!", "success");
       navigate("/seller/dashboard");
     } catch (err) {
-      setError(err.message || "Failed to create listing");
-      showToast && showToast(err.message || "Failed to create listing", "error");
+      setError(err.message || "Failed to update listing");
+      showToast && showToast(err.message || "Failed to update listing", "error");
       setLoading(false);
     }
+  }
+
+  if (fetching) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-sm">Loading auction...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -162,10 +284,17 @@ function CreateListing({ showToast }) {
       <div className="w-full max-w-2xl mx-auto">
         <div className="bg-white/10 rounded-xl p-6 mb-6 border border-white/20">
           <h2 className="text-2xl font-bold flex items-center gap-2 mb-1">
-            <i className="fa-solid fa-plus"></i> Add New Listing
+            <i className="fa-solid fa-edit"></i> Edit Listing
           </h2>
-          <p className="text-white/70 text-sm text-left">Create a new auction listing for your product</p>
+          <p className="text-white/70 text-sm text-left">Update your auction listing</p>
         </div>
+        
+        {error && (
+          <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-6 text-center">
+            <p className="text-red-400">{error}</p>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="bg-white/10 rounded-xl p-6 border border-white/20 mb-4">
             <h3 className="font-semibold mb-4 text-left">Product Information</h3>
@@ -230,37 +359,22 @@ function CreateListing({ showToast }) {
               <div className="text-xs text-white/40 text-left">Only Single image accepted, max 5MB, .png, .jpg, .jpeg only</div>
             </div>
           </div>
+          
           <div className="bg-white/10 rounded-xl p-6 border border-white/20 mb-4">
             <h3 className="font-semibold mb-4 text-left">Auction Settings</h3>
             
-            {/* Auction Type Selector */}
+            {/* Auction Type Display (Read-only) */}
             <div className="mb-4">
-              <label className="block text-xs mb-1 text-left">Auction Type *</label>
+              <label className="block text-xs mb-1 text-left">Auction Type</label>
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  className={`px-4 py-2 rounded text-sm font-semibold transition ${
-                    auctionType === "live"
-                      ? "bg-red-500 text-white"
-                      : "bg-white/10 text-white/70 hover:bg-white/20"
-                  }`}
-                  onClick={() => setAuctionType("live")}
-                >
-                  <i className="fas fa-broadcast-tower mr-2"></i>
-                  Live Auction
-                </button>
-                <button
-                  type="button"
-                  className={`px-4 py-2 rounded text-sm font-semibold transition ${
-                    auctionType === "settled"
-                      ? "bg-blue-500 text-white"
-                      : "bg-white/10 text-white/70 hover:bg-white/20"
-                  }`}
-                  onClick={() => setAuctionType("settled")}
-                >
-                  <i className="fas fa-gavel mr-2"></i>
-                  Settled Auction
-                </button>
+                <span className={`px-4 py-2 rounded text-sm font-semibold ${
+                  auctionType === "live"
+                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                    : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                }`}>
+                  <i className={`fas ${auctionType === "live" ? "fa-broadcast-tower" : "fa-gavel"} mr-2`}></i>
+                  {auctionType === "live" ? "Live Auction" : "Settled Auction"}
+                </span>
               </div>
             </div>
             
@@ -309,12 +423,13 @@ function CreateListing({ showToast }) {
               </div>
             )}
           </div>
+          
           <div className="flex justify-end gap-4">
-            <Button type="button" variant="secondary" size="sm" onClick={() => navigate(-1)}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => navigate("/seller/dashboard")}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" size="sm" disabled={loading}>
-              + Create Listing
+              {loading ? "Updating..." : "Update Listing"}
             </Button>
           </div>
         </form>
@@ -323,4 +438,4 @@ function CreateListing({ showToast }) {
   );
 }
 
-export default CreateListing; 
+export default EditListing; 
