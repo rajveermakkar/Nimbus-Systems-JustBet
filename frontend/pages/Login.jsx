@@ -1,5 +1,5 @@
 import '@fortawesome/fontawesome-free/css/all.min.css';
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import formImage from "./assets/auction_online.jpg";
 import AuthCard from "../src/components/AuthCard";
@@ -27,7 +27,9 @@ function Login({ showToast }) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const location = useLocation();
-  const { setUser } = useContext(UserContext);
+  const { setUser, user } = useContext(UserContext);
+  const hasRedirected = useRef(false);
+  const [justLoggedIn, setJustLoggedIn] = useState(false);
 
   // On mount, check if user wanted to remember their email
   useEffect(() => {
@@ -44,6 +46,18 @@ function Login({ showToast }) {
       showToast && showToast("Email verified successfully!", "success");
     }
   }, [location.state, showToast]);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && user.token && !hasRedirected.current) {
+      hasRedirected.current = true;
+      // Only show 'already logged in' if NOT just logged in
+      if (!justLoggedIn) {
+        showToast && showToast('You are already logged in.', 'info');
+      }
+      navigate('/dashboard');
+    }
+  }, [user, navigate, showToast, justLoggedIn]);
 
   // Simple validation for email and password
   const validate = () => {
@@ -62,8 +76,13 @@ function Login({ showToast }) {
       setErrors({ form: "Email and password are required." });
       return;
     }
+    if (!email || !password) {
+      setErrors({ form: "Email and password must not be empty." });
+      return;
+    }
     setLoading(true);
     setErrors({});
+    const loginPayload = { email, password };
     try {
       const response = await fetch(`${backendUrl}/api/auth/login`, {
         method: "POST",
@@ -71,7 +90,7 @@ function Login({ showToast }) {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(loginPayload),
       });
       const data = await response.json();
       setLoading(false);
@@ -90,6 +109,7 @@ function Login({ showToast }) {
           });
           if (profileRes.ok) {
             const profileData = await profileRes.json();
+            const userWithToken = { ...profileData.user, token: data.token };
             if (profileData.user.role === "seller") {
               // Fetch latest seller status
               const statusRes = await fetch(`${backendUrl}/api/seller/status`, {
@@ -98,23 +118,26 @@ function Login({ showToast }) {
               if (statusRes.ok) {
                 const statusData = await statusRes.json();
                 const updatedUser = {
-                  ...profileData.user,
+                  ...userWithToken,
                   isApproved: statusData.isApproved,
                   businessDetails: statusData.businessDetails,
                 };
                 setUser(updatedUser);
               } else {
-                setUser(profileData.user);
+                setUser(userWithToken);
               }
-              showToast && showToast("Login successful! Redirecting...", "success");
+              setJustLoggedIn(true);
+              showToast && showToast(`Login successful! Welcome, ${userWithToken.firstName || 'User'}`, "success");
               navigate("/dashboard");
             } else if (profileData.user.role === "admin") {
-              setUser(profileData.user);
-              showToast && showToast("Login successful! Redirecting...", "success");
+              setUser(userWithToken);
+              setJustLoggedIn(true);
+              showToast && showToast(`Login successful! Welcome, ${userWithToken.firstName || 'User'}`, "success");
               navigate("/admin/dashboard");
             } else {
-              setUser(profileData.user);
-              showToast && showToast("Login successful! Redirecting...", "success");
+              setUser(userWithToken);
+              setJustLoggedIn(true);
+              showToast && showToast(`Login successful! Welcome, ${userWithToken.firstName || 'User'}`, "success");
               navigate("/dashboard");
             }
           } else {

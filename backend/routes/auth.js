@@ -102,4 +102,7 @@ router.get('/profile', jwtauthMiddleware, userController.getProfile);
 // Logout user
 router.post('/logout', userController.logout);
 
+// Refresh access token
+router.post('/refresh-token', userController.refreshToken);
+
 module.exports = router;

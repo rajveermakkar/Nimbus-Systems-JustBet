@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Button from "./Button";
 import { UserContext } from "../context/UserContext";
+import axios from 'axios';
 
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -9,6 +10,7 @@ function Navbar() {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -33,9 +35,17 @@ function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropdownOpen]);
 
-  function handleLogout() {
+  async function handleLogout() {
+    console.log('Logout triggered');
+    try {
+      await axios.post(`${BACKEND_URL}/api/auth/logout`, {}, { withCredentials: true });
+    } catch (e) {
+      // Optionally handle error
+    }
+    localStorage.removeItem("justbetToken");
+    localStorage.removeItem("justbetUser");
     setUser(null);
-    navigate("/login");
+    navigate('/login');
   }
 
   return (
