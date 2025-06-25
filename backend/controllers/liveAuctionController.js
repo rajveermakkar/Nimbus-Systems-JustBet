@@ -289,7 +289,7 @@ async function getLiveAuctionByIdForSeller(req, res) {
     if (!auction || auction.seller_id !== user.id) {
       return res.status(404).json({ message: 'Live auction not found.' });
     }
-    res.json({ auction });
+    res.json(auction);
   } catch (error) {
     console.error('Error fetching live auction:', error);
     res.status(500).json({ message: 'Server error' });

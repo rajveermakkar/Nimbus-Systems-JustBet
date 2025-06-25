@@ -349,7 +349,7 @@ async function getAuctionByIdForSeller(req, res) {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Auction not found.' });
     }
-    res.json({ auction: result.rows[0] });
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching auction:', error);
     res.status(500).json({ message: 'Server error' });
