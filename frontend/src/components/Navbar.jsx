@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useRef } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Button from "./Button";
 import { UserContext } from "../context/UserContext";
@@ -8,8 +8,6 @@ function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const { user, setUser } = useContext(UserContext);
   const navigate = useNavigate();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null);
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
@@ -20,28 +18,10 @@ function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setDropdownOpen(false);
-      }
-    }
-    if (dropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    } else {
-      document.removeEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [dropdownOpen]);
-
   async function handleLogout() {
-    console.log('Logout triggered');
     try {
       await axios.post(`${BACKEND_URL}/api/auth/logout`, {}, { withCredentials: true });
-    } catch (e) {
-      // Optionally handle error
-    }
+    } catch (e) {}
     localStorage.removeItem("justbetToken");
     localStorage.removeItem("justbetUser");
     setUser(null);
@@ -69,58 +49,42 @@ function Navbar() {
             <i className="fa-solid fa-gavel"></i>
             Auctions
           </Link>
-          {user ? (
+          {user && (
             <>
-              <div className="relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setDropdownOpen((open) => !open)}
-                  className="flex items-center gap-1 text-xs text-white/80 font-medium px-3 py-2 rounded-lg hover:bg-white/10 focus:outline-none"
+              <Link
+                to="/dashboard"
+                className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+              >
+                <i className="fa-solid fa-tachometer-alt"></i>
+                Dashboard
+              </Link>
+              <Link
+                to="/winnings"
+                className="flex items-center gap-1 text-white font-medium hover:text-yellow-400 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+              >
+                <i className="fa-solid fa-trophy"></i>
+                Winnings
+              </Link>
+              <Link
+                to="/wallet"
+                className="flex items-center gap-1 text-white font-medium hover:text-green-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+              >
+                <i className="fa-solid fa-wallet"></i>
+                Wallet
+              </Link>
+              {user.role === "seller" && (
+                <Link
+                  to="/seller/dashboard"
+                  className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
                 >
-                  <i className="fa-solid fa-user"></i>
-                  {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : "User"}
-                  {user.role ? ` (${user.role})` : ""}
-                  <i className={`fa-solid fa-chevron-${dropdownOpen ? "up" : "down"} ml-1 text-xs`}></i>
-                </button>
-                {dropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-[#23235b] border border-white/10 rounded-lg shadow-lg z-50 py-2 animate-fade-in">
-                    <Link
-                      to="/dashboard"
-                      className="block px-4 py-2 text-sm text-white hover:bg-white/10 transition"
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      <i className="fa-solid fa-user-circle mr-2"></i>
-                      User Dashboard
-                    </Link>
-                    {user.role === "seller" && (
-                      <>
-                        <Link
-                          to="/seller/dashboard"
-                          className="block px-4 py-2 text-sm text-white hover:bg-white/10 transition"
-                          onClick={() => setDropdownOpen(false)}
-                        >
-                          <i className="fa-solid fa-store mr-2"></i>
-                          Seller Dashboard
-                        </Link>
-                        <div className="border-t border-white/10 my-2"></div>
-                      </>
-                    )}
-                    {user.role !== "seller" && (
-                      <>
-                        <Link
-                          to="/seller/request"
-                          className="block px-4 py-2 text-sm text-white hover:bg-white/10 transition"
-                          onClick={() => setDropdownOpen(false)}
-                        >
-                          <i className="fa-solid fa-rocket mr-2"></i>
-                          Request to become a seller
-                        </Link>
-                        {/* Placeholder for seller request form/status */}
-                        <div className="border-t border-white/10 my-2"></div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+                  <i className="fa-solid fa-store"></i>
+                  Seller Dashboard
+                </Link>
+              )}
+              <span className="text-xs text-white/80 font-medium px-2">
+                Welcome, {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : "User"}
+                {user.role ? ` (${user.role})` : ""}
+              </span>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold transition"
@@ -129,7 +93,8 @@ function Navbar() {
                 Logout
               </button>
             </>
-          ) : (
+          )}
+          {!user && (
             <>
               <Link
                 to="/login"

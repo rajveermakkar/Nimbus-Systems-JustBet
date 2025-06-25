@@ -125,8 +125,30 @@ async function uploadAuctionImage(req, res) {
 // GET /api/auctions/approved - public endpoint to get all approved auctions
 async function getAllApprovedAuctions(req, res) {
   try {
+    // Get all approved auctions first
     const auctions = await SettledAuction.findByStatus('approved');
-    res.json(auctions);
+    
+    // Get seller info for each auction separately
+    const auctionsWithSellers = [];
+    for (const auction of auctions) {
+      // Get seller details for this auction
+      const sellerQuery = 'SELECT first_name, last_name, email, business_name FROM users WHERE id = $1';
+      const sellerResult = await pool.query(sellerQuery, [auction.seller_id]);
+      const seller = sellerResult.rows[0];
+      
+      // Combine auction and seller data
+      const auctionWithSeller = {
+        ...auction,
+        first_name: seller?.first_name,
+        last_name: seller?.last_name,
+        email: seller?.email,
+        business_name: seller?.business_name
+      };
+      
+      auctionsWithSellers.push(auctionWithSeller);
+    }
+    
+    res.json(auctionsWithSellers);
   } catch (error) {
     console.error('Error fetching approved auctions:', error);
     res.status(500).json({ message: 'Server error' });
@@ -279,8 +301,8 @@ async function getBids(req, res) {
       return res.status(404).json({ message: 'Auction not found.' });
     }
 
-    // Get bids
-    const bids = await Bid.findByAuctionId(id);
+    // Get bids with bidder details
+    const bids = await Bid.findByAuctionIdWithBidders(id);
     res.json(bids);
 
   } catch (error) {
@@ -294,14 +316,14 @@ async function getAuctionWithBids(req, res) {
   try {
     const { id } = req.params;
 
-    // Get auction
-    const auction = await SettledAuction.findById(id);
+    // Get auction with seller details
+    const auction = await SettledAuction.findByIdWithSeller(id);
     if (!auction) {
       return res.status(404).json({ message: 'Auction not found.' });
     }
 
-    // Get recent bids (last 10)
-    const bids = await Bid.findByAuctionId(id);
+    // Get recent bids with bidder details (last 10)
+    const bids = await Bid.findByAuctionIdWithBidders(id);
     const recentBids = bids.slice(0, 10);
 
     res.json({

@@ -2,13 +2,13 @@ const { pool } = require('../db/init');
 
 const SettledAuction = {
   // Create a new auction listing in the database
-  async create({ sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice }) {
+  async create({ sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, minBidIncrement = 1 }) {
     const query = `
-      INSERT INTO settled_auctions (seller_id, title, description, image_url, start_time, end_time, starting_price, reserve_price)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO settled_auctions (seller_id, title, description, image_url, start_time, end_time, starting_price, reserve_price, min_bid_increment)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
-    const result = await pool.query(query, [sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice]);
+    const result = await pool.query(query, [sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, minBidIncrement]);
     return result.rows[0];
   },
 
@@ -16,6 +16,27 @@ const SettledAuction = {
   async findById(id) {
     const result = await pool.query('SELECT * FROM settled_auctions WHERE id = $1', [id]);
     return result.rows[0];
+  },
+
+  // Find auction by id with seller details
+  async findByIdWithSeller(id) {
+    // Get auction first
+    const auction = await this.findById(id);
+    if (!auction) return null;
+    
+    // Get seller details separately
+    const sellerQuery = 'SELECT first_name, last_name, email, business_name FROM users WHERE id = $1';
+    const sellerResult = await pool.query(sellerQuery, [auction.seller_id]);
+    const seller = sellerResult.rows[0];
+    
+    // Combine auction and seller data
+    return {
+      ...auction,
+      first_name: seller?.first_name,
+      last_name: seller?.last_name,
+      email: seller?.email,
+      business_name: seller?.business_name
+    };
   },
 
   // Find auction by status

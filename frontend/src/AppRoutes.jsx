@@ -19,6 +19,12 @@ import { UserContext } from './context/UserContext';
 import SessionExpiryModal from './components/SessionExpiryModal';
 import axios from 'axios';
 
+// Import auction components
+import AuctionPage from '../pages/AuctionPage';
+import AllAuctionsPage from '../pages/AllAuctionsPage';
+import LiveAuctionsPage from '../pages/LiveAuctionsPage';
+import SettledAuctionsPage from '../pages/SettledAuctionsPage';
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 // How long before expiry to show the warning popup (should match backend config)
@@ -221,6 +227,14 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword showToast={showToast} />} />
         <Route path="/verify-email" element={<VerifyEmail showToast={showToast} />} />
         <Route path="/resend-verification" element={<ResendVerification showToast={showToast} />} />
+        
+        {/* Auction Routes */}
+        <Route path="/auctions" element={<AllAuctionsPage />} />
+        <Route path="/auctions/:id" element={<AuctionPage />} />
+        <Route path="/live-auctions" element={<LiveAuctionsPage />} />
+        <Route path="/live-auctions/:id" element={<AuctionPage />} />
+        <Route path="/settled-auctions" element={<SettledAuctionsPage />} />
+        
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <UserDashboard showToast={showToast} />
