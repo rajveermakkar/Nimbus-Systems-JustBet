@@ -341,6 +341,268 @@ const userController = {
       console.error('Refresh token error:', error);
       errorResponse(res, 500, 'Something went wrong');
     }
+  },
+
+  // Get user winnings (auctions they won)
+  async getWinnings(req, res) {
+    try {
+      const userId = req.user.id;
+      const { pool } = require('../db/init');
+
+      // Get live auctions the user won
+      const liveWinningsQuery = `
+        SELECT 
+          la.id,
+          la.title,
+          la.description,
+          la.image_url,
+          la.starting_price,
+          la.current_highest_bid as final_bid,
+          la.end_time,
+          la.status,
+          u.first_name,
+          u.last_name,
+          u.email,
+          'live' as auction_type
+        FROM live_auctions la
+        JOIN users u ON la.seller_id = u.id
+        WHERE la.current_highest_bidder_id = $1 
+        AND la.status = 'closed'
+        ORDER BY la.end_time DESC
+      `;
+
+      // Get settled auctions the user won
+      const settledWinningsQuery = `
+        SELECT 
+          sa.id,
+          sa.title,
+          sa.description,
+          sa.image_url,
+          sa.starting_price,
+          sa.current_highest_bid as final_bid,
+          sa.end_time,
+          sa.status,
+          u.first_name,
+          u.last_name,
+          u.email,
+          'settled' as auction_type
+        FROM settled_auctions sa
+        JOIN users u ON sa.seller_id = u.id
+        WHERE sa.current_highest_bidder_id = $1 
+        AND sa.status = 'closed'
+        ORDER BY sa.end_time DESC
+      `;
+
+      const [liveWinnings, settledWinnings] = await Promise.all([
+        pool.query(liveWinningsQuery, [userId]),
+        pool.query(settledWinningsQuery, [userId])
+      ]);
+
+      const winnings = [
+        ...liveWinnings.rows.map(row => ({ ...row, seller_name: `${row.first_name} ${row.last_name}` })),
+        ...settledWinnings.rows.map(row => ({ ...row, seller_name: `${row.first_name} ${row.last_name}` }))
+      ].sort((a, b) => new Date(b.end_time) - new Date(a.end_time));
+
+      res.json({ winnings });
+    } catch (error) {
+      console.error('Get winnings error:', error);
+      errorResponse(res, 500, 'Something went wrong');
+    }
+  },
+
+  // Get user bid history
+  async getBidHistory(req, res) {
+    try {
+      const userId = req.user.id;
+      const { pool } = require('../db/init');
+
+      // Get live auction bids
+      const liveBidsQuery = `
+        SELECT 
+          lb.id,
+          lb.amount,
+          lb.created_at,
+          la.id as auction_id,
+          la.title,
+          la.image_url,
+          la.status,
+          la.end_time,
+          u.first_name,
+          u.last_name,
+          u.email,
+          'live' as auction_type,
+          CASE 
+            WHEN la.current_highest_bidder_id = $1 THEN true 
+            ELSE false 
+          END as is_winning_bid
+        FROM live_auction_bids lb
+        JOIN live_auctions la ON lb.auction_id = la.id
+        JOIN users u ON la.seller_id = u.id
+        WHERE lb.user_id = $1
+        ORDER BY lb.created_at DESC
+      `;
+
+      // Get settled auction bids
+      const settledBidsQuery = `
+        SELECT 
+          b.id,
+          b.amount,
+          b.created_at,
+          sa.id as auction_id,
+          sa.title,
+          sa.image_url,
+          sa.status,
+          sa.end_time,
+          u.first_name,
+          u.last_name,
+          u.email,
+          'settled' as auction_type,
+          CASE 
+            WHEN sa.current_highest_bidder_id = $1 THEN true 
+            ELSE false 
+          END as is_winning_bid
+        FROM settled_auction_bids b
+        JOIN settled_auctions sa ON b.auction_id = sa.id
+        JOIN users u ON sa.seller_id = u.id
+        WHERE b.user_id = $1
+        ORDER BY b.created_at DESC
+      `;
+
+      const [liveBids, settledBids] = await Promise.all([
+        pool.query(liveBidsQuery, [userId]),
+        pool.query(settledBidsQuery, [userId])
+      ]);
+
+      const bidHistory = [
+        ...liveBids.rows.map(row => ({ ...row, seller_name: `${row.first_name} ${row.last_name}` })),
+        ...settledBids.rows.map(row => ({ ...row, seller_name: `${row.first_name} ${row.last_name}` }))
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      res.json({ bidHistory });
+    } catch (error) {
+      console.error('Get bid history error:', error);
+      errorResponse(res, 500, 'Something went wrong');
+    }
+  },
+
+  // Get won live auction details
+  async getWonLiveAuction(req, res) {
+    try {
+      const userId = req.user.id;
+      const auctionId = req.params.id;
+      const { pool } = require('../db/init');
+
+      // Simple query to get auction details
+      const auctionQuery = `
+        SELECT 
+          id,
+          title,
+          description,
+          image_url,
+          starting_price,
+          current_highest_bid as final_bid,
+          end_time,
+          status,
+          seller_id
+        FROM live_auctions
+        WHERE id = $1 
+        AND current_highest_bidder_id = $2 
+        AND status = 'closed'
+      `;
+
+      const auctionResult = await pool.query(auctionQuery, [auctionId, userId]);
+      
+      if (auctionResult.rows.length === 0) {
+        return errorResponse(res, 404, 'Auction not found or you did not win this auction');
+      }
+
+      const auction = auctionResult.rows[0];
+
+      // Simple query to get seller details
+      const sellerQuery = `
+        SELECT first_name, last_name, email
+        FROM users
+        WHERE id = $1
+      `;
+
+      const sellerResult = await pool.query(sellerQuery, [auction.seller_id]);
+      
+      if (sellerResult.rows.length > 0) {
+        const seller = sellerResult.rows[0];
+        auction.seller_name = `${seller.first_name} ${seller.last_name}`;
+        auction.seller_email = seller.email;
+      } else {
+        auction.seller_name = 'Unknown Seller';
+        auction.seller_email = 'Unknown';
+      }
+
+      auction.auction_type = 'live';
+
+      res.json({ auction });
+    } catch (error) {
+      console.error('Get won live auction error:', error);
+      errorResponse(res, 500, 'Something went wrong');
+    }
+  },
+
+  // Get won settled auction details
+  async getWonSettledAuction(req, res) {
+    try {
+      const userId = req.user.id;
+      const auctionId = req.params.id;
+      const { pool } = require('../db/init');
+
+      // Simple query to get auction details
+      const auctionQuery = `
+        SELECT 
+          id,
+          title,
+          description,
+          image_url,
+          starting_price,
+          current_highest_bid as final_bid,
+          end_time,
+          status,
+          seller_id
+        FROM settled_auctions
+        WHERE id = $1 
+        AND current_highest_bidder_id = $2 
+        AND status = 'closed'
+      `;
+
+      const auctionResult = await pool.query(auctionQuery, [auctionId, userId]);
+      
+      if (auctionResult.rows.length === 0) {
+        return errorResponse(res, 404, 'Auction not found or you did not win this auction');
+      }
+
+      const auction = auctionResult.rows[0];
+
+      // Simple query to get seller details
+      const sellerQuery = `
+        SELECT first_name, last_name, email
+        FROM users
+        WHERE id = $1
+      `;
+
+      const sellerResult = await pool.query(sellerQuery, [auction.seller_id]);
+      
+      if (sellerResult.rows.length > 0) {
+        const seller = sellerResult.rows[0];
+        auction.seller_name = `${seller.first_name} ${seller.last_name}`;
+        auction.seller_email = seller.email;
+      } else {
+        auction.seller_name = 'Unknown Seller';
+        auction.seller_email = 'Unknown';
+      }
+
+      auction.auction_type = 'settled';
+
+      res.json({ auction });
+    } catch (error) {
+      console.error('Get won settled auction error:', error);
+      errorResponse(res, 500, 'Something went wrong');
+    }
   }
 };
 

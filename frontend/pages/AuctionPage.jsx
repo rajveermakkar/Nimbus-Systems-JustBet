@@ -27,6 +27,9 @@ function AuctionPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const [isLiveAuction, setIsLiveAuction] = useState(false);
+  
+  // Winner announcement state
+  const [winnerAnnouncement, setWinnerAnnouncement] = useState(null);
 
   // Determine auction type from URL path
   const isLiveAuctionFromURL = location.pathname.includes('/live-auctions/');
@@ -117,8 +120,19 @@ function AuctionPage() {
         try {
           const liveData = await auctionService.getLiveAuction(id);
           setAuction(liveData);
-          setRecentBids([]); // Live auctions use different bid system
           setIsLiveAuction(true);
+          
+          // Fetch bid history for live auctions
+          try {
+            const response = await fetch(`/api/live-auctions/${id}/bids`);
+            if (response.ok) {
+              const data = await response.json();
+              setRecentBids(data.bids || []);
+            }
+          } catch (bidError) {
+            console.error('Error fetching bid history:', bidError);
+            setRecentBids([]);
+          }
         } catch (liveError) {
           throw new Error('Live auction not found');
         }
@@ -166,14 +180,31 @@ function AuctionPage() {
               // Keep other fields from the original auction data
             };
           });
+        } else if (data.type === 'auction_state') {
+          // Handle initial auction state with existing bids
+          if (data.existingBids && data.existingBids.length > 0) {
+            setRecentBids(data.existingBids);
+          }
+          // Update auction data
+          setAuction(prevAuction => {
+            if (!prevAuction) return data;
+            return {
+              ...prevAuction,
+              current_highest_bid: data.currentBid,
+              current_highest_bidder_id: data.currentBidder,
+            };
+          });
         } else if (data.type === 'bid-update') {
-          setRecentBids(prev => [data.bid, ...prev.slice(0, 9)]); // Keep last 10 bids
+          // Use the full bids array from server (with user names)
+          if (data.bids && Array.isArray(data.bids)) {
+            setRecentBids(data.bids);
+          }
           setAuction(prevAuction => {
             if (!prevAuction) return data.auction;
             return {
               ...prevAuction,
-              current_highest_bid: data.auction.current_highest_bid,
-              current_highest_bidder_id: data.auction.current_highest_bidder_id,
+              current_highest_bid: data.currentBid,
+              current_highest_bidder_id: data.currentBidder,
             };
           });
         } else if (data.type === 'participant-update') {
@@ -184,7 +215,21 @@ function AuctionPage() {
         } else if (data.type === 'auction-end') {
           setPlacingBid(false);
           setBidAmount('');
-          setToast({ show: true, message: `Auction ended! ${data.result.message}`, type: 'info' });
+          
+          // Handle different auction end scenarios
+          let message = '';
+          if (data.result.winner) {
+            message = `🎉 Winner: ${data.result.winner.user_name || `User ${data.result.winner.user_id?.slice(0, 8)}`} won with ${formatPrice(data.result.winner.amount)}!`;
+            setWinnerAnnouncement(data.result);
+          } else if (data.result.status === 'reserve_not_met') {
+            message = '❌ Auction ended - Reserve price not met';
+          } else if (data.result.status === 'no_bids') {
+            message = '❌ Auction ended - No bids were placed';
+          } else {
+            message = 'Auction ended';
+          }
+          
+          setToast({ show: true, message, type: 'info' });
           // Update auction status to show it's ended
           setAuction(prevAuction => ({
             ...prevAuction,
@@ -357,6 +402,52 @@ function AuctionPage() {
           duration={toast.type === 'success' ? 1500 : 3000}
         />
       )}
+      
+      {/* Winner Announcement Modal */}
+      {winnerAnnouncement && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-6 max-w-md mx-4 text-center">
+            <div className="text-6xl mb-4">🏆</div>
+            <h2 className="text-xl font-bold text-white mb-2">Auction Ended!</h2>
+            
+            {winnerAnnouncement.winner ? (
+              <div>
+                <p className="text-green-400 font-semibold mb-2">
+                  Winner: {winnerAnnouncement.winner.user_name || `User ${winnerAnnouncement.winner.user_id?.slice(0, 8)}`}
+                </p>
+                <p className="text-white mb-4">
+                  Final Bid: <span className="text-green-400 font-bold">{formatPrice(winnerAnnouncement.winner.amount)}</span>
+                </p>
+                {winnerAnnouncement.winner.user_id === user?.id && (
+                  <div className="bg-green-900/20 border border-green-500/30 rounded p-3 mb-4">
+                    <p className="text-green-400 font-semibold">🎉 Congratulations! You won this auction!</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-gray-300 mb-4">
+                {winnerAnnouncement.status === 'reserve_not_met' ? 'Reserve price was not met' : 'No bids were placed'}
+              </p>
+            )}
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setWinnerAnnouncement(null)}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => navigate('/live-auctions')}
+                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded transition-colors"
+              >
+                View All Auctions
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center py-6">
         <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left/Main Content */}
@@ -421,13 +512,25 @@ function AuctionPage() {
                       {recentBids.map((bid, index) => (
                         <div 
                           key={bid.id || index} 
-                          className="flex justify-between items-center p-2 rounded bg-white/5"
+                          className={`flex justify-between items-center p-2 rounded ${
+                            index === 0 ? 'bg-green-900/20 border border-green-500/30' : 'bg-white/5'
+                          }`}
                         >
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-white text-sm">
                                 {bid.user_name || `User ${bid.user_id?.slice(0, 8)}`}
                               </span>
+                              {index === 0 && (
+                                <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                                  Highest
+                                </span>
+                              )}
+                              {index === 0 && (bid.user_id === user?.id || bid.user_id === user?.email) && (
+                                <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                                  You
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-gray-400">
                               {new Date(bid.created_at).toLocaleTimeString()}

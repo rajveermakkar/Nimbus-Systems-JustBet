@@ -231,6 +231,85 @@ async function restartLiveAuction(req, res) {
   }
 }
 
+// Get bid history for a live auction
+async function getLiveAuctionBids(req, res) {
+  try {
+    const { id } = req.params;
+    
+    // Check if auction exists and is approved
+    const auction = await LiveAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ message: 'Live auction not found.' });
+    }
+    
+    if (auction.status !== 'approved') {
+      return res.status(403).json({ message: 'This live auction is not available.' });
+    }
+    
+    // Get bid history with user names
+    const bidsQuery = `
+      SELECT 
+        lb.id,
+        lb.amount,
+        lb.created_at,
+        u.first_name,
+        u.last_name,
+        u.email
+      FROM live_auction_bids lb
+      JOIN users u ON lb.user_id = u.id
+      WHERE lb.live_auction_id = $1
+      ORDER BY lb.created_at DESC
+      LIMIT 50
+    `;
+    
+    const bidsResult = await pool.query(bidsQuery, [id]);
+    
+    // Format bids with user names
+    const bids = bidsResult.rows.map(bid => ({
+      id: bid.id,
+      amount: bid.amount,
+      created_at: bid.created_at,
+      user_name: `${bid.first_name} ${bid.last_name}`,
+      user_id: bid.email // Using email as user_id for consistency
+    }));
+    
+    res.json({ bids });
+  } catch (error) {
+    console.error('Error fetching live auction bids:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// Get specific live auction by ID for the logged-in seller
+async function getLiveAuctionByIdForSeller(req, res) {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+    const auction = await LiveAuction.findById(id);
+    if (!auction || auction.seller_id !== user.id) {
+      return res.status(404).json({ message: 'Live auction not found.' });
+    }
+    res.json({ auction });
+  } catch (error) {
+    console.error('Error fetching live auction:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// Get all live auctions for a specific seller (excluding closed ones)
+async function getLiveAuctionsForSeller(req, res) {
+  try {
+    const user = req.user;
+    // Only get auctions that are not closed
+    const query = 'SELECT * FROM live_auctions WHERE seller_id = $1 AND status != $2';
+    const result = await pool.query(query, [user.id, 'closed']);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching seller live auctions:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
 module.exports = {
   createLiveAuction,
   getLiveAuctionsByStatus,
@@ -240,5 +319,8 @@ module.exports = {
   uploadAuctionImage,
   approveLiveAuction,
   getAdminLiveAuctions,
-  restartLiveAuction
+  restartLiveAuction,
+  getLiveAuctionBids,
+  getLiveAuctionByIdForSeller,
+  getLiveAuctionsForSeller
 }; 

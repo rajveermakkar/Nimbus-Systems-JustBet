@@ -200,8 +200,10 @@ async function getMyAuctions(req, res) {
     if (!user || user.role !== 'seller') {
       return res.status(403).json({ message: 'Only sellers can view their own listings.' });
     }
-    const auctions = await SettledAuction.findBySeller(user.id);
-    res.json(auctions);
+    // Only get auctions that are not closed
+    const query = 'SELECT * FROM settled_auctions WHERE seller_id = $1 AND status != $2';
+    const result = await pool.query(query, [user.id, 'closed']);
+    res.json(result.rows);
   } catch (error) {
     console.error('Error fetching seller auctions:', error);
     res.status(500).json({ message: 'Server error' });
@@ -338,6 +340,22 @@ async function getAuctionWithBids(req, res) {
   }
 }
 
+async function getAuctionByIdForSeller(req, res) {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+    const query = 'SELECT * FROM settled_auctions WHERE id = $1 AND seller_id = $2';
+    const result = await pool.query(query, [id, user.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Auction not found.' });
+    }
+    res.json({ auction: result.rows[0] });
+  } catch (error) {
+    console.error('Error fetching auction:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
 module.exports = {
   createAuction,
   listPendingAuctions,
@@ -347,7 +365,8 @@ module.exports = {
   getMyAuctions,
   placeBid,
   getBids,
-  getAuctionWithBids
+  getAuctionWithBids,
+  getAuctionByIdForSeller
 };
 
 module.exports.upload = upload.single('image');

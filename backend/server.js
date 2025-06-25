@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const { initDatabase, testConnection } = require('./db/init');
+const { initDatabase, testConnection, pool } = require('./db/init');
 const { verifyEmailService } = require('./services/emailService');
 const authRoutes = require('./routes/auth');
 const sellerRoutes = require('./routes/sellerRoutes');
@@ -167,8 +167,21 @@ const startServer = async () => {
         const updatedRoom = io.sockets.adapter.rooms.get(auctionId);
         const participantCount = updatedRoom ? updatedRoom.size : 1;
         
-        // Send current auction state to user
-        socket.emit('auction_state', liveAuctionState.getCurrentState(auctionId));
+        // Get existing bid history from database
+        let existingBids = [];
+        try {
+          const dbBids = await LiveAuctionBid.findByAuctionIdWithNames(auctionId);
+          existingBids = dbBids;
+        } catch (err) {
+          console.error('Error fetching existing bids:', err);
+        }
+        
+        // Send current auction state to user with existing bids
+        const currentState = liveAuctionState.getCurrentState(auctionId);
+        socket.emit('auction_state', {
+          ...currentState,
+          existingBids: existingBids
+        });
         
         // Broadcast join to others with participant count
         socket.to(auctionId).emit('user_joined', { 
@@ -240,11 +253,19 @@ const startServer = async () => {
         // Start or reset countdown timer
         liveAuctionState.setTimer(auctionId, 120000, () => handleAuctionEnd(auctionId));
         
+        // Get updated bid history with user names
+        let updatedBids = [];
+        try {
+          updatedBids = await LiveAuctionBid.findByAuctionIdWithNames(auctionId);
+        } catch (err) {
+          console.error('Error fetching updated bids:', err);
+        }
+        
         // Broadcast new bid to all users in room
         io.to(auctionId).emit('bid_update', {
           currentBid: state.currentBid,
           currentBidder: state.currentBidder,
-          bids: state.bids,
+          bids: updatedBids,
           timerEnd: state.timerEnd
         });
       });
@@ -256,13 +277,31 @@ const startServer = async () => {
         socket.rooms.forEach((roomId) => {
           if (roomId !== socket.id) { // socket.id is also in rooms
             const room = io.sockets.adapter.rooms.get(roomId);
-            // Subtract 1 because the user is still in the room when we calculate this
-            const participantCount = room ? Math.max(0, room.size - 1) : 0;
+            // User is already removed from room, so just use current size
+            const participantCount = room ? room.size : 0;
+            console.log(`User left room ${roomId}, new count: ${participantCount}`);
             io.to(roomId).emit('user_joined', { 
               userId: socket.user?.id,
               participantCount: participantCount
             });
           }
+        });
+      });
+
+      // Handle manual leave auction
+      socket.on('leave_auction', ({ auctionId }) => {
+        console.log('User manually leaving auction:', auctionId);
+        socket.leave(auctionId);
+        
+        // Get updated participant count after leaving
+        const room = io.sockets.adapter.rooms.get(auctionId);
+        const participantCount = room ? room.size : 0;
+        console.log(`User left room ${auctionId}, new count: ${participantCount}`);
+        
+        // Broadcast updated count to remaining users
+        io.to(auctionId).emit('user_joined', { 
+          userId: socket.user?.id,
+          participantCount: participantCount
         });
       });
 
@@ -282,10 +321,31 @@ const startServer = async () => {
           message = 'No winner matched the Reserved Price';
           status = 'reserve_not_met';
         } else if (state.currentBidder) {
-          winner = state.currentBidder;
-          message = 'Auction ended. Winner: ' + winner;
-          status = 'won';
-          reserveMet = true;
+          // Fetch winner's user details
+          try {
+            const winnerQuery = 'SELECT first_name, last_name, email FROM users WHERE id = $1';
+            const winnerResult = await pool.query(winnerQuery, [state.currentBidder]);
+            const winnerUser = winnerResult.rows[0];
+            
+            winner = {
+              user_id: state.currentBidder,
+              user_name: winnerUser ? `${winnerUser.first_name} ${winnerUser.last_name}` : 'Unknown User',
+              amount: state.currentBid
+            };
+            message = 'Auction ended. Winner: ' + winner.user_name;
+            status = 'won';
+            reserveMet = true;
+          } catch (err) {
+            console.error('Error fetching winner details:', err);
+            winner = {
+              user_id: state.currentBidder,
+              user_name: 'Unknown User',
+              amount: state.currentBid
+            };
+            message = 'Auction ended. Winner: Unknown User';
+            status = 'won';
+            reserveMet = true;
+          }
         } else {
           message = 'Auction ended. No bids placed.';
           status = 'no_bids';
@@ -295,7 +355,7 @@ const startServer = async () => {
         try {
           await LiveAuctionResult.create({
             auctionId,
-            winnerId: winner,
+            winnerId: winner ? winner.user_id : null,
             finalBid: state.currentBid,
             reserveMet,
             status
