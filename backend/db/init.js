@@ -286,6 +286,24 @@ const initDatabase = async () => {
       `);
     }
 
+    // Always check and add bidding columns to live_auctions if they don't exist
+    const liveBiddingColumnsCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'live_auctions' AND column_name = 'current_highest_bid'
+    `);
+
+    if (liveBiddingColumnsCheck.rows.length === 0) {
+      await pool.query(`
+        ALTER TABLE live_auctions 
+        ADD COLUMN current_highest_bid NUMERIC(12,2),
+        ADD COLUMN current_highest_bidder_id UUID REFERENCES users(id),
+        ADD COLUMN bid_count INTEGER DEFAULT 0,
+        ADD COLUMN min_bid_increment NUMERIC(12,2) DEFAULT 1
+      `);
+      console.log('Added bidding columns to live_auctions table');
+    }
+
     // Check if settled_auction_bids table exists (renamed from bids)
     const settledAuctionBidsTableCheck = await pool.query(`
       SELECT EXISTS (

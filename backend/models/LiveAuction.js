@@ -26,7 +26,7 @@ const LiveAuction = {
 
   // Update live auction fields by ID
   async updateAuction(id, fields) {
-    const allowed = ['title', 'description', 'image_url', 'start_time', 'end_time', 'starting_price', 'reserve_price', 'max_participants', 'status'];
+    const allowed = ['title', 'description', 'image_url', 'start_time', 'end_time', 'starting_price', 'reserve_price', 'max_participants', 'status', 'current_highest_bid', 'current_highest_bidder_id', 'bid_count', 'min_bid_increment'];
     const updates = [];
     const values = [];
     let idx = 1;

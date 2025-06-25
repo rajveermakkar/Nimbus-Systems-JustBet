@@ -1,4 +1,5 @@
 const LiveAuction = require('../models/LiveAuction');
+const { pool } = require('../db/init');
 const multer = require('multer');
 const { uploadImageToAzure } = require('../services/azureBlobService');
 
@@ -45,13 +46,72 @@ async function getLiveAuctionsByStatus(req, res) {
     const { status } = req.query;
     // Only allow public access to approved auctions
     if (!status || status === 'approved') {
+      // Get all approved live auctions first
       const auctions = await LiveAuction.findByStatus('approved');
-      return res.json(auctions);
+      
+      // Get seller info for each auction separately
+      const auctionsWithSellers = [];
+      for (const auction of auctions) {
+        // Get seller details for this auction
+        const sellerQuery = 'SELECT first_name, last_name, email, business_name FROM users WHERE id = $1';
+        const sellerResult = await pool.query(sellerQuery, [auction.seller_id]);
+        const seller = sellerResult.rows[0];
+        
+        // Combine auction and seller data
+        const auctionWithSeller = {
+          ...auction,
+          first_name: seller?.first_name,
+          last_name: seller?.last_name,
+          email: seller?.email,
+          business_name: seller?.business_name
+        };
+        
+        auctionsWithSellers.push(auctionWithSeller);
+      }
+      
+      return res.json(auctionsWithSellers);
     }
     // If status is not 'approved', do not allow (public endpoint)
     return res.status(403).json({ message: 'Forbidden: Only approved live auctions are public.' });
   } catch (error) {
     console.error('Error fetching live auctions:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// Get specific live auction by ID with seller information
+async function getLiveAuctionById(req, res) {
+  try {
+    const { id } = req.params;
+    
+    // Get the live auction first
+    const auction = await LiveAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ message: 'Live auction not found.' });
+    }
+    
+    // Only allow access to approved auctions
+    if (auction.status !== 'approved') {
+      return res.status(403).json({ message: 'This live auction is not available.' });
+    }
+    
+    // Get seller details separately
+    const sellerQuery = 'SELECT first_name, last_name, email, business_name FROM users WHERE id = $1';
+    const sellerResult = await pool.query(sellerQuery, [auction.seller_id]);
+    const seller = sellerResult.rows[0];
+    
+    // Combine auction and seller data
+    const auctionWithSeller = {
+      ...auction,
+      first_name: seller?.first_name,
+      last_name: seller?.last_name,
+      email: seller?.email,
+      business_name: seller?.business_name
+    };
+    
+    res.json(auctionWithSeller);
+  } catch (error) {
+    console.error('Error fetching live auction:', error);
     res.status(500).json({ message: 'Server error' });
   }
 }
@@ -174,6 +234,7 @@ async function restartLiveAuction(req, res) {
 module.exports = {
   createLiveAuction,
   getLiveAuctionsByStatus,
+  getLiveAuctionById,
   updateLiveAuction,
   upload: upload.single('image'),
   uploadAuctionImage,

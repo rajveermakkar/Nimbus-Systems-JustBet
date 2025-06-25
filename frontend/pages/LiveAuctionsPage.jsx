@@ -1,0 +1,74 @@
+import React, { useEffect, useState } from 'react';
+import auctionService from '../src/services/auctionService';
+import AuctionCard from '../src/components/auctions/AuctionCard';
+import Button from '../src/components/Button';
+
+function LiveAuctionsPage() {
+  const [auctions, setAuctions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const fetchAuctions = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await auctionService.getLiveAuctions();
+        setAuctions(data);
+      } catch (err) {
+        setError('Failed to load live auctions. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAuctions();
+  }, []);
+
+  const filtered = auctions.filter(a =>
+    a.title.toLowerCase().includes(search.toLowerCase()) ||
+    a.description.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-2">Live Auctions</h1>
+        <p className="text-gray-300 mb-8">Join real-time live auctions and bid against others!</p>
+        <div className="mb-6 max-w-md mx-auto">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search live auctions..."
+            className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400"
+          />
+        </div>
+        {error && (
+          <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 max-w-md mx-auto mb-8">
+            <i className="fas fa-exclamation-triangle text-red-400 text-2xl mb-2"></i>
+            <span className="text-red-300">{error}</span>
+          </div>
+        )}
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+              <p>Loading auctions...</p>
+            </div>
+          </div>
+        ) : filtered.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filtered.map(auction => (
+              <AuctionCard key={auction.id} auction={auction} type="live" actionLabel="Join Live Auction" />
+            ))}
+          </div>
+        ) : (
+          <div className="text-gray-400 text-center py-8">No live auctions found.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default LiveAuctionsPage; 
