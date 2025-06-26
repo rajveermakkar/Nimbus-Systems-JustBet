@@ -3,6 +3,8 @@ const { pool } = require('../db/init');
 const multer = require('multer');
 const { uploadImageToAzure } = require('../services/azureBlobService');
 const Bid = require('../models/Bid');
+const { getAuctionCountdown, getAuctionType } = require('../utils/auctionUtils');
+const LiveAuction = require('../models/LiveAuction');
 
 // function for a seller create a new auction listing
 async function createAuction(req, res) {
@@ -358,6 +360,31 @@ async function getAuctionByIdForSeller(req, res) {
   }
 }
 
+// GET /api/auction/:type/:id/countdown
+async function getAuctionCountdownAPI(req, res) {
+  try {
+    const { type, id } = req.params;
+    let auction;
+    if (type === 'live') {
+      auction = await LiveAuction.findById(id);
+    } else {
+      auction = await SettledAuction.findById(id);
+    }
+    if (!auction) {
+      return res.status(404).json({ message: 'Auction not found.' });
+    }
+    const auctionType = getAuctionType(auction);
+    const countdown = getAuctionCountdown(auction);
+    res.json({
+      auctionType,
+      ...countdown
+    });
+  } catch (error) {
+    console.error('Error getting auction countdown:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
 module.exports = {
   createAuction,
   listPendingAuctions,
@@ -368,7 +395,8 @@ module.exports = {
   placeBid,
   getBids,
   getAuctionWithBids,
-  getAuctionByIdForSeller
+  getAuctionByIdForSeller,
+  getAuctionCountdownAPI
 };
 
 module.exports.upload = upload.single('image');

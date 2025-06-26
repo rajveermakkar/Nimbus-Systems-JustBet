@@ -32,6 +32,11 @@ function AuctionPage() {
   // Winner announcement state
   const [winnerAnnouncement, setWinnerAnnouncement] = useState(null);
 
+  // Countdown states
+  const [countdown, setCountdown] = useState(null);
+  const [countdownStatus, setCountdownStatus] = useState(null);
+  const [loadingCountdown, setLoadingCountdown] = useState(true);
+
   // Stable onClose function
   const handleToastClose = useCallback(() => {
     setToast({ show: false, message: '', type: 'info' });
@@ -321,6 +326,44 @@ function AuctionPage() {
     }
   };
 
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchCountdown() {
+      if (!auction) return;
+      setLoadingCountdown(true);
+      try {
+        const type = auction.type || 'settled';
+        const data = await auctionService.getAuctionCountdown(type, auction.id);
+        if (isMounted) {
+          setCountdown(data.countdown);
+          setCountdownStatus(data.status);
+        }
+      } catch (e) {
+        if (isMounted) {
+          setCountdown(null);
+          setCountdownStatus(null);
+        }
+      } finally {
+        if (isMounted) setLoadingCountdown(false);
+      }
+    }
+    fetchCountdown();
+    const interval = setInterval(fetchCountdown, 1000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [auction?.id, auction?.type]);
+
+  // Helper to format seconds as HH:MM:SS
+  const formatSeconds = (secs) => {
+    if (secs == null) return '--:--:--';
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return [h, m, s].map(n => n.toString().padStart(2, '0')).join(':');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">
@@ -398,6 +441,7 @@ function AuctionPage() {
           duration={toast.type === 'success' ? 1500 : 3000}
         />
       )}
+
       
       {/* Winner Announcement Modal */}
       {winnerAnnouncement && (
@@ -556,7 +600,7 @@ function AuctionPage() {
               <div className="text-sm text-gray-300 mb-1">Current Bid</div>
               <div className="text-2xl font-bold text-green-400 mb-1">{formatPrice(validCurrentBid)}</div>
               <div className="text-xs text-gray-400 mb-1">Starting bid: <span className="text-white font-semibold">{formatPrice(auction.starting_price)}</span></div>
-              <div className="text-xs text-gray-400 mb-1">Time Remaining:</div>
+              <div className="text-xs text-gray-400 mb-1">Time Remaining: <span className="text-green-300">{formatSeconds(countdown)}</span></div>
               <div className="text-base font-semibold" style={{ color: displayTimeRemaining.ended ? '#f87171' : '#facc15' }}>
                 {/* Remove or comment out any JSX that displays countdown or 'Starting in:' */}
               </div>

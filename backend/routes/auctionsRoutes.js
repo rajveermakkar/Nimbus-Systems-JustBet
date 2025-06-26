@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAllApprovedAuctions, placeBid, getBids, getAuctionWithBids } = require('../controllers/auctionController');
+const { getAllApprovedAuctions, placeBid, getBids, getAuctionWithBids, getAuctionCountdownAPI } = require('../controllers/auctionController');
 const jwtauthMiddleware = require('../middleware/jwtauth');
 
 // Public: Get all approved settled auctions
@@ -8,6 +8,9 @@ router.get('/approved', getAllApprovedAuctions);
 
 // Get auction with bid information (public)
 router.get('/:id', getAuctionWithBids);
+
+// Public: Get countdown for any auction (settled or live)
+router.get('/countdown/:type/:id', getAuctionCountdownAPI);
 
 // Bidding routes (require authentication)
 router.use(jwtauthMiddleware);
