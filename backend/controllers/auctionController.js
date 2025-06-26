@@ -324,16 +324,18 @@ async function getAuctionWithBids(req, res) {
       return res.status(404).json({ message: 'Auction not found.' });
     }
 
+    // Only allow viewing if auction is approved or closed
+    if (auction.status !== 'approved' && auction.status !== 'closed') {
+      return res.status(403).json({ message: 'This auction is not available.' });
+    }
     // Get recent bids with bidder details (last 10)
     const bids = await Bid.findByAuctionIdWithBidders(id);
     const recentBids = bids.slice(0, 10);
-
     res.json({
       auction: auction,
       recentBids: recentBids,
       totalBids: bids.length
     });
-
   } catch (error) {
     console.error('Error fetching auction with bids:', error);
     res.status(500).json({ message: 'Server error' });

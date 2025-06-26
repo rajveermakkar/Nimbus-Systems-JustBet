@@ -1,13 +1,16 @@
 import React, { useContext, useState, useEffect } from "react";
 import { UserContext } from "../src/context/UserContext";
 import Button from "../src/components/Button";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Toast from "../src/components/Toast";
 
 function SellerDashboard() {
   const { user } = useContext(UserContext);
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('overview');
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const initialTab = queryParams.get('tab') || 'overview';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [analytics, setAnalytics] = useState(null);
   const [auctionResults, setAuctionResults] = useState([]);
   const [listings, setListings] = useState([]);
@@ -125,8 +128,17 @@ function SellerDashboard() {
   };
 
   const handleViewAuction = (result) => {
-    const path = `/seller/completed-auction/${result.auction_type}/${result.id}`;
+    const auctionType = result.type || result.auction_type || 'settled';
+    const path = `/seller/completed-auction/${auctionType}/${result.id}`;
     navigate(path);
+  };
+
+  // Update tab and URL when user clicks a tab
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    const params = new URLSearchParams(location.search);
+    params.set('tab', tabId);
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
   };
 
   if (!user || !user.isApproved) {
@@ -181,11 +193,11 @@ function SellerDashboard() {
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabChange(tab.id)}
                   className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${
                     activeTab === tab.id 
-                      ? 'bg-blue-600 text-white' 
-                      : 'text-gray-300 hover:text-white'
+                      ? 'bg-white/10 bg-purple-500/30 text-purple-300 border border-purple-400/40 shadow-[0_0_12px_#a78bfa66] backdrop-blur-md ' 
+                      : 'text-gray-300 hover:text-purple'
                   }`}
                 >
                   <i className={tab.icon}></i>
@@ -207,7 +219,7 @@ function SellerDashboard() {
             {error && (
               <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-6 text-center">
                 <p className="text-red-400">{error}</p>
-                <Button onClick={() => setActiveTab(activeTab)} className="mt-2">
+                <Button onClick={() => handleTabChange(activeTab)} className="mt-2">
                   Try Again
                 </Button>
               </div>
@@ -443,7 +455,8 @@ function SellerDashboard() {
                           </Button>
                           <Button
                             onClick={() => navigate(`/seller/edit-listing/${listing.id}?type=${listing.auction_type}`)}
-                            className="flex-1 text-sm bg-yellow-600 hover:bg-yellow-700"
+                            variant="secondary"
+                            className="flex-1 text-sm"
                           >
                             <i className="fas fa-edit mr-1"></i>
                             Edit

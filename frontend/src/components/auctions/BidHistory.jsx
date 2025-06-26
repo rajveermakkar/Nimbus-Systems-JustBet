@@ -29,8 +29,9 @@ function BidHistory({ auctionId, type = 'settled', bids: propBids }) {
       let data;
       if (type === 'settled') {
         data = await auctionService.getSettledBids(auctionId);
+      } else if (type === 'live') {
+        data = await auctionService.getLiveAuctionBids(auctionId);
       } else {
-        // For live auctions, bids will come through Socket.IO
         data = [];
       }
       setBids(data);
@@ -46,7 +47,7 @@ function BidHistory({ auctionId, type = 'settled', bids: propBids }) {
     if (propBids && propBids.length > 0) {
       setBids(propBids);
       setLoading(false);
-    } else if (type === 'settled') {
+    } else if (type === 'settled' || type === 'live') {
       fetchBids();
     }
   }, [auctionId, type, propBids]);

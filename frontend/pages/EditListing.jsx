@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Button from "../src/components/Button";
+import Toast from "../src/components/Toast";
 
-function EditListing({ showToast }) {
+function EditListing({ showToast: _showToast }) {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const auctionTypeFromURL = searchParams.get('type'); // 'live' or 'settled'
@@ -22,6 +23,11 @@ function EditListing({ showToast }) {
   const [fetching, setFetching] = useState(true);
   const fileInputRef = useRef();
   const navigate = useNavigate();
+  const [toast, setToast] = useState({ show: false, message: '', type: 'info', duration: 3000 });
+
+  const showToast = (message, type = 'info', duration = 3000) => {
+    setToast({ show: true, message, type, duration });
+  };
 
   // Fixed duration options for live auctions
   const durationOptions = [
@@ -40,6 +46,21 @@ function EditListing({ showToast }) {
     const endTime = new Date(start.getTime() + durationMinutes * 60000);
     return endTime.toISOString().slice(0, 16);
   };
+
+  // Convert UTC date string to local datetime-local value
+  function toLocalDatetimeValue(utcString) {
+    if (!utcString) return '';
+    const date = new Date(utcString);
+    const pad = n => n.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  // Convert local datetime-local value to UTC ISO string
+  function toUTCISOString(localValue) {
+    if (!localValue) return '';
+    const date = new Date(localValue);
+    return date.toISOString();
+  }
 
   // Fetch auction data
   const fetchAuction = async () => {
@@ -107,6 +128,7 @@ function EditListing({ showToast }) {
       throw new Error('Auction not found');
     } catch (err) {
       setError('Failed to load auction. Please try again.');
+      showToast('Failed to load auction. Please try again.', "error");
       console.error('Error fetching auction:', err);
     } finally {
       setFetching(false);
@@ -120,10 +142,10 @@ function EditListing({ showToast }) {
     setImageUrl(auction.image_url || "");
     setStartingPrice(auction.starting_price?.toString() || "");
     setReservePrice(auction.reserve_price?.toString() || "");
-    setStartTime(auction.start_time ? new Date(auction.start_time).toISOString().slice(0, 16) : "");
+    setStartTime(auction.start_time ? toLocalDatetimeValue(auction.start_time) : "");
     
     if (type === "settled") {
-      setEndTime(auction.end_time ? new Date(auction.end_time).toISOString().slice(0, 16) : "");
+      setEndTime(auction.end_time ? toLocalDatetimeValue(auction.end_time) : "");
     } else {
       // Calculate duration for live auctions
       if (auction.start_time && auction.end_time) {
@@ -196,7 +218,7 @@ function EditListing({ showToast }) {
     const err = validate();
     if (err) {
       setError(err);
-      showToast && showToast(err, "error");
+      showToast(err, "error");
       return;
     }
     setLoading(true);
@@ -223,11 +245,11 @@ function EditListing({ showToast }) {
       let finalStartTime, finalEndTime;
       
       if (auctionType === "live") {
-        finalStartTime = startTime;
-        finalEndTime = calculateEndTime(startTime, Number(duration));
+        finalStartTime = toUTCISOString(startTime);
+        finalEndTime = toUTCISOString(calculateEndTime(startTime, Number(duration)));
       } else {
-        finalStartTime = startTime;
-        finalEndTime = endTime;
+        finalStartTime = toUTCISOString(startTime);
+        finalEndTime = toUTCISOString(endTime);
       }
       
       // Choose the correct endpoint based on auction type
@@ -247,8 +269,8 @@ function EditListing({ showToast }) {
           imageUrl: finalImageUrl,
           startingPrice,
           reservePrice,
-          startTime: finalStartTime,
-          endTime: finalEndTime,
+          start_time: finalStartTime,
+          end_time: finalEndTime,
           maxParticipants: auctionType === "live" ? 50 : undefined
         })
       });
@@ -259,11 +281,11 @@ function EditListing({ showToast }) {
       }
       
       setLoading(false);
-      showToast && showToast("Listing updated successfully!", "success");
+      showToast("Listing updated successfully!", "success");
       navigate("/seller/dashboard");
     } catch (err) {
       setError(err.message || "Failed to update listing");
-      showToast && showToast(err.message || "Failed to update listing", "error");
+      showToast(err.message || "Failed to update listing", "error");
       setLoading(false);
     }
   }
@@ -281,6 +303,14 @@ function EditListing({ showToast }) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white py-8">
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ ...toast, show: false })}
+          duration={toast.duration}
+        />
+      )}
       <div className="w-full max-w-2xl mx-auto">
         <div className="bg-white/10 rounded-xl p-6 mb-6 border border-white/20">
           <h2 className="text-2xl font-bold flex items-center gap-2 mb-1">
@@ -433,6 +463,7 @@ function EditListing({ showToast }) {
             </Button>
           </div>
         </form>
+        <p className="text-xs text-white/60 mt-2 text-center">Note: Editing this listing will mark it as Pending and it will require admin re-approval.</p>
       </div>
     </div>
   );

@@ -24,6 +24,7 @@ import AuctionPage from '../pages/AuctionPage';
 import AllAuctionsPage from '../pages/AllAuctionsPage';
 import LiveAuctionsPage from '../pages/LiveAuctionsPage';
 import SettledAuctionsPage from '../pages/SettledAuctionsPage';
+import EndedAuctionPage from '../pages/EndedAuctionPage';
 
 // Import user pages
 import MyWinnings from '../pages/MyWinnings';
@@ -31,6 +32,7 @@ import MyBidHistory from '../pages/MyBidHistory';
 import WonAuctionDetails from '../pages/WonAuctionDetails';
 import EditListing from '../pages/EditListing';
 import CompletedAuctionDetails from '../pages/CompletedAuctionDetails';
+import NotFound from '../pages/NotFound';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -240,6 +242,7 @@ function AppRoutes() {
         <Route path="/auctions/:id" element={<AuctionPage />} />
         <Route path="/live-auctions" element={<LiveAuctionsPage />} />
         <Route path="/live-auctions/:id" element={<AuctionPage />} />
+        <Route path="/ended-auction/:id" element={<EndedAuctionPage />} />
         <Route path="/settled-auctions" element={<SettledAuctionsPage />} />
         
         {/* User Routes */}
@@ -287,6 +290,7 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
         <Route path="/not-authorized" element={<NotAuthorized showToast={showToast} />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );

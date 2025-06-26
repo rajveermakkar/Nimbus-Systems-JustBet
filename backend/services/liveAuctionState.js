@@ -3,7 +3,7 @@
 
 const auctions = new Map(); // auctionId -> { currentBid, currentBidder, bids: [], status, timer }
 
-function initAuction(auctionId, startingPrice, reservePrice, minIncrement = 1) {
+function initAuction(auctionId, startingPrice, reservePrice, minIncrement = 1, startTime) {
   auctions.set(auctionId, {
     currentBid: startingPrice,
     currentBidder: null,
@@ -12,7 +12,8 @@ function initAuction(auctionId, startingPrice, reservePrice, minIncrement = 1) {
     bids: [],
     status: 'open',
     timer: null,
-    timerEnd: null
+    timerEnd: null,
+    startTime: startTime
   });
 }
 

@@ -206,14 +206,12 @@ const sellerController = {
             winnerName = userResult.rows[0].first_name + ' ' + userResult.rows[0].last_name;
           }
         }
-        
         const resultType = row.current_highest_bidder_id ? 'sold' : 'no_bids';
-        
         allResults.push({
           ...row,
           winner_name: winnerName,
           result_type: resultType,
-          auction_type: 'live'
+          auction_type: row.type || 'live'
         });
       }
 
@@ -227,14 +225,12 @@ const sellerController = {
             winnerName = userResult.rows[0].first_name + ' ' + userResult.rows[0].last_name;
           }
         }
-        
         const resultType = row.current_highest_bidder_id ? 'sold' : 'no_bids';
-        
         allResults.push({
           ...row,
           winner_name: winnerName,
           result_type: resultType,
-          auction_type: 'settled'
+          auction_type: row.type || 'settled'
         });
       }
 

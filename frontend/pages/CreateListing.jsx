@@ -1,8 +1,9 @@
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../src/components/Button";
+import Toast from "../src/components/Toast";
 
-function CreateListing({ showToast }) {
+function CreateListing() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -15,6 +16,7 @@ function CreateListing({ showToast }) {
   const [endTime, setEndTime] = useState(""); // For settled auctions
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'info', duration: 3000 });
   const fileInputRef = useRef();
   const navigate = useNavigate();
 
@@ -83,6 +85,10 @@ function CreateListing({ showToast }) {
     return null;
   }
 
+  const showToast = (message, type = 'info', duration = 3000) => {
+    setToast({ show: true, message, type, duration });
+  };
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
@@ -148,8 +154,8 @@ function CreateListing({ showToast }) {
         throw new Error(data.message || "Failed to create listing");
       }
       setLoading(false);
-      showToast && showToast("Listing created successfully!", "success");
-      navigate("/seller/dashboard");
+      showToast("Listing created successfully!", "success");
+      navigate("/seller/dashboard?tab=listings");
     } catch (err) {
       setError(err.message || "Failed to create listing");
       showToast && showToast(err.message || "Failed to create listing", "error");
@@ -159,6 +165,14 @@ function CreateListing({ showToast }) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white py-8">
+      {loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white/10 p-8 rounded-xl flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+            <p className="text-white text-lg font-semibold">Creating Listing...</p>
+          </div>
+        </div>
+      )}
       <div className="w-full max-w-2xl mx-auto">
         <div className="bg-white/10 rounded-xl p-6 mb-6 border border-white/20">
           <h2 className="text-2xl font-bold flex items-center gap-2 mb-1">
@@ -318,6 +332,7 @@ function CreateListing({ showToast }) {
             </Button>
           </div>
         </form>
+        <p className="text-xs text-white/60 mt-2 text-center">Note: Your listing will be marked as Pending until approved by an admin.</p>
       </div>
     </div>
   );

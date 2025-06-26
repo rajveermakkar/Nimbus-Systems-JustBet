@@ -6,12 +6,14 @@ import Button from '../src/components/Button';
 function SettledAuctionsPage() {
   const [auctions, setAuctions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showInitialLoading, setShowInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    const fetchAuctions = async () => {
-      setLoading(true);
+    let intervalId;
+    const fetchAuctions = async (isInitial = false) => {
+      if (isInitial) setShowInitialLoading(true);
       setError(null);
       try {
         const data = await auctionService.getSettledAuctions();
@@ -19,10 +21,12 @@ function SettledAuctionsPage() {
       } catch (err) {
         setError('Failed to load settled auctions. Please try again.');
       } finally {
-        setLoading(false);
+        if (isInitial) setShowInitialLoading(false);
       }
     };
-    fetchAuctions();
+    fetchAuctions(true);
+    intervalId = setInterval(() => fetchAuctions(false), 7000);
+    return () => clearInterval(intervalId);
   }, []);
 
   const filtered = auctions.filter(a =>
@@ -50,7 +54,7 @@ function SettledAuctionsPage() {
             <span className="text-red-300">{error}</span>
           </div>
         )}
-        {loading ? (
+        {showInitialLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
@@ -60,7 +64,7 @@ function SettledAuctionsPage() {
         ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {filtered.map(auction => (
-              <AuctionCard key={auction.id} auction={auction} type="settled" actionLabel="Bid Now" />
+              <AuctionCard key={auction.id} auction={auction} actionLabel="Bid Now" />
             ))}
           </div>
         ) : (

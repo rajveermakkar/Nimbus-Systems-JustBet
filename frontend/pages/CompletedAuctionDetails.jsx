@@ -114,6 +114,7 @@ function CompletedAuctionDetails() {
 
   const isSold = auction.status === 'closed' && auction.current_highest_bidder_id;
   const finalBid = auction.current_highest_bid || auction.starting_price;
+  const auctionType = auction?.type || type || 'settled';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white py-6">
@@ -162,11 +163,11 @@ function CompletedAuctionDetails() {
 
               <div className="flex items-center gap-2">
                 <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                  type === 'live' 
+                  auctionType === 'live' 
                     ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
                     : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                 }`}>
-                  {type === 'live' ? 'Live Auction' : 'Settled Auction'}
+                  {auctionType === 'live' ? 'Live Auction' : 'Settled Auction'}
                 </span>
                 <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
                   isSold 

@@ -203,28 +203,16 @@ const startServer = async () => {
           socket.emit('bid_error', 'Auction not open for bidding.');
           return;
         }
-
-        // EXTRA CHECK: Fetch auction from DB for status and end_time
-        let auction;
-        try {
-          auction = await LiveAuctionModel.findById(auctionId);
-        } catch (err) {
-          socket.emit('bid_error', 'Server error. Please try again.');
-          return;
-        }
-        if (!auction) {
-          socket.emit('bid_error', 'Auction not found.');
-          return;
-        }
-        if (auction.status !== 'approved' && auction.status !== 'open') {
-          socket.emit('bid_error', 'Auction is closed.');
-          return;
-        }
-        // Check end time from DB
+        
+        // Prevent bidding before auction start time
         const now = Date.now();
-        const dbEndTime = new Date(auction.end_time).getTime();
-        if (now >= dbEndTime) {
-          liveAuctionState.closeAuction(auctionId);
+        if (state.startTime && now < new Date(state.startTime).getTime()) {
+          socket.emit('bid_error', 'Auction has not started yet.');
+          return;
+        }
+        
+        // Check if auction has reached its end time
+        if (state.endTime && now >= state.endTime) {
           socket.emit('bid_error', 'Auction has ended.');
           return;
         }
