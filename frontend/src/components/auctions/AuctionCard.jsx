@@ -128,26 +128,14 @@ function AuctionCard({ auction, actionLabel }) {
         <div className="mt-auto flex flex-col gap-2">
           {actionLabel && (
             <div className="mt-4">
-              {notStarted ? (
-                <div className="w-full py-2 rounded-lg bg-white/10 backdrop-blur-sm text-center text-white/70 border border-white/20" style={{ minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  Starting in: <span className="ml-2 font-mono text-white">{countdown}</span>
-                </div>
-              ) : (
-                <Button
-                  onClick={() => {
-                    if (type === 'live' && status.status === 'live') {
-                      navigate(`/live-auctions/${auction.id}`);
-                    } else if (type === 'live') {
-                      navigate(`/live-auctions/${auction.id}`);
-                    } else {
-                      navigate(`/auctions/${auction.id}`);
-                    }
-                  }}
-                  className="w-full"
-                >
-                  {actionLabel}
-                </Button>
-              )}
+              <Button
+                onClick={() => {
+                  navigate(`/auction/${type}/${auction.id}`);
+                }}
+                className="w-full"
+              >
+                {actionLabel}
+              </Button>
             </div>
           )}
         </div>

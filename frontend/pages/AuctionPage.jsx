@@ -9,7 +9,7 @@ import Toast from '../src/components/Toast';
 import EndpointSVG from './assets/Endpoint-amico.svg';
 
 function AuctionPage() {
-  const { id } = useParams();
+  const { id, type } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useContext(UserContext);
@@ -45,51 +45,6 @@ function AuctionPage() {
     }).format(price);
   };
 
-  // Calculate time remaining
-  const getTimeRemaining = (endTime) => {
-    const now = new Date();
-    const end = new Date(endTime);
-    const diff = end - now;
-    if (diff <= 0) return { ended: true, text: 'Auction Ended' };
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-    if (days > 0) return { ended: false, text: `${days}d ${hours}h ${minutes}m` };
-    if (hours > 0) return { ended: false, text: `${hours}h ${minutes}m ${seconds}s` };
-    return { ended: false, text: `${minutes}m ${seconds}s` };
-  };
-
-  // Calculate time remaining for live auctions
-  const getLiveTimeRemaining = () => {
-    if (!auction) return { ended: true, text: 'Loading...' };
-    
-    const now = new Date();
-    const end = new Date(auction.end_time);
-    const endDiff = end - now;
-    
-    // If auction has passed its end time
-    if (endDiff <= 0) {
-      return { ended: true, text: 'Auction Ended' };
-    }
-    
-    // If no bids have been placed yet, show time until auction ends
-    if (!auction.current_highest_bidder_id || auction.current_highest_bid === auction.starting_price) {
-      const days = Math.floor(endDiff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((endDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((endDiff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((endDiff % (1000 * 60)) / 1000);
-      
-      if (days > 0) return { ended: false, text: `Ends in: ${days}d ${hours}h ${minutes}m` };
-      if (hours > 0) return { ended: false, text: `Ends in: ${hours}h ${minutes}m ${seconds}s` };
-      return { ended: false, text: `Ends in: ${minutes}m ${seconds}s` };
-    }
-    
-    // If bids have been placed, show that countdown is active
-    // Note: The actual countdown is managed by the backend
-    return { ended: false, text: 'Bidding Active - 2min Timer' };
-  };
-
   // Get auction status (for live auctions)
   const getAuctionStatus = () => {
     if (!auction) return { status: 'loading', color: 'bg-gray-500' };
@@ -112,30 +67,23 @@ function AuctionPage() {
     try {
       setLoading(true);
       setError(null);
-      // Always fetch both endpoints and determine type from auction.type
       let auctionData = null;
       let isLive = false;
-      try {
+      if (type === 'settled') {
+        const settledData = await auctionService.getSettledAuction(id);
+        auctionData = settledData.auction || settledData;
+        isLive = false;
+      } else if (type === 'live') {
         const liveData = await auctionService.getLiveAuction(id);
-        if (liveData && (liveData.type === 'live' || liveData.max_participants)) {
-          auctionData = liveData;
-          isLive = true;
-        }
-      } catch {}
-      if (!auctionData) {
-        try {
-          const settledData = await auctionService.getSettledAuction(id);
-          if (settledData && (settledData.type === 'settled' || !settledData.max_participants)) {
-            auctionData = settledData.auction || settledData;
-            isLive = false;
-          }
-        } catch {}
+        auctionData = liveData;
+        isLive = true;
+      } else {
+        throw new Error('Invalid auction type');
       }
-      if (!auctionData) throw new Error('Auction not found');
       setAuction(auctionData);
-      setIsLiveAuction(auctionData.type === 'live');
+      setIsLiveAuction(type === 'live');
       // Fetch bid history for live auctions
-      if (auctionData.type === 'live') {
+      if (type === 'live') {
         try {
           const response = await fetch(`/api/live-auctions/${id}/bids`);
           if (response.ok) {
@@ -156,7 +104,7 @@ function AuctionPage() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, type]);
 
   // Connect to Socket.IO for live auctions
   useEffect(() => {
@@ -253,33 +201,49 @@ function AuctionPage() {
     };
   }, [id, user, isLiveAuction]);
 
-  // Start polling for settled auction updates
+  // Optimized: Only call fetchAuction for settled auctions, and use Promise.all for live auctions
   useEffect(() => {
-    if (isLiveAuction) return; // Don't poll for live auctions
-    
-    fetchAuction();
-    const stopPolling = auctionService.startAuctionPolling(id, (response) => {
-      setAuction(response.auction);
-      setRecentBids(response.recentBids || []);
-    }, 5000); // 5 seconds
-    return () => stopPolling();
-  }, [id, isLiveAuction, fetchAuction]); // Added fetchAuction to dependencies
-
-  // Initial fetch for live auctions
-  useEffect(() => {
-    if (isLiveAuction) {
+    let stopPolling;
+    if (type === 'settled') {
       fetchAuction();
+      stopPolling = auctionService.startAuctionPolling(id, (response) => {
+        setAuction(response.auction);
+        setRecentBids(response.recentBids || []);
+      }, 5000); // 5 seconds
+    } else if (type === 'live') {
+      setLoading(true);
+      setError(null);
+      async function loadLiveAuction() {
+        try {
+          const auctionData = await auctionService.getLiveAuction(id);
+          setAuction(auctionData);
+          setIsLiveAuction(true);
+          try {
+            const response = await fetch(`/api/live-auctions/${id}/bids`);
+            if (response.ok) {
+              const bidsData = await response.json();
+              setRecentBids(bidsData.bids || []);
+            } else {
+              setRecentBids([]);
+            }
+          } catch {
+            setRecentBids([]);
+          }
+        } catch {
+          setError('Failed to load auction. Please try again.');
+          setAuction(null);
+          setIsLiveAuction(false);
+          setRecentBids([]);
+        } finally {
+          setLoading(false);
+        }
+      }
+      loadLiveAuction();
     }
-  }, [id, isLiveAuction, fetchAuction]); // Added fetchAuction to dependencies
-
-  // Update countdown timer
-  useEffect(() => {
-    if (!auction) return;
-    const timer = setInterval(() => {
-      setAuction(prev => ({ ...prev }));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [auction]);
+    return () => {
+      if (stopPolling) stopPolling();
+    };
+  }, [id, type]);
 
   // After setting auction, redirect if closed live auction
   useEffect(() => {
@@ -388,7 +352,6 @@ function AuctionPage() {
     );
   }
 
-  const timeRemaining = getTimeRemaining(auction.end_time);
   const currentBid = auction.current_highest_bid || auction.starting_price;
   const minBidIncrement = auction.min_bid_increment || 1;
 
@@ -400,7 +363,7 @@ function AuctionPage() {
   const status = isLiveAuction ? getAuctionStatus() : null;
   
   // Get time remaining (different logic for live vs settled auctions)
-  const displayTimeRemaining = isLiveAuction ? getLiveTimeRemaining() : timeRemaining;
+  const displayTimeRemaining = { ended: auction.status === 'closed', text: '' };
 
   // Check if auction is ended
   const isAuctionEnded = displayTimeRemaining.ended || auction.status === 'closed' || (isLiveAuction && status?.status === 'ended');
@@ -595,7 +558,7 @@ function AuctionPage() {
               <div className="text-xs text-gray-400 mb-1">Starting bid: <span className="text-white font-semibold">{formatPrice(auction.starting_price)}</span></div>
               <div className="text-xs text-gray-400 mb-1">Time Remaining:</div>
               <div className="text-base font-semibold" style={{ color: displayTimeRemaining.ended ? '#f87171' : '#facc15' }}>
-                {displayTimeRemaining.text}
+                {/* Remove or comment out any JSX that displays countdown or 'Starting in:' */}
               </div>
               {isLiveAuction && (
                 <div className="text-xs text-gray-400 mt-1">
@@ -610,6 +573,11 @@ function AuctionPage() {
                 <h3 className="text-base font-semibold mb-2 text-left">
                   Place Your {isLiveAuction ? 'Live ' : ''}Bid
                 </h3>
+                {isLiveAuction && status?.status === 'upcoming' && (
+                  <div className="text-center py-4 text-yellow-400 font-semibold">
+                    Bidding will open when the auction starts.
+                  </div>
+                )}
                 {!user ? (
                   <div className="text-center py-4">
                     <p className="text-gray-400 mb-4 text-sm">Please log in to place a bid</p>
@@ -632,7 +600,7 @@ function AuctionPage() {
                         onChange={(e) => setBidAmount(e.target.value)}
                         placeholder={`Minimum: ${formatPrice(validCurrentBid + validMinIncrement)}`}
                         className="w-full mt-2 mb-2 px-3 py-2 bg-white/10 border border-white/20 rounded text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm"
-                        disabled={placingBid || (isLiveAuction && !isConnected)}
+                        disabled={placingBid || (isLiveAuction && (!isConnected || status?.status === 'upcoming'))}
                       />
                     </div>
                     {/* Quick Bid Buttons */}
@@ -644,7 +612,7 @@ function AuctionPage() {
                           const newBid = validCurrentBid + validMinIncrement;
                           setBidAmount(newBid.toFixed(2));
                         }}
-                        disabled={placingBid || (isLiveAuction && !isConnected) || isNaN(validCurrentBid) || isNaN(validMinIncrement)}
+                        disabled={placingBid || (isLiveAuction && (!isConnected || status?.status === 'upcoming')) || isNaN(validCurrentBid) || isNaN(validMinIncrement)}
                       >
                         Bid {formatPrice(validCurrentBid + validMinIncrement)}
                       </button>
@@ -655,7 +623,7 @@ function AuctionPage() {
                           const newBid = validCurrentBid + validMinIncrement * 2;
                           setBidAmount(newBid.toFixed(2));
                         }}
-                        disabled={placingBid || (isLiveAuction && !isConnected) || isNaN(validCurrentBid) || isNaN(validMinIncrement)}
+                        disabled={placingBid || (isLiveAuction && (!isConnected || status?.status === 'upcoming')) || isNaN(validCurrentBid) || isNaN(validMinIncrement)}
                       >
                         Bid {formatPrice(validCurrentBid + validMinIncrement * 2)}
                       </button>
@@ -672,7 +640,7 @@ function AuctionPage() {
                     )}
                     <Button
                       type="submit"
-                      disabled={placingBid || !bidAmount || (isLiveAuction && !isConnected)}
+                      disabled={placingBid || !bidAmount || (isLiveAuction && (!isConnected || status?.status === 'upcoming'))}
                       className="w-full"
                     >
                       {placingBid ? (

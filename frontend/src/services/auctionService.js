@@ -116,12 +116,8 @@ const auctionService = {
       }
     };
 
-    // Initial call
-    poll();
-    
-    // Set up interval
+    // Set up interval (do NOT call poll immediately)
     const intervalId = setInterval(poll, interval);
-    
     // Return function to stop polling
     return () => clearInterval(intervalId);
   },

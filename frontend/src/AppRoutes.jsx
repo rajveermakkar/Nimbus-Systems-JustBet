@@ -239,9 +239,8 @@ function AppRoutes() {
         
         {/* Auction Routes */}
         <Route path="/auctions" element={<AllAuctionsPage />} />
-        <Route path="/auctions/:id" element={<AuctionPage />} />
+        <Route path="/auction/:type/:id" element={<AuctionPage />} />
         <Route path="/live-auctions" element={<LiveAuctionsPage />} />
-        <Route path="/live-auctions/:id" element={<AuctionPage />} />
         <Route path="/ended-auction/:id" element={<EndedAuctionPage />} />
         <Route path="/settled-auctions" element={<SettledAuctionsPage />} />
         
