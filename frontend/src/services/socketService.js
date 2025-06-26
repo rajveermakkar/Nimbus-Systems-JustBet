@@ -72,8 +72,8 @@ class SocketService {
     this.socket.on('auction_state', (data) => {
       if (callback) {
         callback({
-          type: 'auction-update',
-          auction: data
+          type: 'auction_state',
+          ...data
         });
       }
     });
@@ -83,16 +83,7 @@ class SocketService {
       if (callback) {
         callback({
           type: 'bid-update',
-          bid: {
-            id: Date.now(),
-            user_id: data.currentBidder,
-            amount: data.currentBid,
-            created_at: new Date().toISOString()
-          },
-          auction: {
-            current_highest_bid: data.currentBid,
-            current_highest_bidder_id: data.currentBidder
-          }
+          ...data
         });
       }
     });
@@ -123,6 +114,9 @@ class SocketService {
     if (!this.socket || !this.isConnected) {
       return;
     }
+
+    // Emit leave event to server
+    this.socket.emit('leave_auction', { auctionId });
 
     // Remove listeners for this auction
     this.socket.off('auction_state');

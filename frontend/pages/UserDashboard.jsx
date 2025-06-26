@@ -21,14 +21,14 @@ function UserDashboard() {
       description: "Auctions you've won",
       icon: "fa-solid fa-trophy",
       bg: "bg-green-600",
-      onClick: () => navigate("/dashboard?tab=winnings"),
+      onClick: () => navigate("/my-winnings"),
     },
     {
       title: "Bid History",
       description: "Track your bids",
       icon: "fa-solid fa-clock-rotate-left",
       bg: "bg-purple-600",
-      onClick: () => navigate("/dashboard?tab=bids"),
+      onClick: () => navigate("/my-bid-history"),
     },
   ];
 

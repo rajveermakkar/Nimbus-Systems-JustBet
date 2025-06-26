@@ -22,6 +22,8 @@
 
 ### Auctions (Live)
 - **GET /api/live-auction?status=approved** — Get all approved live auctions (public live events view).
+- **GET /api/live-auction/:id** — Get specific live auction by ID (public).
+- **GET /api/live-auction/:id/bids** — Get bid history for a live auction (public).
 
 ---
 
@@ -29,17 +31,21 @@
 
 - **POST /api/seller/request** — Request to become a seller. (if buyer)
 - **GET /api/seller/status** — Get status of seller request. (if buyer)
+- **GET /api/seller/analytics** — Get seller analytics and statistics.
+- **GET /api/seller/auction-results** — Get auction results (winners, final bids, etc.).
 
 ### Settled Auctions
 - **POST /api/seller/auctions** — Create a new settled auction. Body: `{ title, description, imageUrl, startTime, endTime, startingPrice, reservePrice }`
 - **POST /api/seller/auctions/upload-image** — Upload image for settled auction. Form-data: `image` (file)
 - **PATCH /api/seller/auctions/:id** — Update a settled auction (only by owner).
+- **GET /api/seller/auctions/:id** — Get a single settled auction by ID (only by owner).
 - **GET /api/seller/auctions** — Get all settled auctions created by the seller.
 
 ### Live Auctions
 - **POST /api/seller/live-auction** — Create a new live auction. Body: `{ title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, maxParticipants }`
 - **POST /api/seller/live-auction/upload-image** — Upload image for live auction. Form-data: `image` (file)
 - **PATCH /api/seller/live-auction/:id** — Update a live auction (only by owner).
+- **GET /api/seller/live-auction/:id** — Get a single live auction by ID (only by owner).
 - **GET /api/seller/live-auction** — Get all live auctions created by the seller.
 - **POST /api/seller/live-auction/:id/restart** — Restart a live auction that didn't meet reserve price (only by owner).
 
@@ -63,6 +69,9 @@
 ## Authenticated User Endpoints
 
 - **GET /api/auth/profile** — Get the profile of the currently logged-in user.
+- **POST /api/auth/refresh-token** — Refresh access token.
+- **GET /api/auth/winnings** — Get user winnings (auctions they won).
+- **GET /api/auth/user/:id** — Get user details by ID (for winner information).
 
 ---
 
@@ -70,4 +79,6 @@
 - All POST/PATCH endpoints that require authentication must include a valid JWT token in the `Authorization: Bearer <token>` header.
 - For image upload endpoints, use `multipart/form-data` with a file field named `image`.
 - For creating or updating auctions, required fields are specified in the body. Refer to the endpoint description for details.
+- Seller endpoints require the user to have an approved seller role.
+- Admin endpoints require the user to have an admin role.
 

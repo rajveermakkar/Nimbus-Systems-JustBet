@@ -200,8 +200,10 @@ async function getMyAuctions(req, res) {
     if (!user || user.role !== 'seller') {
       return res.status(403).json({ message: 'Only sellers can view their own listings.' });
     }
-    const auctions = await SettledAuction.findBySeller(user.id);
-    res.json(auctions);
+    // Only get auctions that are not closed
+    const query = 'SELECT * FROM settled_auctions WHERE seller_id = $1 AND status != $2';
+    const result = await pool.query(query, [user.id, 'closed']);
+    res.json(result.rows);
   } catch (error) {
     console.error('Error fetching seller auctions:', error);
     res.status(500).json({ message: 'Server error' });
@@ -322,18 +324,36 @@ async function getAuctionWithBids(req, res) {
       return res.status(404).json({ message: 'Auction not found.' });
     }
 
+    // Only allow viewing if auction is approved or closed
+    if (auction.status !== 'approved' && auction.status !== 'closed') {
+      return res.status(403).json({ message: 'This auction is not available.' });
+    }
     // Get recent bids with bidder details (last 10)
     const bids = await Bid.findByAuctionIdWithBidders(id);
     const recentBids = bids.slice(0, 10);
-
     res.json({
       auction: auction,
       recentBids: recentBids,
       totalBids: bids.length
     });
-
   } catch (error) {
     console.error('Error fetching auction with bids:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function getAuctionByIdForSeller(req, res) {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+    const query = 'SELECT * FROM settled_auctions WHERE id = $1 AND seller_id = $2';
+    const result = await pool.query(query, [id, user.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Auction not found.' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching auction:', error);
     res.status(500).json({ message: 'Server error' });
   }
 }
@@ -347,7 +367,8 @@ module.exports = {
   getMyAuctions,
   placeBid,
   getBids,
-  getAuctionWithBids
+  getAuctionWithBids,
+  getAuctionByIdForSeller
 };
 
 module.exports.upload = upload.single('image');

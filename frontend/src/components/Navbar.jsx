@@ -59,13 +59,6 @@ function Navbar() {
                 Dashboard
               </Link>
               <Link
-                to="/winnings"
-                className="flex items-center gap-1 text-white font-medium hover:text-yellow-400 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
-              >
-                <i className="fa-solid fa-trophy"></i>
-                Winnings
-              </Link>
-              <Link
                 to="/wallet"
                 className="flex items-center gap-1 text-white font-medium hover:text-green-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
               >

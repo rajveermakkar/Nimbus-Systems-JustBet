@@ -18,11 +18,9 @@ const jwtauthMiddleware = async (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Decoded JWT:', decoded); // Debug log
 
     // Get latest user data to ensure role and approval status are current
     const user = await User.findById(decoded.id);
-    console.log('User fetched from DB:', user); // Debug log
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }

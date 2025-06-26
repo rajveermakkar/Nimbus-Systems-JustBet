@@ -24,6 +24,15 @@ import AuctionPage from '../pages/AuctionPage';
 import AllAuctionsPage from '../pages/AllAuctionsPage';
 import LiveAuctionsPage from '../pages/LiveAuctionsPage';
 import SettledAuctionsPage from '../pages/SettledAuctionsPage';
+import EndedAuctionPage from '../pages/EndedAuctionPage';
+
+// Import user pages
+import MyWinnings from '../pages/MyWinnings';
+import MyBidHistory from '../pages/MyBidHistory';
+import WonAuctionDetails from '../pages/WonAuctionDetails';
+import EditListing from '../pages/EditListing';
+import CompletedAuctionDetails from '../pages/CompletedAuctionDetails';
+import NotFound from '../pages/NotFound';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -230,10 +239,27 @@ function AppRoutes() {
         
         {/* Auction Routes */}
         <Route path="/auctions" element={<AllAuctionsPage />} />
-        <Route path="/auctions/:id" element={<AuctionPage />} />
+        <Route path="/auction/:type/:id" element={<AuctionPage />} />
         <Route path="/live-auctions" element={<LiveAuctionsPage />} />
-        <Route path="/live-auctions/:id" element={<AuctionPage />} />
+        <Route path="/ended-auction/:id" element={<EndedAuctionPage />} />
         <Route path="/settled-auctions" element={<SettledAuctionsPage />} />
+        
+        {/* User Routes */}
+        <Route path="/my-winnings" element={
+          <ProtectedRoute>
+            <MyWinnings />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-bid-history" element={
+          <ProtectedRoute>
+            <MyBidHistory />
+          </ProtectedRoute>
+        } />
+        <Route path="/won-auction/:type/:id" element={
+          <ProtectedRoute>
+            <WonAuctionDetails />
+          </ProtectedRoute>
+        } />
         
         <Route path="/dashboard" element={
           <ProtectedRoute>
@@ -251,12 +277,19 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
         <Route path="/seller/request" element={<SellerRequestForm showToast={showToast} />} />
+        <Route path="/seller/edit-listing/:id" element={<ProtectedRoute><EditListing /></ProtectedRoute>} />
+        <Route path="/seller/completed-auction/:type/:id" element={
+          <ProtectedRoute allowedRoles={['seller']}>
+            <CompletedAuctionDetails />
+          </ProtectedRoute>
+        } />
         <Route path="/admin/dashboard" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminDashboard showToast={showToast} />
           </ProtectedRoute>
         } />
         <Route path="/not-authorized" element={<NotAuthorized showToast={showToast} />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );

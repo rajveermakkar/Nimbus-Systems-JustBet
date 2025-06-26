@@ -116,14 +116,21 @@ const auctionService = {
       }
     };
 
-    // Initial call
-    poll();
-    
-    // Set up interval
+    // Set up interval (do NOT call poll immediately)
     const intervalId = setInterval(poll, interval);
-    
     // Return function to stop polling
     return () => clearInterval(intervalId);
+  },
+
+  // Get bids for live auction
+  async getLiveAuctionBids(auctionId) {
+    try {
+      const response = await api.get(`/live-auction/${auctionId}/bids`);
+      return response.data.bids;
+    } catch (error) {
+      console.error('Error fetching live auction bids:', error);
+      throw error;
+    }
   }
 };
 

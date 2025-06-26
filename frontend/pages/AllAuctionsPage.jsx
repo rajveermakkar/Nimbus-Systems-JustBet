@@ -7,11 +7,13 @@ function AllAuctionsPage() {
   const [liveAuctions, setLiveAuctions] = useState([]);
   const [settledAuctions, setSettledAuctions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showInitialLoading, setShowInitialLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true);
+    let intervalId;
+    const fetchAll = async (isInitial = false) => {
+      if (isInitial) setShowInitialLoading(true);
       setError(null);
       try {
         const [live, settled] = await Promise.all([
@@ -23,10 +25,12 @@ function AllAuctionsPage() {
       } catch (err) {
         setError('Failed to load auctions. Please try again.');
       } finally {
-        setLoading(false);
+        if (isInitial) setShowInitialLoading(false);
       }
     };
-    fetchAll();
+    fetchAll(true);
+    intervalId = setInterval(() => fetchAll(false), 7000);
+    return () => clearInterval(intervalId);
   }, []);
 
   return (
@@ -40,7 +44,7 @@ function AllAuctionsPage() {
             <span className="text-red-300">{error}</span>
           </div>
         )}
-        {loading ? (
+        {showInitialLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
@@ -64,7 +68,7 @@ function AllAuctionsPage() {
               {liveAuctions.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   {liveAuctions.slice(0, 4).map(auction => (
-                    <AuctionCard key={auction.id} auction={auction} type="live" actionLabel="Join Live Auction" />
+                    <AuctionCard key={auction.id} auction={auction} actionLabel="Join Live Auction" />
                   ))}
                 </div>
               ) : (
@@ -87,7 +91,7 @@ function AllAuctionsPage() {
               {settledAuctions.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   {settledAuctions.slice(0, 4).map(auction => (
-                    <AuctionCard key={auction.id} auction={auction} type="settled" actionLabel="Bid Now" />
+                    <AuctionCard key={auction.id} auction={auction} actionLabel="Bid Now" />
                   ))}
                 </div>
               ) : (

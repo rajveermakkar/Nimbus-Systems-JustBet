@@ -4,11 +4,11 @@ const LiveAuction = {
   // Create a new live auction
   async create({ sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, maxParticipants }) {
     const query = `
-      INSERT INTO live_auctions (seller_id, title, description, image_url, start_time, end_time, starting_price, reserve_price, max_participants)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO live_auctions (seller_id, title, description, image_url, start_time, end_time, starting_price, reserve_price, max_participants, type)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
-    const result = await pool.query(query, [sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, maxParticipants]);
+    const result = await pool.query(query, [sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, maxParticipants, 'live']);
     return result.rows[0];
   },
 

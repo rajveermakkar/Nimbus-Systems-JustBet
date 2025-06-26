@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../Button';
 
-function AuctionCard({ auction, type = 'settled', actionLabel }) {
+function AuctionCard({ auction, actionLabel }) {
   const navigate = useNavigate();
+  const type = auction.type || 'settled';
 
   // Format price
   const formatPrice = (price) => {
@@ -38,27 +39,15 @@ function AuctionCard({ auction, type = 'settled', actionLabel }) {
 
   // Get auction status
   const getAuctionStatus = () => {
-    if (type === 'live') {
-      const now = new Date();
-      const start = new Date(auction.start_time);
-      const end = new Date(auction.end_time);
-
-      if (now < start) {
-        return { status: 'upcoming', text: 'Upcoming', color: 'bg-blue-500' };
-      } else if (now >= start && now <= end) {
-        return { status: 'live', text: 'LIVE', color: 'bg-red-500' };
-      } else {
-        return { status: 'ended', text: 'Ended', color: 'bg-gray-500' };
-      }
+    const now = new Date();
+    const start = new Date(auction.start_time);
+    const end = new Date(auction.end_time);
+    if (now < start) {
+      return { status: 'upcoming', text: 'Upcoming', color: 'bg-blue-500' };
+    } else if (now >= start && now <= end) {
+      return { status: 'active', text: 'Active', color: 'bg-green-500' };
     } else {
-      const now = new Date();
-      const end = new Date(auction.end_time);
-
-      if (now > end) {
-        return { status: 'ended', text: 'Ended', color: 'bg-gray-500' };
-      } else {
-        return { status: 'active', text: 'Active', color: 'bg-green-500' };
-      }
+      return { status: 'ended', text: 'Ended', color: 'bg-gray-500' };
     }
   };
 
@@ -66,15 +55,52 @@ function AuctionCard({ auction, type = 'settled', actionLabel }) {
   const timeRemaining = getTimeRemaining(auction.end_time);
   const currentBid = auction.current_highest_bid || auction.starting_price;
 
+  // Determine if this is a live auction and if it hasn't started yet
+  const isLive = auction.type === 'live';
+  const isSettled = auction.type === 'settled';
+  const now = Date.now();
+  const startTime = new Date(auction.start_time || auction.startTime).getTime();
+  const notStarted = (isLive || isSettled) && startTime > now;
+
+  // Countdown for not-yet-started auctions
+  const [countdown, setCountdown] = useState('');
+  useEffect(() => {
+    if (!notStarted) return;
+    function updateCountdown() {
+      const now = Date.now();
+      const diff = startTime - now;
+      if (diff <= 0) {
+        setCountdown('00:00:00');
+        return;
+      }
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      const pad = n => n.toString().padStart(2, '0');
+      setCountdown(`${pad(hours)}:${pad(minutes)}:${pad(seconds)}`);
+    }
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [notStarted, startTime]);
+
   return (
     <div className="bg-white/5 rounded-2xl shadow-xl overflow-hidden flex flex-col flex-1 min-w-[220px] max-w-[300px] w-full mx-auto transition-transform hover:scale-[1.025] hover:shadow-2xl">
       {/* Image */}
-      <div className="bg-white/10 flex items-center justify-center h-36">
+      <div className="bg-white/10 flex items-center justify-center h-36 relative">
         {auction.image_url ? (
           <img src={auction.image_url} alt={auction.title} className="h-28 w-auto object-contain" />
         ) : (
           <i className="fa-solid fa-image text-gray-400 text-4xl"></i>
         )}
+        {/* Auction type badge in top left */}
+        <div className="absolute top-2 left-2 z-10">
+          {type === 'live' ? (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/40 border border-red-400/50 text-red-100 backdrop-blur shadow-sm" style={{fontSize: '11px'}}>Live</span>
+          ) : (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/40 border border-blue-400/50 text-blue-100 backdrop-blur shadow-sm" style={{fontSize: '11px'}}>Settled</span>
+          )}
+        </div>
       </div>
       {/* Content */}
       <div className="flex-1 flex flex-col p-4">
@@ -100,18 +126,18 @@ function AuctionCard({ auction, type = 'settled', actionLabel }) {
           {auction.category && <><span className="text-left">Category:</span><span className="text-white text-left">{auction.category}</span></>}
         </div>
         <div className="mt-auto flex flex-col gap-2">
-          <Button
-            className="w-full"
-            onClick={() => {
-              if (type === 'live' && status.status === 'live') {
-                navigate(`/live-auctions/${auction.id}`);
-              } else {
-                navigate(`/auctions/${auction.id}`);
-              }
-            }}
-          >
-            {actionLabel || (type === 'live' ? (status.status === 'live' ? 'Join Live Auction' : 'View Details') : 'Bid Now')}
-          </Button>
+          {actionLabel && (
+            <div className="mt-4">
+              <Button
+                onClick={() => {
+                  navigate(`/auction/${type}/${auction.id}`);
+                }}
+                className="w-full"
+              >
+                {actionLabel}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
