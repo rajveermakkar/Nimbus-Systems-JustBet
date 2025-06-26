@@ -6,6 +6,7 @@ import socketService from '../src/services/socketService';
 import BidHistory from '../src/components/auctions/BidHistory';
 import Button from '../src/components/Button';
 import Toast from '../src/components/Toast';
+import EndpointSVG from './assets/Endpoint-amico.svg';
 
 function AuctionPage() {
   const { id } = useParams();
@@ -30,9 +31,6 @@ function AuctionPage() {
   
   // Winner announcement state
   const [winnerAnnouncement, setWinnerAnnouncement] = useState(null);
-
-  // Determine auction type from URL path
-  const isLiveAuctionFromURL = location.pathname.includes('/live-auctions/');
 
   // Stable onClose function
   const handleToastClose = useCallback(() => {
@@ -114,46 +112,51 @@ function AuctionPage() {
     try {
       setLoading(true);
       setError(null);
-      
-      if (isLiveAuctionFromURL) {
-        // Fetch as live auction
+      // Always fetch both endpoints and determine type from auction.type
+      let auctionData = null;
+      let isLive = false;
+      try {
+        const liveData = await auctionService.getLiveAuction(id);
+        if (liveData && (liveData.type === 'live' || liveData.max_participants)) {
+          auctionData = liveData;
+          isLive = true;
+        }
+      } catch {}
+      if (!auctionData) {
         try {
-          const liveData = await auctionService.getLiveAuction(id);
-          setAuction(liveData);
-          setIsLiveAuction(true);
-          
-          // Fetch bid history for live auctions
-          try {
-            const response = await fetch(`/api/live-auctions/${id}/bids`);
-            if (response.ok) {
-              const data = await response.json();
-              setRecentBids(data.bids || []);
-            }
-          } catch (bidError) {
-            console.error('Error fetching bid history:', bidError);
-            setRecentBids([]);
+          const settledData = await auctionService.getSettledAuction(id);
+          if (settledData && (settledData.type === 'settled' || !settledData.max_participants)) {
+            auctionData = settledData.auction || settledData;
+            isLive = false;
           }
-        } catch (liveError) {
-          throw new Error('Live auction not found');
+        } catch {}
+      }
+      if (!auctionData) throw new Error('Auction not found');
+      setAuction(auctionData);
+      setIsLiveAuction(auctionData.type === 'live');
+      // Fetch bid history for live auctions
+      if (auctionData.type === 'live') {
+        try {
+          const response = await fetch(`/api/live-auctions/${id}/bids`);
+          if (response.ok) {
+            const data = await response.json();
+            setRecentBids(data.bids || []);
+          }
+        } catch (bidError) {
+          setRecentBids([]);
         }
       } else {
-        // Fetch as settled auction
-        try {
-          const response = await auctionService.getSettledAuction(id);
-          setAuction(response.auction);
-          setRecentBids(response.recentBids || []);
-          setIsLiveAuction(false);
-        } catch (settledError) {
-          throw new Error('Settled auction not found');
-        }
+        setRecentBids(auctionData.recentBids || []);
       }
     } catch (err) {
       setError('Failed to load auction. Please try again.');
-      console.error('Error fetching auction:', err);
+      setAuction(null);
+      setIsLiveAuction(false);
+      setRecentBids([]);
     } finally {
       setLoading(false);
     }
-  }, [id, isLiveAuctionFromURL]);
+  }, [id]);
 
   // Connect to Socket.IO for live auctions
   useEffect(() => {
@@ -252,7 +255,7 @@ function AuctionPage() {
 
   // Start polling for settled auction updates
   useEffect(() => {
-    if (isLiveAuctionFromURL) return; // Don't poll for live auctions
+    if (isLiveAuction) return; // Don't poll for live auctions
     
     fetchAuction();
     const stopPolling = auctionService.startAuctionPolling(id, (response) => {
@@ -260,14 +263,14 @@ function AuctionPage() {
       setRecentBids(response.recentBids || []);
     }, 5000); // 5 seconds
     return () => stopPolling();
-  }, [id, isLiveAuctionFromURL, fetchAuction]); // Added fetchAuction to dependencies
+  }, [id, isLiveAuction, fetchAuction]); // Added fetchAuction to dependencies
 
   // Initial fetch for live auctions
   useEffect(() => {
-    if (isLiveAuctionFromURL) {
+    if (isLiveAuction) {
       fetchAuction();
     }
-  }, [id, isLiveAuctionFromURL, fetchAuction]); // Added fetchAuction to dependencies
+  }, [id, isLiveAuction, fetchAuction]); // Added fetchAuction to dependencies
 
   // Update countdown timer
   useEffect(() => {
@@ -277,6 +280,13 @@ function AuctionPage() {
     }, 1000);
     return () => clearInterval(timer);
   }, [auction]);
+
+  // After setting auction, redirect if closed live auction
+  useEffect(() => {
+    if (auction && auction.type === 'live' && auction.status === 'closed') {
+      navigate(`/ended-auction/${auction.id}`, { replace: true });
+    }
+  }, [auction, navigate]);
 
   // Handle bid submission
   const handlePlaceBid = async (e) => {
@@ -391,6 +401,29 @@ function AuctionPage() {
   
   // Get time remaining (different logic for live vs settled auctions)
   const displayTimeRemaining = isLiveAuction ? getLiveTimeRemaining() : timeRemaining;
+
+  // Check if auction is ended
+  const isAuctionEnded = displayTimeRemaining.ended || auction.status === 'closed' || (isLiveAuction && status?.status === 'ended');
+
+  // Show ended auction message if auction exists but is ended
+  if (isAuctionEnded) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white px-4">
+        <div className="flex flex-col items-center w-full" style={{ marginBottom: '1.2rem'}}>
+          <img src={EndpointSVG} alt="Auction Ended" className="w-full max-w-xs h-auto" style={{maxWidth: '320px', marginBottom: '0.5rem'}} />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">This auction has ended</h1>
+        <p className="text-white/80 mb-6 text-center max-w-md mx-auto">Bidding is now closed. You can view the bid history and auction details below, or return to all auctions.</p>
+        <Button
+          variant="primary"
+          onClick={() => navigate(isLiveAuction ? '/live-auctions' : '/auctions')}
+          className="mx-auto"
+        >
+          Back to {isLiveAuction ? 'Live' : ''} Auctions
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <>

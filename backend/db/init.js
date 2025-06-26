@@ -29,7 +29,6 @@ const updateUsersTable = async () => {
         ADD COLUMN verification_token UUID,
         ADD COLUMN verification_token_expires TIMESTAMP WITH TIME ZONE
       `);
-      console.log('Added verification columns to users table');
     }
 
     // Check for reset token columns
@@ -45,7 +44,6 @@ const updateUsersTable = async () => {
         ADD COLUMN reset_token UUID,
         ADD COLUMN reset_token_expires TIMESTAMP WITH TIME ZONE
       `);
-      console.log('Added reset token columns to users table');
     }
 
     // Check for business-related columns
@@ -64,7 +62,6 @@ const updateUsersTable = async () => {
         ADD COLUMN business_phone VARCHAR(50),
         ADD COLUMN is_approved BOOLEAN DEFAULT false
       `);
-      console.log('Added business-related columns to users table');
     }
   } catch (error) {
     console.error('Error updating users table:', error);
@@ -136,7 +133,6 @@ const initDatabase = async () => {
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      console.log('Users table created with all columns');
 
       // Create function to update updated_at timestamp
       await pool.query(`
@@ -148,7 +144,6 @@ const initDatabase = async () => {
         END;
         $$ language 'plpgsql';
       `);
-      console.log('Created update_updated_at function');
 
       // Create trigger to automatically update updated_at
       await pool.query(`
@@ -169,7 +164,6 @@ const initDatabase = async () => {
     // Always check and create admin user if it doesn't exist
     await createInitialAdmin();
     
-
     // Check if settled_auctions table exists
     const settledAuctionsTableCheck = await pool.query(`
       SELECT EXISTS (
@@ -196,11 +190,11 @@ const initDatabase = async () => {
           min_bid_increment NUMERIC(12,2) DEFAULT 1,
           status VARCHAR(20) NOT NULL DEFAULT 'pending',
           is_approved BOOLEAN DEFAULT false,
+          type VARCHAR(20) NOT NULL DEFAULT 'settled',
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      console.log('settled_auctions table created');
 
       // Create function to update updated_at timestamp for settled_auctions
       await pool.query(`
@@ -220,6 +214,22 @@ const initDatabase = async () => {
           EXECUTE FUNCTION update_settled_auctions_updated_at_column();
       `);
     }
+    // Always check and add/configure type column for settled_auctions (outside the if block)
+    try {
+      const typeColumnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'settled_auctions' AND column_name = 'type'
+      `);
+      if (typeColumnCheck.rows.length === 0) {
+        await pool.query(`ALTER TABLE settled_auctions ADD COLUMN type VARCHAR(20)`);
+        await pool.query(`UPDATE settled_auctions SET type = 'settled' WHERE type IS NULL`);
+        await pool.query(`ALTER TABLE settled_auctions ALTER COLUMN type SET DEFAULT 'settled'`);
+        await pool.query(`ALTER TABLE settled_auctions ALTER COLUMN type SET NOT NULL`);
+      }
+    } catch (err) {
+      console.error('ERROR while checking/adding type column for settled_auctions:', err);
+    }
 
     // Always check and add bidding columns to settled_auctions if they don't exist
     const biddingColumnsCheck = await pool.query(`
@@ -236,7 +246,6 @@ const initDatabase = async () => {
         ADD COLUMN bid_count INTEGER DEFAULT 0,
         ADD COLUMN min_bid_increment NUMERIC(12,2) DEFAULT 1
       `);
-      console.log('Added bidding columns to settled_auctions table');
     }
 
     // Check if live_auctions table exists
@@ -261,11 +270,11 @@ const initDatabase = async () => {
           reserve_price NUMERIC(12,2),
           max_participants INTEGER NOT NULL,
           status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          type VARCHAR(20) NOT NULL DEFAULT 'live',
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      console.log('live_auctions table created');
 
       // Create function to update updated_at timestamp for live_auctions
       await pool.query(`
@@ -284,6 +293,23 @@ const initDatabase = async () => {
           FOR EACH ROW
           EXECUTE FUNCTION update_live_auctions_updated_at_column();
       `);
+
+    }
+    // Always check and add/configure type column for live_auctions (outside the if block)
+    try {
+      const liveTypeColumnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'live_auctions' AND column_name = 'type'
+      `);
+      if (liveTypeColumnCheck.rows.length === 0) {
+        await pool.query(`ALTER TABLE live_auctions ADD COLUMN type VARCHAR(20)`);
+        await pool.query(`UPDATE live_auctions SET type = 'live' WHERE type IS NULL`);
+        await pool.query(`ALTER TABLE live_auctions ALTER COLUMN type SET DEFAULT 'live'`);
+        await pool.query(`ALTER TABLE live_auctions ALTER COLUMN type SET NOT NULL`);
+      }
+    } catch (err) {
+      console.error('ERROR while checking/adding type column for live_auctions:', err);
     }
 
     // Always check and add bidding columns to live_auctions if they don't exist
@@ -301,7 +327,6 @@ const initDatabase = async () => {
         ADD COLUMN bid_count INTEGER DEFAULT 0,
         ADD COLUMN min_bid_increment NUMERIC(12,2) DEFAULT 1
       `);
-      console.log('Added bidding columns to live_auctions table');
     }
 
     // Check if settled_auction_bids table exists (renamed from bids)
@@ -325,7 +350,6 @@ const initDatabase = async () => {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      console.log('settled_auction_bids table created');
     }
     
     // Check if refresh_tokens table exists
@@ -345,7 +369,6 @@ const initDatabase = async () => {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      console.log('refresh_tokens table created');
     }
     
     // Check if live_auction_bids table exists
@@ -366,7 +389,6 @@ const initDatabase = async () => {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      console.log('live_auction_bids table created');
     }
     
     // Check if live_auction_results table exists
@@ -389,7 +411,6 @@ const initDatabase = async () => {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      console.log('live_auction_results table created');
     }
     
     console.log('Database initialization complete!');

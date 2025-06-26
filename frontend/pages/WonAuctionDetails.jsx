@@ -16,6 +16,8 @@ function WonAuctionDetails() {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
 
+  const auctionType = auction?.type || type || 'settled';
+
   // Format price
   const formatPrice = (price) => {
     return new Intl.NumberFormat('en-US', {
@@ -41,7 +43,7 @@ function WonAuctionDetails() {
       setLoading(true);
       setError(null);
 
-      const endpoint = type === 'live' 
+      const endpoint = auctionType === 'live' 
         ? `${backendUrl}/api/auth/won-live-auction/${id}`
         : `${backendUrl}/api/auth/won-settled-auction/${id}`;
 
@@ -67,10 +69,10 @@ function WonAuctionDetails() {
   };
 
   useEffect(() => {
-    if (user && user.token && id && type) {
+    if (user && user.token && id && auctionType) {
       fetchWonAuction();
     }
-  }, [user, id, type]);
+  }, [user, id, auctionType]);
 
   const handleToastClose = () => {
     setToast({ show: false, message: '', type: 'info' });
@@ -155,7 +157,7 @@ function WonAuctionDetails() {
                   </div>
                   <div>
                     <p className="text-gray-400">Auction Type</p>
-                    <p className="text-blue-400 font-semibold capitalize">{type}</p>
+                    <p className="text-blue-400 font-semibold capitalize">{auctionType}</p>
                   </div>
                   <div>
                     <p className="text-gray-400">Description</p>

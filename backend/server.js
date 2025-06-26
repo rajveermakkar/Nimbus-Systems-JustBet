@@ -204,8 +204,14 @@ const startServer = async () => {
           return;
         }
         
-        // Check if auction has reached its end time
+        // Prevent bidding before auction start time
         const now = Date.now();
+        if (state.startTime && now < new Date(state.startTime).getTime()) {
+          socket.emit('bid_error', 'Auction has not started yet.');
+          return;
+        }
+        
+        // Check if auction has reached its end time
         if (state.endTime && now >= state.endTime) {
           socket.emit('bid_error', 'Auction has ended.');
           return;

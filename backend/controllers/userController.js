@@ -536,7 +536,7 @@ const userController = {
         auction.seller_email = 'Unknown';
       }
 
-      auction.auction_type = 'live';
+      auction.type = auction.type || 'live';
 
       res.json({ auction });
     } catch (error) {
@@ -596,7 +596,7 @@ const userController = {
         auction.seller_email = 'Unknown';
       }
 
-      auction.auction_type = 'settled';
+      auction.type = auction.type || 'settled';
 
       res.json({ auction });
     } catch (error) {
