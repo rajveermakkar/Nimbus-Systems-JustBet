@@ -343,7 +343,6 @@ const userController = {
     }
   },
 
-  // Get user winnings (with SQL JOINs for performance)
   async getWinnings(req, res) {
     try {
       const userId = req.user.id;
@@ -388,7 +387,6 @@ const userController = {
     }
   },
 
-  // Get user bid history (with SQL JOINs for performance)
   async getBidHistory(req, res) {
     try {
       const userId = req.user.id;
