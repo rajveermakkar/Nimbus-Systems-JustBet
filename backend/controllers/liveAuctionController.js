@@ -46,8 +46,16 @@ async function getLiveAuctionsByStatus(req, res) {
     const { status } = req.query;
     // Only allow public access to approved auctions
     if (!status || status === 'approved') {
-      // Get all approved live auctions first
-      const auctions = await LiveAuction.findByStatus('approved');
+      // Get all approved live auctions that haven't ended yet
+      const now = new Date();
+      const query = `
+        SELECT * FROM live_auctions 
+        WHERE status = 'approved' 
+        AND end_time > $1
+        ORDER BY start_time ASC
+      `;
+      const result = await pool.query(query, [now]);
+      const auctions = result.rows;
       
       // Get seller info for each auction separately
       const auctionsWithSellers = [];

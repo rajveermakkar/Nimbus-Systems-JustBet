@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../src/components/Button";
 import Toast from "../src/components/Toast";
+import Select from 'react-select';
 
 function CreateListing() {
   const [title, setTitle] = useState("");
@@ -299,14 +300,76 @@ function CreateListing() {
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs mb-1 text-left">Duration *</label>
-                  <select className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm" value={duration} onChange={e => setDuration(e.target.value)}>
-                    <option value="">Select duration</option>
-                    {durationOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    className="react-select-container"
+                    classNamePrefix="react-select"
+                    options={durationOptions}
+                    value={durationOptions.find(opt => opt.value === duration) || null}
+                    onChange={option => setDuration(option ? option.value : "")}
+                    placeholder="Select duration"
+                    isClearable
+                    styles={{
+                      control: (base, state) => ({
+                        ...base,
+                        backgroundColor: "rgba(255,255,255,0.05)",
+                        borderColor: state.isFocused ? "#a78bfa" : "#ffffff33",
+                        boxShadow: "none",
+                        color: "#fff",
+                        minHeight: "40px",
+                        borderRadius: "8px",
+                        fontSize: "1rem",
+                        fontFamily: "inherit",
+                        transition: "border-color 0.2s",
+                      }),
+                      valueContainer: (base) => ({
+                        ...base,
+                        padding: "0 12px"
+                      }),
+                      placeholder: (base) => ({
+                        ...base,
+                        color: "#bdb4e6",
+                        fontSize: "1rem"
+                      }),
+                      singleValue: (base) => ({
+                        ...base,
+                        color: "#fff",
+                        fontSize: "1rem"
+                      }),
+                      menu: (base) => ({
+                        ...base,
+                        backgroundColor: "#2a2a72",
+                        color: "#fff",
+                        borderRadius: "8px",
+                        marginTop: 2,
+                        fontSize: "1rem"
+                      }),
+                      option: (base, state) => ({
+                        ...base,
+                        backgroundColor: state.isSelected
+                          ? "#4f46e5"
+                          : state.isFocused
+                          ? "#3730a3"
+                          : "#2a2a72",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontSize: "1rem"
+                      }),
+                      dropdownIndicator: (base, state) => ({
+                        ...base,
+                        color: "#bdb4e6",
+                        "&:hover": { color: "#fff" }
+                      }),
+                      indicatorSeparator: (base) => ({
+                        ...base,
+                        backgroundColor: "#ffffff33"
+                      }),
+                      input: (base) => ({
+                        ...base,
+                        color: "#fff",
+                        fontSize: "1rem"
+                      }),
+                    }}
+                  />
                   <p className="text-xs text-white/50 mt-1">Auction will end after this duration</p>
                 </div>
               </div>
@@ -315,10 +378,12 @@ function CreateListing() {
                 <div className="flex-1">
                   <label className="block text-xs mb-1 text-left">Start Date/Time *</label>
                   <input type="datetime-local" className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                  <p className="text-xs text-white/50 mt-1">Set when you want the auction to start (after approval)</p>
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs mb-1 text-left">End Date/Time *</label>
                   <input type="datetime-local" className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                  <p className="text-xs text-white/50 mt-1">Auction will end at this time</p>
                 </div>
               </div>
             )}

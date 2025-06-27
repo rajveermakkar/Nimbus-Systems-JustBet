@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { getAllApprovedAuctions, placeBid, getBids, getAuctionWithBids, getAuctionCountdownAPI } = require('../controllers/auctionController');
+const { getAllApprovedAuctions, placeBid, getBids, getAuctionWithBids, getAuctionCountdownAPI, processSpecificAuction } = require('../controllers/auctionController');
 const jwtauthMiddleware = require('../middleware/jwtauth');
+const userController = require('../controllers/userController');
 
 // Public: Get all approved settled auctions
 router.get('/approved', getAllApprovedAuctions);
@@ -20,5 +21,11 @@ router.post('/:id/bid', placeBid);
 
 // Get all bids for a settled auction
 router.get('/:id/bids', getBids);
+
+// Admin: Manually process a specific auction (for testing/fixing missed auctions)
+router.post('/:id/process', processSpecificAuction);
+
+// Winnings v2 (from results tables, type-safe)
+// router.get('/winnings-v2', userController.getWinningsV2);
 
 module.exports = router; 

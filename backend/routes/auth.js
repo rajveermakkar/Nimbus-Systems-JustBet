@@ -115,6 +115,15 @@ router.get('/bid-history', jwtauthMiddleware, userController.getBidHistory);
 router.get('/won-live-auction/:id', jwtauthMiddleware, userController.getWonLiveAuction);
 router.get('/won-settled-auction/:id', jwtauthMiddleware, userController.getWonSettledAuction);
 
+// Get won auction details (by type, from results table)
+router.get('/won-auction/:type/:id', jwtauthMiddleware, userController.getWonAuction);
+
+// Get settled auction result for winner announcement
+router.get('/settled-auction-result/:id', jwtauthMiddleware, userController.getSettledAuctionResult);
+
+// Get live auction result for winner announcement
+router.get('/live-auction-result/:id', jwtauthMiddleware, userController.getLiveAuctionResult);
+
 // Get user details by ID (for winner information)
 router.get('/user/:id', jwtauthMiddleware, async (req, res) => {
   try {

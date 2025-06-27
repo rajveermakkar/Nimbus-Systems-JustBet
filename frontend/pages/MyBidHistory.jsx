@@ -71,10 +71,7 @@ function MyBidHistory() {
   };
 
   const handleViewAuction = (bid) => {
-    const path = bid.auction_type === 'live' 
-      ? `/live-auctions/${bid.auction_id}` 
-      : `/auctions/${bid.auction_id}`;
-    navigate(path);
+    navigate(`/auction/${bid.auction_type}/${bid.auction_id}`);
   };
 
   if (loading) {

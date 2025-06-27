@@ -43,9 +43,7 @@ function WonAuctionDetails() {
       setLoading(true);
       setError(null);
 
-      const endpoint = auctionType === 'live' 
-        ? `${backendUrl}/api/auth/won-live-auction/${id}`
-        : `${backendUrl}/api/auth/won-settled-auction/${id}`;
+      const endpoint = `${backendUrl}/api/auth/won-auction/${auctionType}/${id}`;
 
       const response = await fetch(endpoint, {
         headers: {
