@@ -142,8 +142,17 @@ const sellerController = {
       const liveResult = await pool.query(liveQuery, [sellerId]);
       const settledResult = await pool.query(settledQuery, [sellerId]);
 
-      const live = liveResult.rows[0];
-      const settled = settledResult.rows[0];
+      // Fallback defaults if no rows
+      const zeroStats = {
+        total: 0,
+        completed: 0,
+        active: 0,
+        with_bids: 0,
+        revenue: 0,
+        avg_price: 0
+      };
+      const live = liveResult.rows[0] || zeroStats;
+      const settled = settledResult.rows[0] || zeroStats;
 
       // Calculate totals
       const totalAuctions = parseInt(live.total) + parseInt(settled.total);

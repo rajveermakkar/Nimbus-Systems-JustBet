@@ -63,7 +63,7 @@
 
 ### Settled Auctions
 - **GET /api/admin/auctions/settled/pending** — Get all pending settled auctions.
-- **POST /api/admin/auctions/settled/:id/approve** — Approve a settled auction.
+- **PATCH /api/admin/auctions/settled/:id/approve** — Approve a settled auction.
 
 ### Live Auctions
 - **GET /api/admin/auctions/live** — Get all live auctions by status (pending, approved, etc.).

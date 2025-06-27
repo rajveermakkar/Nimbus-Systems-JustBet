@@ -257,7 +257,7 @@ async function placeBid(req, res) {
     }
 
     // Check if auction is approved and active
-    if (!auction.is_approved || auction.status !== 'approved') {
+    if (auction.status !== 'approved') {
       return res.status(400).json({ error: 'Auction is not open for bidding.' });
     }
 

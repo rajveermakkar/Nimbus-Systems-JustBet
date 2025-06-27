@@ -83,7 +83,7 @@ function EditListing({ showToast: _showToast }) {
           return;
         }
         // If settled fails, try live auction
-        res = await fetch(`${apiUrl}/api/live-auction/${id}`, {
+        res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -97,7 +97,7 @@ function EditListing({ showToast: _showToast }) {
         }
       } else {
         // Try live auction first (default)
-        let res = await fetch(`${apiUrl}/api/live-auction/${id}`, {
+        let res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -111,7 +111,7 @@ function EditListing({ showToast: _showToast }) {
           }
         }
         // If not live auction or doesn't have max_participants, try settled auction
-        res = await fetch(`${apiUrl}/api/auctions/${id}`, {
+        res = await fetch(`${apiUrl}/api/seller/auctions/settled/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -228,7 +228,10 @@ function EditListing({ showToast: _showToast }) {
       if (imageFiles.length > 0) {
         const formData = new FormData();
         formData.append("image", imageFiles[0]);
-        const uploadRes = await fetch(`${apiUrl}/api/seller/auctions/upload-image`, {
+        const uploadEndpoint = auctionType === "live"
+          ? `${apiUrl}/api/seller/auctions/live/upload-image`
+          : `${apiUrl}/api/seller/auctions/settled/upload-image`;
+        const uploadRes = await fetch(uploadEndpoint, {
           method: "POST",
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -251,8 +254,8 @@ function EditListing({ showToast: _showToast }) {
       
       // Choose the correct endpoint based on auction type
       const endpoint = auctionType === "live" 
-        ? `${apiUrl}/api/seller/live-auction/${id}`
-        : `${apiUrl}/api/seller/auctions/${id}`;
+        ? `${apiUrl}/api/seller/auctions/live/${id}`
+        : `${apiUrl}/api/seller/auctions/settled/${id}`;
       
       const res = await fetch(endpoint, {
         method: "PATCH",

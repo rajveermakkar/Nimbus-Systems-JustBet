@@ -308,6 +308,9 @@ async function getLiveAuctionByIdForSeller(req, res) {
     if (!auction || auction.seller_id !== user.id) {
       return res.status(404).json({ error: 'Live auction not found.' });
     }
+    if (auction.status === 'closed') {
+      return res.status(403).json({ error: 'Auction has closed and cannot be edited.' });
+    }
     res.json(auction);
   } catch (error) {
     console.error('Error fetching live auction:', error);

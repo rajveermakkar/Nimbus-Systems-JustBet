@@ -20,8 +20,8 @@ function AllAuctionsPage() {
           auctionService.getLiveAuctions(),
           auctionService.getSettledAuctions()
         ]);
-        setLiveAuctions(live);
-        setSettledAuctions(settled);
+        setLiveAuctions(live || []);
+        setSettledAuctions(settled || []);
       } catch (err) {
         setError('Failed to load auctions. Please try again.');
       } finally {

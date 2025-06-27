@@ -108,7 +108,10 @@ function CreateListing() {
       if (imageFiles.length > 0) {
         const formData = new FormData();
         formData.append("image", imageFiles[0]);
-        const uploadRes = await fetch(`${apiUrl}/api/seller/auctions/upload-image`, {
+        const uploadEndpoint = auctionType === "live"
+          ? `${apiUrl}/api/seller/auctions/live/upload-image`
+          : `${apiUrl}/api/seller/auctions/settled/upload-image`;
+        const uploadRes = await fetch(uploadEndpoint, {
           method: "POST",
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -130,8 +133,8 @@ function CreateListing() {
       
       // Choose the correct endpoint based on auction type
       const endpoint = auctionType === "live" 
-        ? `${apiUrl}/api/seller/live-auction`
-        : `${apiUrl}/api/seller/auctions`;
+        ? `${apiUrl}/api/seller/auctions/live`
+        : `${apiUrl}/api/seller/auctions/settled`;
       
       const res = await fetch(endpoint, {
         method: "POST",

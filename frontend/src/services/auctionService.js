@@ -10,30 +10,34 @@ const api = axios.create({
 
 // Add request interceptor to include JWT token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('justbetToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // Always get the latest token from localStorage at request time
+  const latestToken = localStorage.getItem('justbetToken');
+  if (latestToken) {
+    config.headers.Authorization = `Bearer ${latestToken}`;
+  } else {
+    // Remove the header if no token is present
+    delete config.headers.Authorization;
   }
   return config;
 });
 
 const auctionService = {
-  // Get all approved settled auctions
+  // Get all approved settled auctions (public)
   async getSettledAuctions() {
     try {
-      const response = await api.get('/auctions/approved');
-      return response.data;
+      const response = await api.get('/auctions/settled');
+      return response.data.auctions;
     } catch (error) {
       console.error('Error fetching settled auctions:', error);
       throw error;
     }
   },
 
-  // Get all approved live auctions
+  // Get all approved live auctions (public)
   async getLiveAuctions() {
     try {
-      const response = await api.get('/live-auction?status=approved');
-      return response.data;
+      const response = await api.get('/auctions/live');
+      return response.data.auctions;
     } catch (error) {
       console.error('Error fetching live auctions:', error);
       throw error;
@@ -43,8 +47,8 @@ const auctionService = {
   // Get specific settled auction with bids
   async getSettledAuction(id) {
     try {
-      const response = await api.get(`/auctions/${id}`);
-      return response.data;
+      const response = await api.get(`/auctions/settled/${id}`);
+      return response.data.auction;
     } catch (error) {
       console.error('Error fetching settled auction:', error);
       throw error;
@@ -54,8 +58,8 @@ const auctionService = {
   // Get specific live auction
   async getLiveAuction(id) {
     try {
-      const response = await api.get(`/live-auction/${id}`);
-      return response.data;
+      const response = await api.get(`/auctions/live/${id}`);
+      return response.data.auction;
     } catch (error) {
       console.error('Error fetching live auction:', error);
       throw error;
@@ -65,7 +69,7 @@ const auctionService = {
   // Place bid on settled auction
   async placeSettledBid(auctionId, amount) {
     try {
-      const response = await api.post(`/auctions/${auctionId}/bid`, { amount });
+      const response = await api.post(`/auctions/settled/${auctionId}/bid`, { amount });
       return response.data;
     } catch (error) {
       console.error('Error placing bid:', error);
@@ -76,10 +80,43 @@ const auctionService = {
   // Get bids for settled auction
   async getSettledBids(auctionId) {
     try {
-      const response = await api.get(`/auctions/${auctionId}/bids`);
-      return response.data;
+      const response = await api.get(`/auctions/settled/${auctionId}/bids`);
+      return response.data.bids;
     } catch (error) {
       console.error('Error fetching bids:', error);
+      throw error;
+    }
+  },
+
+  // Get bids for live auction
+  async getLiveAuctionBids(auctionId) {
+    try {
+      const response = await api.get(`/auctions/live/${auctionId}/bids`);
+      return response.data.bids;
+    } catch (error) {
+      console.error('Error fetching live auction bids:', error);
+      throw error;
+    }
+  },
+
+  // Get result for settled auction
+  async getSettledAuctionResult(auctionId) {
+    try {
+      const response = await api.get(`/auctions/settled/${auctionId}/result`);
+      return response.data.result;
+    } catch (error) {
+      console.error('Error fetching settled auction result:', error);
+      throw error;
+    }
+  },
+
+  // Get result for live auction
+  async getLiveAuctionResult(auctionId) {
+    try {
+      const response = await api.get(`/auctions/live/${auctionId}/result`);
+      return response.data.result;
+    } catch (error) {
+      console.error('Error fetching live auction result:', error);
       throw error;
     }
   },
@@ -94,14 +131,8 @@ const auctionService = {
         console.error('Polling error:', error);
       }
     };
-
-    // Initial call
     poll();
-    
-    // Set up interval
     const intervalId = setInterval(poll, interval);
-    
-    // Return function to stop polling
     return () => clearInterval(intervalId);
   },
 
@@ -115,22 +146,8 @@ const auctionService = {
         console.error('Auction polling error:', error);
       }
     };
-
-    // Set up interval (do NOT call poll immediately)
     const intervalId = setInterval(poll, interval);
-    // Return function to stop polling
     return () => clearInterval(intervalId);
-  },
-
-  // Get bids for live auction
-  async getLiveAuctionBids(auctionId) {
-    try {
-      const response = await api.get(`/live-auction/${auctionId}/bids`);
-      return response.data.bids;
-    } catch (error) {
-      console.error('Error fetching live auction bids:', error);
-      throw error;
-    }
   },
 
   // Get countdown for any auction (settled or live)

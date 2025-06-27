@@ -35,12 +35,18 @@ function WinnerDeclaration({ winnerAnnouncement, onClose, auctionType = 'live' }
         {winnerAnnouncement.winner ? (
           <div>
             <p className="text-green-400 font-semibold mb-2">
-              Winner: {winnerAnnouncement.winner.user_name || `User ${winnerAnnouncement.winner.user_id?.slice(0, 8)}`}
+              Winner: {winnerAnnouncement.winner.first_name && winnerAnnouncement.winner.last_name
+                ? `${winnerAnnouncement.winner.first_name} ${winnerAnnouncement.winner.last_name}`
+                : winnerAnnouncement.winner.email
+                  ? winnerAnnouncement.winner.email
+                  : winnerAnnouncement.winner.id
+                    ? `User ${winnerAnnouncement.winner.id?.slice(0, 8)}`
+                    : 'Unknown'}
             </p>
             <p className="text-white mb-4">
               Final Bid: <span className="text-green-400 font-bold">{formatPrice(winnerAnnouncement.winner.amount)}</span>
             </p>
-            {winnerAnnouncement.winner.user_id === user?.id && (
+            {winnerAnnouncement.winner.id === user?.id && (
               <div className="bg-green-900/20 border border-green-500/30 rounded p-3 mb-4">
                 <p className="text-green-400 font-semibold">🎉 Congratulations! You won this auction!</p>
               </div>

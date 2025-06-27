@@ -18,7 +18,7 @@ router.patch('/sellers/:userId/approve', adminController.handleSellerApproval);
 
 // Settled Auctions (Admin Only)
 router.get('/auctions/settled/pending', auctionController.listPendingAuctions);
-router.post('/auctions/settled/:id/approve', auctionController.approveAuction);
+router.patch('/auctions/settled/:id/approve', auctionController.approveAuction);
 
 // Live Auctions (Admin Only)
 router.get('/auctions/live', liveAuctionController.getAdminLiveAuctions);

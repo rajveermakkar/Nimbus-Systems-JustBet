@@ -70,7 +70,7 @@ function AuctionPage() {
         const checkSettledWinner = async () => {
           try {
             console.log('Checking for settled auction result...');
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/settled-auction-result/${auction.id}`, {
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auctions/settled/${auction.id}/result`, {
               headers: {
                 'Authorization': `Bearer ${user.token}`,
                 'Content-Type': 'application/json'
@@ -186,12 +186,15 @@ function AuctionPage() {
       setError(null);
       let auctionData = null;
       let isLive = false;
+      console.log('[AuctionPage] Fetching auction', { id, type });
       if (type === 'settled') {
         const settledData = await auctionService.getSettledAuction(id);
-        auctionData = settledData.auction || settledData;
+        console.log('[AuctionPage] Settled auction data:', settledData);
+        auctionData = settledData;
         isLive = false;
       } else if (type === 'live') {
         const liveData = await auctionService.getLiveAuction(id);
+        console.log('[AuctionPage] Live auction data:', liveData);
         auctionData = liveData;
         isLive = true;
       } else {
@@ -202,29 +205,29 @@ function AuctionPage() {
       // Fetch bid history for live auctions
       if (type === 'live') {
         try {
-          const response = await fetch(`/api/live-auctions/${id}/bids`);
+          const response = await fetch(`/api/auctions/live/${id}/bids`);
           if (response.ok) {
             const data = await response.json();
+            console.log('[AuctionPage] Live auction bids:', data.bids);
             setRecentBids(data.bids || []);
           }
         } catch (bidError) {
+          console.error('[AuctionPage] Error fetching live bids:', bidError);
           setRecentBids([]);
         }
       } else {
+        console.log('[AuctionPage] Settled auction recentBids:', auctionData.recentBids);
         setRecentBids(auctionData.recentBids || []);
       }
     } catch (err) {
-      console.error('Error fetching auction:', err);
-      
-      // Check if this might be an ended auction
-      if (type === 'live') {
+      console.error('[AuctionPage] Error fetching auction:', err);
+      if (type === 'settled') {
         try {
-          // Try to check if this is an ended auction by checking the database directly
-          const response = await fetch(`/api/live-auctions/${id}`);
+          const response = await fetch(`/api/auctions/settled/${id}`);
           if (response.ok) {
             const auctionData = await response.json();
-            if (auctionData.status === 'closed') {
-              // Pass auction data and winner announcement through navigation state
+            console.log('[AuctionPage] Settled auction fallback fetch:', auctionData);
+            if (auctionData.status === 'closed' || auctionData.auction?.status === 'closed') {
               navigate(`/ended-auction/${id}`, { 
                 replace: true,
                 state: { 
@@ -236,10 +239,9 @@ function AuctionPage() {
             }
           }
         } catch (checkError) {
-          console.error('Error checking auction status:', checkError);
+          console.error('[AuctionPage] Error checking auction status:', checkError);
         }
       }
-      
       setError('Failed to load auction. Please try again.');
       setAuction(null);
       setIsLiveAuction(false);
@@ -378,6 +380,7 @@ function AuctionPage() {
     if (type === 'settled') {
       fetchAuction();
       stopPolling = auctionService.startAuctionPolling(id, (response) => {
+        console.log('[AuctionPage] Polling response:', response);
         setAuction(response.auction);
         setRecentBids(response.recentBids || []);
       }, 5000); // 5 seconds
@@ -404,7 +407,7 @@ function AuctionPage() {
           }
           
           try {
-            const response = await fetch(`/api/live-auctions/${id}/bids`);
+            const response = await fetch(`/api/auctions/live/${id}/bids`);
             if (response.ok) {
               const bidsData = await response.json();
               setRecentBids(bidsData.bids || []);
@@ -419,7 +422,7 @@ function AuctionPage() {
           
           // Check if this might be an ended auction
           try {
-            const response = await fetch(`/api/live-auctions/${id}`);
+            const response = await fetch(`/api/auctions/live/${id}`);
             if (response.ok) {
               const auctionData = await response.json();
               if (auctionData.status === 'closed') {
@@ -467,18 +470,14 @@ function AuctionPage() {
       setBidError('Please log in to place a bid.');
       return;
     }
-    
     if (isLiveAuction && !isConnected) {
       setBidError('Not connected to live auction. Please refresh the page.');
       return;
     }
-    
-    // Check if auction is closed or ended by time
     if (isAuctionEndedValue) {
       setBidError('This auction has already ended.');
       return;
     }
-    
     const amount = parseFloat(bidAmount);
     if (!amount || amount <= 0) {
       setBidError('Please enter a valid bid amount.');
@@ -492,15 +491,14 @@ function AuctionPage() {
       setBidError(`Minimum bid increment is ${formatPrice(validMinIncrement)}`);
       return;
     }
-    
     try {
       setPlacingBid(true);
       setBidError('');
       setBidSuccess('');
-      
+      console.log('[AuctionPage] Placing bid', { id, amount, isLiveAuction });
       if (isLiveAuction) {
-        // Place bid through Socket.IO for live auctions
         socketService.placeLiveBid(id, amount, (response) => {
+          console.log('[AuctionPage] Live bid response:', response);
           if (response.success) {
             setBidSuccess('Live bid placed successfully!');
             setBidAmount('');
@@ -513,8 +511,8 @@ function AuctionPage() {
           setPlacingBid(false);
         });
       } else {
-        // Place bid through REST API for settled auctions
-        await auctionService.placeSettledBid(id, amount);
+        const bidRes = await auctionService.placeSettledBid(id, amount);
+        console.log('[AuctionPage] Settled bid response:', bidRes);
         setBidSuccess('Bid placed successfully!');
         setBidAmount('');
         fetchAuction();
@@ -523,6 +521,7 @@ function AuctionPage() {
         setPlacingBid(false);
       }
     } catch (err) {
+      console.error('[AuctionPage] Error placing bid:', err);
       setBidError(err.response?.data?.message || 'Failed to place bid. Please try again.');
       setToast({ show: true, message: err.response?.data?.message || 'Failed to place bid. Please try again.', type: 'error' });
       setPlacingBid(false);
@@ -750,7 +749,7 @@ function AuctionPage() {
             <div className="rounded-lg bg-white/10 shadow p-4">
               <h1 className="text-lg font-bold mb-1 text-left mb-2">{auction.title}</h1>
               <div className="mb-1 text-xs text-gray-300 text-left mt-2">
-                Seller: <span className="font-semibold text-white">{auction.business_name || `${auction.first_name} ${auction.last_name}` || auction.email || 'Unknown'}</span>
+                Seller: <span className="font-semibold text-white">{auction.seller?.first_name + ' ' + auction.seller?.last_name + (auction.seller?.business_name ? ` (${auction.seller.business_name})` : '')}</span>
               </div>
               <div className="text-sm text-gray-200 whitespace-pre-line text-left mt-2">
                 {auction.description}
