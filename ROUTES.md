@@ -15,15 +15,20 @@
 - **POST /api/auth/logout** — Logout user.
 
 ### Auctions (Settled)
-- **GET /api/auctions/approved** — Get all approved settled auctions (public marketplace view).
-- **GET /api/auctions/:id** — Get auction with current bid information (public).
-- **POST /api/auctions/:id/bid** — Place a bid on a settled auction (authenticated users only). Body: `{ amount }`
-- **GET /api/auctions/:id/bids** — Get all bids for a settled auction (authenticated users only).
+- **GET /api/auctions/settled** — Get all approved settled auctions (public marketplace view).
+- **GET /api/auctions/settled/:id** — Get a single settled auction (public).
+- **POST /api/auctions/settled/:id/bid** — Place a bid on a settled auction (authenticated users only). Body: `{ amount }`
+- **GET /api/auctions/settled/:id/bids** — Get all bids for a settled auction (authenticated users only).
+- **GET /api/auctions/settled/:id/result** — Get result (winner info) for a settled auction.
 
 ### Auctions (Live)
-- **GET /api/live-auction?status=approved** — Get all approved live auctions (public live events view).
-- **GET /api/live-auction/:id** — Get specific live auction by ID (public).
-- **GET /api/live-auction/:id/bids** — Get bid history for a live auction (public).
+- **GET /api/auctions/live** — Get all approved live auctions (public live events view).
+- **GET /api/auctions/live/:id** — Get a single live auction (public).
+- **GET /api/auctions/live/:id/bids** — Get bid history for a live auction (public).
+- **GET /api/auctions/live/:id/result** — Get result (winner info) for a live auction.
+
+### Auction Utilities
+- **GET /api/auctions/countdown/:type/:id** — Get countdown for any auction (settled or live).
 
 ---
 
@@ -35,19 +40,19 @@
 - **GET /api/seller/auction-results** — Get auction results (winners, final bids, etc.).
 
 ### Settled Auctions
-- **POST /api/seller/auctions** — Create a new settled auction. Body: `{ title, description, imageUrl, startTime, endTime, startingPrice, reservePrice }`
-- **POST /api/seller/auctions/upload-image** — Upload image for settled auction. Form-data: `image` (file)
-- **PATCH /api/seller/auctions/:id** — Update a settled auction (only by owner).
-- **GET /api/seller/auctions/:id** — Get a single settled auction by ID (only by owner).
-- **GET /api/seller/auctions** — Get all settled auctions created by the seller.
+- **POST /api/seller/auctions/settled** — Create a new settled auction. Body: `{ title, description, imageUrl, startTime, endTime, startingPrice, reservePrice }`
+- **POST /api/seller/auctions/settled/upload-image** — Upload image for settled auction. Form-data: `image` (file)
+- **PATCH /api/seller/auctions/settled/:id** — Update a settled auction (only by owner).
+- **GET /api/seller/auctions/settled/:id** — Get a single settled auction by ID (only by owner).
+- **GET /api/seller/auctions/settled** — Get all settled auctions created by the seller.
 
 ### Live Auctions
-- **POST /api/seller/live-auction** — Create a new live auction. Body: `{ title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, maxParticipants }`
-- **POST /api/seller/live-auction/upload-image** — Upload image for live auction. Form-data: `image` (file)
-- **PATCH /api/seller/live-auction/:id** — Update a live auction (only by owner).
-- **GET /api/seller/live-auction/:id** — Get a single live auction by ID (only by owner).
-- **GET /api/seller/live-auction** — Get all live auctions created by the seller.
-- **POST /api/seller/live-auction/:id/restart** — Restart a live auction that didn't meet reserve price (only by owner).
+- **POST /api/seller/auctions/live** — Create a new live auction. Body: `{ title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, maxParticipants }`
+- **POST /api/seller/auctions/live/upload-image** — Upload image for live auction. Form-data: `image` (file)
+- **PATCH /api/seller/auctions/live/:id** — Update a live auction (only by owner).
+- **GET /api/seller/auctions/live/:id** — Get a single live auction by ID (only by owner).
+- **GET /api/seller/auctions/live** — Get all live auctions created by the seller.
+- **POST /api/seller/auctions/live/:id/restart** — Restart a live auction that didn't meet reserve price (only by owner).
 
 ---
 
@@ -57,12 +62,13 @@
 - **PATCH /api/admin/sellers/:userId/approve** — Approve or reject a seller request.
 
 ### Settled Auctions
-- **GET /api/admin/auctions/pending** — Get all pending settled auctions.
-- **POST /api/admin/auctions/:id/approve** — Approve a settled auction.
+- **GET /api/admin/auctions/settled/pending** — Get all pending settled auctions.
+- **POST /api/admin/auctions/settled/:id/approve** — Approve a settled auction.
 
 ### Live Auctions
-- **GET /api/admin/live-auction?status=pending** — Get all live auctions by status (pending, approved, etc.).
-- **PATCH /api/admin/live-auction/:id/approve** — Approve a live auction.
+- **GET /api/admin/auctions/live** — Get all live auctions by status (pending, approved, etc.).
+- **GET /api/admin/auctions/live/pending** — Get all pending live auctions.
+- **PATCH /api/admin/auctions/live/:id/approve** — Approve a live auction.
 
 ---
 
@@ -81,4 +87,34 @@
 - For creating or updating auctions, required fields are specified in the body. Refer to the endpoint description for details.
 - Seller endpoints require the user to have an approved seller role.
 - Admin endpoints require the user to have an admin role.
+
+---
+
+## Updatable Fields for Auctions
+
+### Settled Auctions (PATCH /api/seller/auctions/settled/:id)
+- title
+- description
+- image_url
+- start_time
+- end_time
+- starting_price
+- reserve_price
+- min_bid_increment (optional, defaults to 5 if not provided)
+
+### Live Auctions (PATCH /api/seller/auctions/live/:id)
+- title
+- description
+- image_url
+- start_time
+- end_time
+- starting_price
+- reserve_price
+- min_bid_increment (optional, defaults to 5 if not provided)
+- max_participants
+
+**Note:**
+- `min_bid_increment` is always used in bidding logic. If not provided, it defaults to 5.
+- `max_participants` is only required for live auctions.
+- Approval is handled by setting `status` to `approved` for both auction types.
 

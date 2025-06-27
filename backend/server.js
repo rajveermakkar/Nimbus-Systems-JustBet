@@ -18,7 +18,9 @@ const LiveAuctionBid = require('./models/LiveAuctionBid');
 const LiveAuctionResult = require('./models/LiveAuctionResult');
 
 // Start settled auction cron job
-const settledAuctionCron = require('./services/settledAuctionCron');
+if (process.env.NODE_ENV !== 'test') {
+  require('./services/settledAuctionCron');
+}
 
 const app = express();
 const port = process.env.PORT || 3000;

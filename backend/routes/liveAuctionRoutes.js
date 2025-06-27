@@ -1,15 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const liveAuctionController = require('../controllers/liveAuctionController');
+const userController = require('../controllers/userController');
 
-// Public endpoint to Get approved live auctions 
-router.get('/', liveAuctionController.getLiveAuctionsByStatus);
+// GET all approved live auctions
+router.get('/auctions/live', liveAuctionController.getLiveAuctionsByStatus);
 
-// Public endpoint to Get specific live auction by ID
-router.get('/:id', liveAuctionController.getLiveAuctionById);
+// GET single live auction
+router.get('/auctions/live/:id', liveAuctionController.getLiveAuctionById);
 
-// Get bid history for a live auction
-router.get('/:id/bids', liveAuctionController.getLiveAuctionBids);
+// GET all bids for a live auction
+router.get('/auctions/live/:id/bids', liveAuctionController.getLiveAuctionBids);
+
+// GET result for a live auction (winner info)
+router.get('/auctions/live/:id/result', userController.getLiveAuctionResult);
 
 // Join live auction room
 

@@ -36,7 +36,14 @@ const adminController = {
         return res.status(400).json({ error: 'User is not a seller' });
       }
 
-      const updatedUser = await User.updateRoleAndApproval(userId, 'seller', approved);
+      // Preserve business details when approving
+      const businessDetails = {
+        businessName: user.business_name,
+        businessDescription: user.business_description,
+        businessAddress: user.business_address,
+        businessPhone: user.business_phone
+      };
+      const updatedUser = await User.updateRoleAndApproval(userId, 'seller', approved, businessDetails);
       const token = generateToken(req.user);
 
       res.json({
