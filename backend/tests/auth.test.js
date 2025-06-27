@@ -54,6 +54,14 @@ jest.mock('../models/User', () => ({
   findByResetToken: jest.fn()
 }));
 
+// Mock RefreshToken model
+jest.mock('../models/RefreshToken', () => ({
+  create: jest.fn(),
+  findByToken: jest.fn(),
+  delete: jest.fn(),
+  deleteByUser: jest.fn()
+}));
+
 // Import the registration function
 const register = async (req, res) => {
   const { firstName, lastName, email, password, confirmPassword } = req.body;
@@ -525,7 +533,7 @@ describe('Role-Based Authentication', () => {
           role: 'admin'
         }),
         'test-secret',
-        { expiresIn: '30m' }
+        { expiresIn: '60m' }
       );
     });
 
@@ -551,7 +559,7 @@ describe('Role-Based Authentication', () => {
           role: 'user'
         }),
         'test-secret',
-        { expiresIn: '30m' }
+        { expiresIn: '60m' }
       );
     });
 
