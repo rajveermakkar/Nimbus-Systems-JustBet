@@ -17,7 +17,7 @@ router.get('/pending-sellers', adminController.getPendingSellers);
 router.patch('/sellers/:userId/approve', adminController.handleSellerApproval);
 
 // List all pending auctions (admin only)
-router.get('/auctions/pending', auctionController.listPendingAuctions);
+router.get('`/auctions/pending`', auctionController.listPendingAuctions);
 
 // Approve an auction (admin only)
 router.post('/auctions/:id/approve', auctionController.approveAuction);
