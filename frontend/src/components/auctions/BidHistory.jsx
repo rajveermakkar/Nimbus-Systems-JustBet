@@ -28,7 +28,8 @@ function BidHistory({ auctionId, type = 'settled', bids: propBids }) {
       setError(null);
       let data;
       if (type === 'settled') {
-        data = await auctionService.getSettledBids(auctionId);
+        const response = await auctionService.getSettledBids(auctionId);
+        data = Array.isArray(response) ? response : [];
       } else if (type === 'live') {
         data = await auctionService.getLiveAuctionBids(auctionId);
       } else {
@@ -44,10 +45,12 @@ function BidHistory({ auctionId, type = 'settled', bids: propBids }) {
   };
 
   useEffect(() => {
-    if (propBids && propBids.length > 0) {
+    if (propBids !== undefined) {
+      // If propBids is provided (even if empty), use it
       setBids(propBids);
       setLoading(false);
     } else if (type === 'settled' || type === 'live') {
+      // Only fetch if propBids is not provided
       fetchBids();
     }
   }, [auctionId, type, propBids]);
@@ -101,12 +104,12 @@ function BidHistory({ auctionId, type = 'settled', bids: propBids }) {
                   }
                 </span>
                 {index === 0 && (
-                  <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                  <span className="bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-sm ml-1 align-middle" style={{ fontWeight: 500, letterSpacing: '0.5px' }}>
                     Highest
                   </span>
                 )}
                 {index === 0 && (bid.user_id === user?.id || bid.email === user?.email) && (
-                  <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                  <span className="bg-blue-500 text-white text-[10px] px-1.5 py-0.5 rounded-sm ml-1 align-middle" style={{ fontWeight: 500, letterSpacing: '0.5px' }}>
                     You
                   </span>
                 )}

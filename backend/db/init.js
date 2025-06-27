@@ -9,8 +9,60 @@ const pool = new Pool({
   port: process.env.DB_PORT,
   ssl: process.env.DB_SSL === 'true' ? {
     rejectUnauthorized: false //for azure postgres server , not requrred for localhost
-  } : false
+  } : false,
+  // Add connection pool settings
+  max: 20, // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+  maxUses: 7500, // Close (and replace) a connection after it has been used 7500 times
 });
+
+// Add error handling to prevent crashes
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  // Don't crash the app, just log the error
+});
+
+pool.on('connect', (client) => {
+  client.on('error', (err) => {
+    console.error('Database client error:', err);
+    // Don't crash the app, just log the error
+  });
+});
+
+// Add a wrapper function for database queries with retry logic
+const queryWithRetry = async (text, params, maxRetries = 3) => {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await pool.query(text, params);
+    } catch (error) {
+      lastError = error;
+      console.error(`Database query attempt ${attempt} failed:`, error.message);
+      
+      // If it's a connection error and we have retries left, wait and try again
+      if (attempt < maxRetries && (
+        error.code === 'ECONNRESET' || 
+        error.code === 'ENOTFOUND' || 
+        error.code === 'ETIMEDOUT' ||
+        error.message.includes('Connection terminated')
+      )) {
+        console.log(`Retrying database query in ${attempt * 1000}ms...`);
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+        continue;
+      }
+      
+      // If it's not a connection error or we're out of retries, throw the error
+      throw error;
+    }
+  }
+  
+  throw lastError;
+};
+
+// Export the retry wrapper
+module.exports.queryWithRetry = queryWithRetry;
 
 // Add new columns to users table if they don't exist
 const updateUsersTable = async () => {
@@ -412,6 +464,28 @@ const initDatabase = async () => {
         );
       `);
     }
+
+    // Check if settled_auction_results table exists
+    const settledAuctionResultsTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'settled_auction_results'
+      );
+    `);
+
+    if (!settledAuctionResultsTableCheck.rows[0].exists) {
+      await pool.query(`
+        CREATE TABLE settled_auction_results (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          auction_id UUID NOT NULL REFERENCES settled_auctions(id),
+          winner_id UUID REFERENCES users(id),
+          final_bid NUMERIC(12,2),
+          reserve_met BOOLEAN NOT NULL,
+          status VARCHAR(20) NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    }
     
     console.log('Database initialization complete!');
   } catch (error) {
@@ -435,5 +509,6 @@ const testConnection = async () => {
 module.exports = {
   pool,
   initDatabase,
-  testConnection
+  testConnection,
+  queryWithRetry
 };

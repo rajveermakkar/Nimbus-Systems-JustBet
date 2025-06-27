@@ -131,6 +131,17 @@ const auctionService = {
       console.error('Error fetching live auction bids:', error);
       throw error;
     }
+  },
+
+  // Get countdown for any auction (settled or live)
+  async getAuctionCountdown(type, id) {
+    try {
+      const response = await api.get(`/auctions/countdown/${type}/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching auction countdown:', error);
+      throw error;
+    }
   }
 };
 

@@ -3,6 +3,9 @@ const { pool } = require('../db/init');
 const multer = require('multer');
 const { uploadImageToAzure } = require('../services/azureBlobService');
 const Bid = require('../models/Bid');
+const { getAuctionCountdown, getAuctionType } = require('../utils/auctionUtils');
+const LiveAuction = require('../models/LiveAuction');
+const settledAuctionCron = require('../services/settledAuctionCron');
 
 // function for a seller create a new auction listing
 async function createAuction(req, res) {
@@ -62,6 +65,10 @@ async function createAuction(req, res) {
       startingPrice: Number(startingPrice),
       reservePrice: reserve !== null ? Number(reserve) : null
     });
+    
+    // Schedule the auction for processing when it ends
+    settledAuctionCron.scheduleAuctionProcessing(auction.id, end);
+    
     res.status(201).json(auction);
   } catch (error) {
     console.error('Error creating auction:', error);
@@ -96,6 +103,11 @@ async function approveAuction(req, res) {
     if (!auction) {
       return res.status(404).json({ message: 'Auction not found.' });
     }
+    
+    // Schedule the auction for processing when it ends
+    settledAuctionCron.scheduleAuctionProcessing(id, auction.end_time);
+    console.log(`Scheduled approved auction ${id} to end at ${new Date(auction.end_time).toLocaleString()}`);
+    
     res.json(auction);
   } catch (error) {
     console.error('Error approving auction:', error);
@@ -125,8 +137,16 @@ async function uploadAuctionImage(req, res) {
 // GET /api/auctions/approved - public endpoint to get all approved auctions
 async function getAllApprovedAuctions(req, res) {
   try {
-    // Get all approved auctions first
-    const auctions = await SettledAuction.findByStatus('approved');
+    // Get all approved auctions that haven't ended yet
+    const now = new Date();
+    const query = `
+      SELECT * FROM settled_auctions 
+      WHERE status = 'approved' 
+      AND end_time > $1
+      ORDER BY start_time ASC
+    `;
+    const result = await pool.query(query, [now]);
+    const auctions = result.rows;
     
     // Get seller info for each auction separately
     const auctionsWithSellers = [];
@@ -182,6 +202,13 @@ async function updateAuction(req, res) {
     if (!updated) {
       return res.status(400).json({ message: 'No valid fields to update.' });
     }
+    
+    // Reschedule auction if end time was changed
+    if (fields.endTime && fields.endTime !== auction.end_time) {
+      console.log(`Rescheduling auction ${id} due to end time change: ${auction.end_time} -> ${fields.endTime}`);
+      settledAuctionCron.scheduleAuctionProcessing(id, fields.endTime);
+    }
+    
     let msg = 'Auction updated.';
     if (auction.is_approved) {
       msg = 'Auction updated. Changes require admin re-approval.';
@@ -216,6 +243,12 @@ async function placeBid(req, res) {
     const user = req.user;
     const { id } = req.params;
     const { amount } = req.body;
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ message: 'Invalid auction ID format.' });
+    }
 
     // Validate bid amount
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -297,6 +330,12 @@ async function getBids(req, res) {
   try {
     const { id } = req.params;
 
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ message: 'Invalid auction ID format.' });
+    }
+
     // Check if auction exists
     const auction = await SettledAuction.findById(id);
     if (!auction) {
@@ -318,6 +357,12 @@ async function getAuctionWithBids(req, res) {
   try {
     const { id } = req.params;
 
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ message: 'Invalid auction ID format.' });
+    }
+
     // Get auction with seller details
     const auction = await SettledAuction.findByIdWithSeller(id);
     if (!auction) {
@@ -331,8 +376,15 @@ async function getAuctionWithBids(req, res) {
     // Get recent bids with bidder details (last 10)
     const bids = await Bid.findByAuctionIdWithBidders(id);
     const recentBids = bids.slice(0, 10);
+    // Ensure current_highest_bidder_id is present (fallback to highest bid user if missing)
+    let auctionWithWinner = { ...auction };
+    if (!auctionWithWinner.current_highest_bidder_id && bids.length > 0) {
+      // Find the highest bid
+      const highestBid = bids.reduce((max, bid) => bid.amount > max.amount ? bid : max, bids[0]);
+      auctionWithWinner.current_highest_bidder_id = highestBid.user_id;
+    }
     res.json({
-      auction: auction,
+      auction: auctionWithWinner,
       recentBids: recentBids,
       totalBids: bids.length
     });
@@ -358,6 +410,62 @@ async function getAuctionByIdForSeller(req, res) {
   }
 }
 
+// GET /api/auction/:type/:id/countdown
+async function getAuctionCountdownAPI(req, res) {
+  try {
+    const { type, id } = req.params;
+    let auction;
+    if (type === 'live') {
+      auction = await LiveAuction.findById(id);
+    } else {
+      auction = await SettledAuction.findById(id);
+    }
+    if (!auction) {
+      return res.status(404).json({ message: 'Auction not found.' });
+    }
+    const auctionType = getAuctionType(auction);
+    const countdown = getAuctionCountdown(auction);
+    res.json({
+      auctionType,
+      ...countdown
+    });
+  } catch (error) {
+    console.error('Error getting auction countdown:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// Manual trigger to process a specific auction (for testing/fixing missed auctions)
+async function processSpecificAuction(req, res) {
+  try {
+    const user = req.user;
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admins can manually process auctions.' });
+    }
+    const { id } = req.params;
+    
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ message: 'Invalid auction ID format.' });
+    }
+    
+    // Check if auction exists
+    const auction = await SettledAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ message: 'Auction not found.' });
+    }
+    
+    // Process the auction
+    await settledAuctionCron.processSpecificAuction(id);
+    
+    res.json({ message: `Auction ${id} processed successfully` });
+  } catch (error) {
+    console.error('Error manually processing auction:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
 module.exports = {
   createAuction,
   listPendingAuctions,
@@ -368,7 +476,9 @@ module.exports = {
   placeBid,
   getBids,
   getAuctionWithBids,
-  getAuctionByIdForSeller
+  getAuctionByIdForSeller,
+  getAuctionCountdownAPI,
+  processSpecificAuction
 };
 
 module.exports.upload = upload.single('image');

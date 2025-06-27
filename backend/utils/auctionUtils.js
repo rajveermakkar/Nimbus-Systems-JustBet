@@ -21,4 +21,12 @@ function getAuctionCountdown(auction) {
   }
 }
 
-module.exports = { getAuctionCountdown }; 
+function getAuctionType(auction) {
+  if (!auction) return null;
+  if (auction.type) return auction.type;
+  // fallback: check for unique fields
+  if (auction.max_participants !== undefined) return 'live';
+  return 'settled';
+}
+
+module.exports = { getAuctionCountdown, getAuctionType }; 

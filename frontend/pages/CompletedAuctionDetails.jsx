@@ -39,7 +39,7 @@ function CompletedAuctionDetails() {
         throw new Error('No authentication token found');
       }
 
-      const auctionUrl = `${import.meta.env.VITE_BACKEND_URL}/api/seller/${type === 'live' ? 'live-auction' : 'auctions'}/${id}`;
+      const auctionUrl = `${import.meta.env.VITE_BACKEND_URL}/api/${type === 'live' ? 'live-auction' : 'auctions'}/${id}`;
       const auctionResponse = await fetch(auctionUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -51,11 +51,13 @@ function CompletedAuctionDetails() {
       }
 
       const auctionData = await auctionResponse.json();
-      setAuction(auctionData);
+      const auctionObj = auctionData.auction || auctionData;
+      setAuction(auctionObj);
+      console.log('Auction data:', auctionObj);
 
       // Get winner details if auction was sold
-      if (auctionData.status === 'closed' && auctionData.current_highest_bidder_id) {
-        const winnerUrl = `${import.meta.env.VITE_BACKEND_URL}/api/auth/user/${auctionData.current_highest_bidder_id}`;
+      if (auctionObj.status === 'closed' && auctionObj.current_highest_bidder_id) {
+        const winnerUrl = `${import.meta.env.VITE_BACKEND_URL}/api/auth/user/${auctionObj.current_highest_bidder_id}`;
         const winnerResponse = await fetch(winnerUrl, {
           headers: {
             'Authorization': `Bearer ${token}`

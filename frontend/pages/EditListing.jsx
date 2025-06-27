@@ -72,7 +72,7 @@ function EditListing({ showToast: _showToast }) {
       // Try the correct endpoint first based on URL parameter
       if (auctionTypeFromURL === 'settled') {
         // Try settled auction first
-        let res = await fetch(`${apiUrl}/api/seller/auctions/${id}`, {
+        let res = await fetch(`${apiUrl}/api/auctions/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -82,9 +82,8 @@ function EditListing({ showToast: _showToast }) {
           populateForm(data, "settled");
           return;
         }
-        
         // If settled fails, try live auction
-        res = await fetch(`${apiUrl}/api/seller/live-auction/${id}`, {
+        res = await fetch(`${apiUrl}/api/live-auction/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -98,7 +97,7 @@ function EditListing({ showToast: _showToast }) {
         }
       } else {
         // Try live auction first (default)
-        let res = await fetch(`${apiUrl}/api/seller/live-auction/${id}`, {
+        let res = await fetch(`${apiUrl}/api/live-auction/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -111,9 +110,8 @@ function EditListing({ showToast: _showToast }) {
             return;
           }
         }
-        
         // If not live auction or doesn't have max_participants, try settled auction
-        res = await fetch(`${apiUrl}/api/seller/auctions/${id}`, {
+        res = await fetch(`${apiUrl}/api/auctions/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -124,7 +122,6 @@ function EditListing({ showToast: _showToast }) {
           return;
         }
       }
-      
       throw new Error('Auction not found');
     } catch (err) {
       setError('Failed to load auction. Please try again.');

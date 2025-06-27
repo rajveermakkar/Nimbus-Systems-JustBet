@@ -180,65 +180,73 @@ const sellerController = {
     }
   },
 
-  // Get auction results
+  // Get seller auction results (junior-level, no advanced joins)
   async getAuctionResults(req, res) {
     try {
       const sellerId = req.user.id;
+      const { type } = req.query;
       const { pool } = require('../db/init');
-
-      // Get live auction results - simple query
-      const liveQuery = 'SELECT id, title, description, image_url, starting_price, current_highest_bid as final_bid, end_time, status, max_participants, current_highest_bidder_id FROM live_auctions WHERE seller_id = $1 AND status = $2 ORDER BY end_time DESC';
-      const liveResults = await pool.query(liveQuery, [sellerId, 'closed']);
-
-      // Get settled auction results - simple query
-      const settledQuery = 'SELECT id, title, description, image_url, starting_price, current_highest_bid as final_bid, end_time, status, current_highest_bidder_id FROM settled_auctions WHERE seller_id = $1 AND status = $2 ORDER BY end_time DESC';
-      const settledResults = await pool.query(settledQuery, [sellerId, 'closed']);
-
-      const allResults = [];
-
-      // Process live auction results
-      for (const row of liveResults.rows) {
-        let winnerName = null;
-        if (row.current_highest_bidder_id) {
-          const userQuery = 'SELECT first_name, last_name FROM users WHERE id = $1';
-          const userResult = await pool.query(userQuery, [row.current_highest_bidder_id]);
-          if (userResult.rows[0]) {
-            winnerName = userResult.rows[0].first_name + ' ' + userResult.rows[0].last_name;
+      let results = [];
+      // Live auction results
+      if (!type || type === 'all' || type === 'live') {
+        const liveResults = await pool.query('SELECT * FROM live_auction_results', []);
+        for (const result of liveResults.rows) {
+          const auctionRes = await pool.query('SELECT * FROM live_auctions WHERE id = $1 AND seller_id = $2', [result.auction_id, sellerId]);
+          const auction = auctionRes.rows[0];
+          let winnerName = 'No Winner';
+          if (result.winner_id) {
+            const winnerRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [result.winner_id]);
+            if (winnerRes.rows[0]) {
+              winnerName = winnerRes.rows[0].first_name + ' ' + winnerRes.rows[0].last_name;
+            }
+          }
+          if (auction) {
+            results.push({
+              ...result,
+              auction_type: 'live',
+              title: auction.title,
+              description: auction.description,
+              image_url: auction.image_url,
+              starting_price: auction.starting_price,
+              end_time: auction.end_time,
+              status: auction.status,
+              winner_name: winnerName
+            });
           }
         }
-        const resultType = row.current_highest_bidder_id ? 'sold' : 'no_bids';
-        allResults.push({
-          ...row,
-          winner_name: winnerName,
-          result_type: resultType,
-          auction_type: row.type || 'live'
-        });
       }
-
-      // Process settled auction results
-      for (const row of settledResults.rows) {
-        let winnerName = null;
-        if (row.current_highest_bidder_id) {
-          const userQuery = 'SELECT first_name, last_name FROM users WHERE id = $1';
-          const userResult = await pool.query(userQuery, [row.current_highest_bidder_id]);
-          if (userResult.rows[0]) {
-            winnerName = userResult.rows[0].first_name + ' ' + userResult.rows[0].last_name;
+      // Settled auction results
+      if (!type || type === 'all' || type === 'settled') {
+        const settledResults = await pool.query('SELECT * FROM settled_auction_results', []);
+        for (const result of settledResults.rows) {
+          const auctionRes = await pool.query('SELECT * FROM settled_auctions WHERE id = $1 AND seller_id = $2', [result.auction_id, sellerId]);
+          const auction = auctionRes.rows[0];
+          let winnerName = 'No Winner';
+          if (result.winner_id) {
+            const winnerRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [result.winner_id]);
+            if (winnerRes.rows[0]) {
+              winnerName = winnerRes.rows[0].first_name + ' ' + winnerRes.rows[0].last_name;
+            }
+          }
+          if (auction) {
+            results.push({
+              ...result,
+              auction_type: 'settled',
+              title: auction.title,
+              description: auction.description,
+              image_url: auction.image_url,
+              starting_price: auction.starting_price,
+              end_time: auction.end_time,
+              status: auction.status,
+              winner_name: winnerName
+            });
           }
         }
-        const resultType = row.current_highest_bidder_id ? 'sold' : 'no_bids';
-        allResults.push({
-          ...row,
-          winner_name: winnerName,
-          result_type: resultType,
-          auction_type: row.type || 'settled'
-        });
       }
-
-      // Sort by end time (newest first)
-      allResults.sort((a, b) => new Date(b.end_time) - new Date(a.end_time));
-
-      res.json({ results: allResults });
+      results.sort((a, b) => new Date(b.end_time) - new Date(a.end_time));
+      res.json({ results });
     } catch (error) {
+      console.error('Get auction results error:', error);
       res.status(500).json({ error: 'Something went wrong' });
     }
   }

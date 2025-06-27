@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../Button';
+import auctionService from '../../services/auctionService';
 
 function AuctionCard({ auction, actionLabel }) {
   const navigate = useNavigate();
@@ -63,26 +64,46 @@ function AuctionCard({ auction, actionLabel }) {
   const notStarted = (isLive || isSettled) && startTime > now;
 
   // Countdown for not-yet-started auctions
-  const [countdown, setCountdown] = useState('');
+  const [countdown, setCountdown] = useState(null);
+  const [countdownStatus, setCountdownStatus] = useState(null);
+  const [loadingCountdown, setLoadingCountdown] = useState(true);
+
   useEffect(() => {
-    if (!notStarted) return;
-    function updateCountdown() {
-      const now = Date.now();
-      const diff = startTime - now;
-      if (diff <= 0) {
-        setCountdown('00:00:00');
-        return;
+    let isMounted = true;
+    async function fetchCountdown() {
+      setLoadingCountdown(true);
+      try {
+        const type = auction.type || 'settled';
+        const data = await auctionService.getAuctionCountdown(type, auction.id);
+        if (isMounted) {
+          setCountdown(data.countdown);
+          setCountdownStatus(data.status);
+        }
+      } catch (e) {
+        if (isMounted) {
+          setCountdown(null);
+          setCountdownStatus(null);
+        }
+      } finally {
+        if (isMounted) setLoadingCountdown(false);
       }
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      const pad = n => n.toString().padStart(2, '0');
-      setCountdown(`${pad(hours)}:${pad(minutes)}:${pad(seconds)}`);
     }
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-    return () => clearInterval(interval);
-  }, [notStarted, startTime]);
+    fetchCountdown();
+    const interval = setInterval(fetchCountdown, 1000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [auction.id, auction.type]);
+
+  // Helper to format seconds as HH:MM:SS
+  const formatSeconds = (secs) => {
+    if (secs == null) return '--:--:--';
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return [h, m, s].map(n => n.toString().padStart(2, '0')).join(':');
+  };
 
   return (
     <div className="bg-white/5 rounded-2xl shadow-xl overflow-hidden flex flex-col flex-1 min-w-[220px] max-w-[300px] w-full mx-auto transition-transform hover:scale-[1.025] hover:shadow-2xl">
@@ -112,8 +133,10 @@ function AuctionCard({ auction, actionLabel }) {
         <div className="mb-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-gray-400 px-2">
           <span className="text-left">Current Bid:</span>
           <span className="text-green-400 font-bold text-left">{formatPrice(currentBid)}</span>
-          <span className="text-left">Time Left:</span>
-          <span className="text-white font-semibold text-left">{timeRemaining}</span>
+          <span className="text-left">{countdownStatus === 'pre' ? 'Starting In:' : countdownStatus === 'ongoing' ? 'Remaining Time:' : 'Time Left:'}</span>
+          <span className="text-white font-semibold text-left">
+            {formatSeconds(countdown)}
+          </span>
           <span className="text-left">Seller:</span>
           <span className="font-semibold text-white text-left">
             {auction.business_name
@@ -127,15 +150,34 @@ function AuctionCard({ auction, actionLabel }) {
         </div>
         <div className="mt-auto flex flex-col gap-2">
           {actionLabel && (
-            <div className="mt-4">
-              <Button
-                onClick={() => {
-                  navigate(`/auction/${type}/${auction.id}`);
-                }}
-                className="w-full"
-              >
-                {actionLabel}
-              </Button>
+            <div className="mt-4 flex flex-col gap-2">
+              {countdownStatus === 'pre' ? (
+                <Button
+                  variant="secondary"
+                  className="w-full opacity-80 cursor-not-allowed"
+                  disabled
+                >
+                  <span>Starting In:</span>
+                  <span className="ml-2 font-mono tabular-nums">{formatSeconds(countdown)}</span>
+                </Button>
+              ) : countdownStatus === 'ongoing' ? (
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  onClick={() => navigate(`/auction/${type}/${auction.id}`)}
+                >
+                  Join Auction
+                  <span className="ml-2 text-xs text-yellow-200 font-mono"></span>
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  onClick={() => navigate(`/auction/${type}/${auction.id}`)}
+                >
+                  {actionLabel}
+                </Button>
+              )}
             </div>
           )}
         </div>

@@ -59,7 +59,7 @@ function SellerDashboard() {
   // Fetch auction results
   const fetchAuctionResults = async () => {
     try {
-    setLoading(true);
+      setLoading(true);
       const token = localStorage.getItem("justbetToken");
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const res = await fetch(`${apiUrl}/api/seller/auction-results`, {
@@ -67,7 +67,19 @@ function SellerDashboard() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch auction results");
-      setAuctionResults(data.results || []);
+      // Map backend status to frontend result_type
+      const mappedResults = (data.results || []).map(result => ({
+        ...result,
+        result_type:
+          (result.status === 'won' || (result.status === 'closed' && result.winner_id))
+            ? 'sold'
+            : result.status === 'no_bids'
+            ? 'no_bids'
+            : result.status === 'reserve_not_met'
+            ? 'reserve_not_met'
+            : result.status
+      }));
+      setAuctionResults(mappedResults);
     } catch (err) {
       setError(err.message || "Failed to fetch auction results");
     } finally {
@@ -129,7 +141,8 @@ function SellerDashboard() {
 
   const handleViewAuction = (result) => {
     const auctionType = result.type || result.auction_type || 'settled';
-    const path = `/seller/completed-auction/${auctionType}/${result.id}`;
+    const auctionId = result.auction_id;
+    const path = `/seller/completed-auction/${auctionType}/${auctionId}`;
     navigate(path);
   };
 

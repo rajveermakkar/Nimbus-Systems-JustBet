@@ -1,43 +1,204 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useContext } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { UserContext } from '../src/context/UserContext';
 import auctionService from '../src/services/auctionService';
 import BidHistory from '../src/components/auctions/BidHistory';
 import Button from '../src/components/Button';
+import Toast from '../src/components/Toast';
+import WinnerDeclaration from '../src/components/WinnerDeclaration';
 import EndpointSVG from './assets/Endpoint-amico.svg';
 
 function EndedAuctionPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useContext(UserContext);
   const [auction, setAuction] = useState(null);
   const [bids, setBids] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [winnerAnnouncement, setWinnerAnnouncement] = useState(null);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+  const [winnerChecked, setWinnerChecked] = useState(false);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log('EndedAuctionPage: State update:', {
+      auction: auction ? { id: auction.id, title: auction.title, status: auction.status } : null,
+      winnerAnnouncement,
+      winnerChecked,
+      loading,
+      error,
+      navigationState: location.state
+    });
+  }, [auction, winnerAnnouncement, winnerChecked, loading, error, location.state]);
+
+  // Format price
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(price);
+  };
+
+  // Check for auction winner when page loads
+  useEffect(() => {
+    if (auction && !winnerAnnouncement && !winnerChecked) {
+      console.log('EndedAuctionPage: Checking for winner announcement, auction:', auction.id);
+      setWinnerChecked(true); // Mark as checked to prevent re-running
+      
+      const checkWinner = async () => {
+        try {
+          const type = auction.type || 'live';
+          let resultUrl = '';
+          if (type === 'settled') {
+            resultUrl = `${import.meta.env.VITE_BACKEND_URL}/api/auth/settled-auction-result/${auction.id}`;
+          } else {
+            resultUrl = `${import.meta.env.VITE_BACKEND_URL}/api/auth/live-auction-result/${auction.id}`;
+          }
+          console.log('EndedAuctionPage: Checking auction result at', resultUrl, 'for auction type:', type);
+          const response = await fetch(resultUrl, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('justbetToken')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log('EndedAuctionPage: Auction result response status:', response.status);
+          if (response.ok) {
+            const result = await response.json();
+            console.log('EndedAuctionPage: Auction result:', result);
+            if (result.result) {
+              setWinnerAnnouncement({
+                winner: result.result.winner_id ? {
+                  user_id: result.result.winner_id,
+                  user_name: result.result.winner_name,
+                  amount: result.result.final_bid
+                } : null,
+                status: result.result.status,
+                finalBid: result.result.final_bid
+              });
+              // Show toast notification
+              let message = '';
+              if (result.result.winner_id) {
+                message = `🏆 Winner: ${result.result.winner_name} won with ${formatPrice(result.result.final_bid)}!`;
+                if (result.result.winner_id === user?.id) {
+                  message = `🎉 Congratulations! You won this auction with ${formatPrice(result.result.final_bid)}!`;
+                }
+              } else if (result.result.status === 'reserve_not_met') {
+                message = '❌ Auction ended - Reserve price not met';
+              } else if (result.result.status === 'no_bids') {
+                message = '❌ Auction ended - No bids were placed';
+              } else {
+                message = 'Auction ended';
+              }
+              setToast({ show: true, message, type: 'info' });
+              return;
+            }
+          } else {
+            console.log('EndedAuctionPage: No auction result found for auction type:', type, 'auction ID:', auction.id);
+            // Show a generic message if no result exists yet
+            setToast({ show: true, message: 'Auction has ended. Winner will be announced shortly.', type: 'info' });
+          }
+        } catch (error) {
+          console.error('EndedAuctionPage: Error fetching auction result:', error);
+        }
+      };
+      checkWinner();
+      const interval = setInterval(checkWinner, 30000);
+      return () => {
+        clearInterval(interval);
+      };
+    }
+  }, [auction?.id, auction?.type, winnerAnnouncement, winnerChecked, user?.token]);
 
   useEffect(() => {
     async function fetchAuction() {
       setLoading(true);
       setError(null);
+      // Check if we have auction data from navigation state (redirect)
+      if (location.state?.auctionData) {
+        console.log('EndedAuctionPage: Using auction data from navigation state:', location.state.auctionData);
+        const auctionData = location.state.auctionData;
+        setAuction(auctionData);
+        setLoading(false);
+        // Fetch bid history
+        try {
+          // Determine auction type - use from data or fallback to 'settled' for ended auctions
+          const auctionType = auctionData.type || 'settled';
+          console.log('EndedAuctionPage: Determined auction type:', auctionType);
+          
+          if (auctionType === 'settled') {
+            console.log('EndedAuctionPage: Fetching settled auction bids for:', id);
+            const bidData = await auctionService.getSettledBids(id);
+            console.log('EndedAuctionPage: Settled auction bid response:', bidData);
+            // Backend returns bids array directly, not wrapped in object
+            setBids(Array.isArray(bidData) ? bidData : []);
+          } else {
+            console.log('EndedAuctionPage: Fetching live auction bids for:', id);
+            const bidData = await auctionService.getLiveAuctionBids(id);
+            console.log('EndedAuctionPage: Live auction bid response:', bidData);
+            setBids(bidData || []);
+          }
+        } catch (error) {
+          console.error('EndedAuctionPage: Error fetching bids:', error);
+          setBids([]);
+        }
+        return;
+      }
+      // Check if there's an error from redirect
+      if (location.state?.error) {
+        console.log('EndedAuctionPage: Error from redirect:', location.state.error);
+        setError(location.state.error);
+        setLoading(false);
+        return;
+      }
       try {
-        const data = await auctionService.getLiveAuction(id);
+        console.log('EndedAuctionPage: Fetching auction with ID:', id);
+        // Try both live and settled auction fetch
+        let data = null;
+        let type = 'live';
+        try {
+          data = await auctionService.getLiveAuction(id);
+          type = 'live';
+        } catch {
+          try {
+            const settled = await auctionService.getSettledAuction(id);
+            data = settled.auction || settled;
+            type = 'settled';
+          } catch {}
+        }
+        if (!data) {
+          setError('This auction does not exist or is not ended.');
+          setAuction(null);
+          setLoading(false);
+          return;
+        }
         if (data.status !== 'closed') {
           setError('This auction is not ended.');
           setAuction(null);
         } else {
-          setAuction(data);
+          setAuction({ ...data, type });
           // Fetch bid history
           try {
-            const res = await fetch(`/api/live-auctions/${id}/bids`);
-            if (res.ok) {
-              const bidData = await res.json();
-              setBids(bidData.bids || []);
+            if (type === 'settled') {
+              console.log('EndedAuctionPage: Fetching settled auction bids (main function) for:', id);
+              const bidData = await auctionService.getSettledBids(id);
+              console.log('EndedAuctionPage: Settled auction bid response (main function):', bidData);
+              // Backend returns bids array directly, not wrapped in object
+              setBids(Array.isArray(bidData) ? bidData : []);
             } else {
-              setBids([]);
+              console.log('EndedAuctionPage: Fetching live auction bids (main function) for:', id);
+              const bidData = await auctionService.getLiveAuctionBids(id);
+              console.log('EndedAuctionPage: Live auction bid response (main function):', bidData);
+              setBids(bidData || []);
             }
-          } catch {
+          } catch (error) {
+            console.error('EndedAuctionPage: Error fetching bids (main function):', error);
             setBids([]);
           }
         }
       } catch (err) {
+        console.error('EndedAuctionPage: Error fetching auction:', err);
         setError('Failed to load auction. Please try again.');
         setAuction(null);
       } finally {
@@ -45,7 +206,7 @@ function EndedAuctionPage() {
       }
     }
     fetchAuction();
-  }, [id]);
+  }, [id, location.state]);
 
   if (loading) {
     return (
@@ -77,16 +238,36 @@ function EndedAuctionPage() {
     );
   }
 
-  // Map backend bid fields to BidHistory expected fields
-  const mappedBids = bids.slice(0, 10).map(bid => ({
-    ...bid,
-    first_name: bid.user_name ? bid.user_name.split(' ')[0] : '',
-    last_name: bid.user_name ? bid.user_name.split(' ').slice(1).join(' ') : '',
-    email: bid.user_id || '',
-  }));
+  // Backend already provides first_name, last_name, and email in the correct format
+  const displayBids = bids.slice(0, 10);
+
+  console.log('EndedAuctionPage: Bid data for BidHistory:', {
+    originalBids: bids,
+    displayBids: displayBids,
+    auctionType: auction.type,
+    auctionId: id
+  });
 
   return (
     <div className="min-h-screen flex flex-col items-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white px-4 py-8">
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ show: false, message: '', type: 'info' })}
+          duration={3000}
+        />
+      )}
+
+      {/* Winner Announcement Modal */}
+      {winnerAnnouncement && (
+        <WinnerDeclaration
+          winnerAnnouncement={winnerAnnouncement}
+          onClose={() => setWinnerAnnouncement(null)}
+          auctionType={auction.type || 'live'}
+        />
+      )}
+
       <div className="flex flex-col items-center w-full" style={{ marginBottom: '1.2rem'}}>
         <img src={EndpointSVG} alt="Auction Ended" className="w-full max-w-xs h-auto" style={{maxWidth: '320px', marginBottom: '0.5rem'}} />
       </div>
@@ -113,22 +294,22 @@ function EndedAuctionPage() {
           <div className="text-sm text-gray-200 whitespace-pre-line text-center mt-2">
             {auction.description}
           </div>
-          <div className="mt-4 text-base font-semibold text-red-400">Auction Ended</div>
+          <div className="mt-4 text-base font-semibold text-purple-400">Auction Ended</div>
           <div className="text-xs text-gray-400 mt-1">Ended at: {new Date(auction.end_time).toLocaleString()}</div>
           <div className="text-xs text-gray-400 mt-1">Final Bid: <span className="text-green-400 font-bold">{auction.current_highest_bid ? `$${auction.current_highest_bid}` : 'No bids'}</span></div>
         </div>
         {/* Bid History */}
         <div className="rounded-lg bg-white/10 shadow p-4">
           <h3 className="text-base font-semibold mb-3 text-left">Bid History</h3>
-          <BidHistory auctionId={id} type="live" bids={mappedBids} />
+          <BidHistory auctionId={id} type={auction.type || 'live'} bids={displayBids} />
         </div>
       </div>
       <Button
         variant="primary"
-        onClick={() => navigate('/live-auctions')}
+        onClick={() => navigate(auction.type === 'settled' ? '/auctions' : '/live-auctions')}
         className="mx-auto"
       >
-        Back to Live Auctions
+        Back to {auction.type === 'settled' ? 'Settled' : 'Live'} Auctions
       </Button>
     </div>
   );

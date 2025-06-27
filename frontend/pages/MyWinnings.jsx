@@ -71,8 +71,11 @@ function MyWinnings() {
   };
 
   const handleViewAuction = (winning) => {
-    const path = `/won-auction/${winning.auction_type}/${winning.id}`;
-    navigate(path);
+    if (winning.status === "closed" || winning.status === "ended") {
+      navigate(`/ended-auction/${winning.auction_id}`);
+    } else {
+      navigate(`/auction/${winning.auction_type}/${winning.auction_id}`);
+    }
   };
 
   if (loading) {
@@ -135,7 +138,7 @@ function MyWinnings() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {winnings.map((winning) => (
                 <div 
-                  key={`${winning.auction_type}-${winning.id}`}
+                  key={`${winning.auction_type}-${winning.auction_id}`}
                   className="bg-white/10 rounded-lg p-4 hover:bg-white/15 transition-colors"
                 >
                   {/* Auction Image */}

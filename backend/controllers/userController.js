@@ -343,79 +343,54 @@ const userController = {
     }
   },
 
-  // Get user winnings (auctions they won)
   async getWinnings(req, res) {
     try {
       const userId = req.user.id;
+      const { type } = req.query;
       const { pool } = require('../db/init');
-
-      // Get live auctions the user won
-      const liveWinningsQuery = `
-        SELECT 
-          la.id,
-          la.title,
-          la.description,
-          la.image_url,
-          la.starting_price,
-          la.current_highest_bid as final_bid,
-          la.end_time,
-          la.status,
-          u.first_name,
-          u.last_name,
-          u.email,
-          'live' as auction_type
-        FROM live_auctions la
-        JOIN users u ON la.seller_id = u.id
-        WHERE la.current_highest_bidder_id = $1 
-        AND la.status = 'closed'
-        ORDER BY la.end_time DESC
-      `;
-
-      // Get settled auctions the user won
-      const settledWinningsQuery = `
-        SELECT 
-          sa.id,
-          sa.title,
-          sa.description,
-          sa.image_url,
-          sa.starting_price,
-          sa.current_highest_bid as final_bid,
-          sa.end_time,
-          sa.status,
-          u.first_name,
-          u.last_name,
-          u.email,
-          'settled' as auction_type
-        FROM settled_auctions sa
-        JOIN users u ON sa.seller_id = u.id
-        WHERE sa.current_highest_bidder_id = $1 
-        AND sa.status = 'closed'
-        ORDER BY sa.end_time DESC
-      `;
-
-      const [liveWinnings, settledWinnings] = await Promise.all([
-        pool.query(liveWinningsQuery, [userId]),
-        pool.query(settledWinningsQuery, [userId])
-      ]);
-
-      const winnings = [
-        ...liveWinnings.rows.map(row => ({ ...row, seller_name: `${row.first_name} ${row.last_name}` })),
-        ...settledWinnings.rows.map(row => ({ ...row, seller_name: `${row.first_name} ${row.last_name}` }))
-      ].sort((a, b) => new Date(b.end_time) - new Date(a.end_time));
-
+      let winnings = [];
+      if (!type || type === 'all' || type === 'live') {
+        const liveQuery = `
+          SELECT lar.*, la.title, la.description, la.image_url, la.starting_price, la.end_time, la.status, u.first_name, u.last_name, 'live' as auction_type
+          FROM live_auction_results lar
+          JOIN live_auctions la ON lar.auction_id = la.id
+          JOIN users u ON la.seller_id = u.id
+          WHERE lar.winner_id = $1 AND lar.status = 'won'
+          ORDER BY la.end_time DESC
+        `;
+        const liveRows = (await pool.query(liveQuery, [userId])).rows.map(row => ({
+          ...row,
+          seller_name: `${row.first_name} ${row.last_name}`
+        }));
+        winnings = winnings.concat(liveRows);
+      }
+      if (!type || type === 'all' || type === 'settled') {
+        const settledQuery = `
+          SELECT sar.*, sa.title, sa.description, sa.image_url, sa.starting_price, sa.end_time, sa.status, u.first_name, u.last_name, 'settled' as auction_type
+          FROM settled_auction_results sar
+          JOIN settled_auctions sa ON sar.auction_id = sa.id
+          JOIN users u ON sa.seller_id = u.id
+          WHERE sar.winner_id = $1 AND sar.status = 'won'
+          ORDER BY sa.end_time DESC
+        `;
+        const settledRows = (await pool.query(settledQuery, [userId])).rows.map(row => ({
+          ...row,
+          seller_name: `${row.first_name} ${row.last_name}`
+        }));
+        winnings = winnings.concat(settledRows);
+      }
+      winnings.sort((a, b) => new Date(b.end_time) - new Date(a.end_time));
       res.json({ winnings });
     } catch (error) {
       console.error('Get winnings error:', error);
-      errorResponse(res, 500, 'Something went wrong');
+      res.status(500).json({ error: 'Something went wrong' });
     }
   },
 
-  // Get user bid history
   async getBidHistory(req, res) {
     try {
       const userId = req.user.id;
       const { pool } = require('../db/init');
-
       // Get live auction bids
       const liveBidsQuery = `
         SELECT 
@@ -429,7 +404,6 @@ const userController = {
           la.end_time,
           u.first_name,
           u.last_name,
-          u.email,
           'live' as auction_type,
           CASE 
             WHEN la.current_highest_bidder_id = $1 THEN true 
@@ -441,7 +415,6 @@ const userController = {
         WHERE lb.user_id = $1
         ORDER BY lb.created_at DESC
       `;
-
       // Get settled auction bids
       const settledBidsQuery = `
         SELECT 
@@ -455,7 +428,6 @@ const userController = {
           sa.end_time,
           u.first_name,
           u.last_name,
-          u.email,
           'settled' as auction_type,
           CASE 
             WHEN sa.current_highest_bidder_id = $1 THEN true 
@@ -467,21 +439,18 @@ const userController = {
         WHERE b.user_id = $1
         ORDER BY b.created_at DESC
       `;
-
       const [liveBids, settledBids] = await Promise.all([
         pool.query(liveBidsQuery, [userId]),
         pool.query(settledBidsQuery, [userId])
       ]);
-
       const bidHistory = [
         ...liveBids.rows.map(row => ({ ...row, seller_name: `${row.first_name} ${row.last_name}` })),
         ...settledBids.rows.map(row => ({ ...row, seller_name: `${row.first_name} ${row.last_name}` }))
       ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
       res.json({ bidHistory });
     } catch (error) {
       console.error('Get bid history error:', error);
-      errorResponse(res, 500, 'Something went wrong');
+      res.status(500).json({ error: 'Something went wrong' });
     }
   },
 
@@ -545,6 +514,82 @@ const userController = {
     }
   },
 
+  // Get settled auction result for winner announcement
+  async getSettledAuctionResult(req, res) {
+    try {
+      const auctionId = req.params.id;
+      const { pool } = require('../db/init');
+
+      // Get the auction result
+      const resultQuery = `
+        SELECT 
+          sar.*,
+          u.first_name,
+          u.last_name,
+          u.email
+        FROM settled_auction_results sar
+        LEFT JOIN users u ON sar.winner_id = u.id
+        WHERE sar.auction_id = $1
+      `;
+
+      const result = await pool.query(resultQuery, [auctionId]);
+      
+      if (result.rows.length === 0) {
+        return errorResponse(res, 404, 'Auction result not found');
+      }
+
+      const auctionResult = result.rows[0];
+      
+      // Add winner name if there is a winner
+      if (auctionResult.winner_id) {
+        auctionResult.winner_name = `${auctionResult.first_name} ${auctionResult.last_name}`;
+      }
+
+      res.json({ result: auctionResult });
+    } catch (error) {
+      console.error('Get settled auction result error:', error);
+      errorResponse(res, 500, 'Something went wrong');
+    }
+  },
+
+  // Get live auction result for winner announcement
+  async getLiveAuctionResult(req, res) {
+    try {
+      const auctionId = req.params.id;
+      const { pool } = require('../db/init');
+
+      // Get the auction result
+      const resultQuery = `
+        SELECT 
+          lar.*,
+          u.first_name,
+          u.last_name,
+          u.email
+        FROM live_auction_results lar
+        LEFT JOIN users u ON lar.winner_id = u.id
+        WHERE lar.auction_id = $1
+      `;
+
+      const result = await pool.query(resultQuery, [auctionId]);
+      
+      if (result.rows.length === 0) {
+        return errorResponse(res, 404, 'Auction result not found');
+      }
+
+      const auctionResult = result.rows[0];
+      
+      // Add winner name if there is a winner
+      if (auctionResult.winner_id) {
+        auctionResult.winner_name = `${auctionResult.first_name} ${auctionResult.last_name}`;
+      }
+
+      res.json({ result: auctionResult });
+    } catch (error) {
+      console.error('Get live auction result error:', error);
+      errorResponse(res, 500, 'Something went wrong');
+    }
+  },
+
   // Get won settled auction details
   async getWonSettledAuction(req, res) {
     try {
@@ -602,6 +647,60 @@ const userController = {
     } catch (error) {
       console.error('Get won settled auction error:', error);
       errorResponse(res, 500, 'Something went wrong');
+    }
+  },
+
+  // Get won auction details (junior-level, from results table, for both types)
+  async getWonAuction(req, res) {
+    try {
+      const userId = req.user.id;
+      const { id, type } = req.params;
+      const { pool } = require('../db/init');
+      let result = null;
+      let auction = null;
+      let sellerName = 'Unknown';
+      let auctionType = type || 'settled';
+      if (auctionType === 'live') {
+        const resultRes = await pool.query('SELECT * FROM live_auction_results WHERE auction_id = $1 AND winner_id = $2', [id, userId]);
+        result = resultRes.rows[0];
+        if (result) {
+          const auctionRes = await pool.query('SELECT * FROM live_auctions WHERE id = $1', [id]);
+          auction = auctionRes.rows[0];
+          if (auction) {
+            const sellerRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [auction.seller_id]);
+            if (sellerRes.rows[0]) {
+              sellerName = sellerRes.rows[0].first_name + ' ' + sellerRes.rows[0].last_name;
+            }
+          }
+        }
+      } else {
+        const resultRes = await pool.query('SELECT * FROM settled_auction_results WHERE auction_id = $1 AND winner_id = $2', [id, userId]);
+        result = resultRes.rows[0];
+        if (result) {
+          const auctionRes = await pool.query('SELECT * FROM settled_auctions WHERE id = $1', [id]);
+          auction = auctionRes.rows[0];
+          if (auction) {
+            const sellerRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [auction.seller_id]);
+            if (sellerRes.rows[0]) {
+              sellerName = sellerRes.rows[0].first_name + ' ' + sellerRes.rows[0].last_name;
+            }
+          }
+        }
+      }
+      if (!result || !auction) {
+        return res.status(404).json({ error: 'Auction not found or you did not win this auction' });
+      }
+      res.json({
+        auction: {
+          ...auction,
+          final_bid: result.final_bid,
+          seller_name: sellerName,
+          type: auctionType
+        }
+      });
+    } catch (error) {
+      console.error('Get won auction error:', error);
+      res.status(500).json({ error: 'Something went wrong' });
     }
   }
 };
