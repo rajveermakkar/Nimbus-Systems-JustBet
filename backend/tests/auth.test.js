@@ -54,6 +54,36 @@ jest.mock('../models/User', () => ({
   findByResetToken: jest.fn()
 }));
 
+// Mock RefreshToken model
+jest.mock('../models/RefreshToken', () => ({
+  create: jest.fn().mockResolvedValue({ rows: [{ id: 'mock-refresh-token-id' }] }),
+  findByToken: jest.fn(),
+  deleteByToken: jest.fn(),
+  deleteByUserId: jest.fn(),
+  deleteByUser: jest.fn()
+}));
+
+// Mock LiveAuction model
+jest.mock('../models/LiveAuction', () => ({
+  create: jest.fn(),
+  findById: jest.fn(),
+  updateAuction: jest.fn(),
+  findBySellerId: jest.fn()
+}));
+
+// Mock LiveAuctionBid model
+jest.mock('../models/LiveAuctionBid', () => ({
+  create: jest.fn(),
+  findByAuctionId: jest.fn(),
+  findByAuctionIdWithNames: jest.fn(),
+  deleteOldestBid: jest.fn()
+}));
+
+// Mock LiveAuctionResult model
+jest.mock('../models/LiveAuctionResult', () => ({
+  create: jest.fn()
+}));
+
 // Import the registration function
 const register = async (req, res) => {
   const { firstName, lastName, email, password, confirmPassword } = req.body;
@@ -525,7 +555,7 @@ describe('Role-Based Authentication', () => {
           role: 'admin'
         }),
         'test-secret',
-        { expiresIn: '30m' }
+        { expiresIn: '60m' }
       );
     });
 
@@ -551,7 +581,7 @@ describe('Role-Based Authentication', () => {
           role: 'user'
         }),
         'test-secret',
-        { expiresIn: '30m' }
+        { expiresIn: '60m' }
       );
     });
 

@@ -1,5 +1,67 @@
+// Set test environment
+process.env.NODE_ENV = 'test';
+
 const request = require('supertest');
 const app = require('../server');
+const { pool } = require('../db/init');
+
+// Mock all database models and services
+jest.mock('../models/User', () => ({
+  create: jest.fn(),
+  findByEmail: jest.fn(),
+  findById: jest.fn(),
+  updateVerificationStatus: jest.fn(),
+  setVerificationToken: jest.fn(),
+  setResetToken: jest.fn(),
+  updatePassword: jest.fn(),
+  findByVerificationToken: jest.fn(),
+  findByResetToken: jest.fn()
+}));
+
+jest.mock('../models/RefreshToken', () => ({
+  create: jest.fn().mockResolvedValue({ rows: [{ id: 'mock-refresh-token-id' }] }),
+  findByToken: jest.fn(),
+  deleteByToken: jest.fn(),
+  deleteByUserId: jest.fn(),
+  deleteByUser: jest.fn()
+}));
+
+jest.mock('../models/LiveAuction', () => ({
+  create: jest.fn(),
+  findById: jest.fn(),
+  updateAuction: jest.fn(),
+  findBySellerId: jest.fn()
+}));
+
+jest.mock('../models/SettledAuction', () => ({
+  create: jest.fn(),
+  findById: jest.fn(),
+  updateAuction: jest.fn(),
+  findBySellerId: jest.fn()
+}));
+
+jest.mock('../db/init', () => ({
+  pool: {
+    query: jest.fn()
+  },
+  testConnection: jest.fn().mockResolvedValue(true),
+  initDatabase: jest.fn().mockResolvedValue(true)
+}));
+
+jest.mock('bcrypt', () => ({
+  hash: jest.fn(),
+  compare: jest.fn()
+}));
+
+jest.mock('jsonwebtoken', () => ({
+  sign: jest.fn(),
+  verify: jest.fn()
+}));
+
+jest.mock('../services/emailService', () => ({
+  sendVerificationEmail: jest.fn(),
+  sendPasswordResetEmail: jest.fn()
+}));
 
 // Helper to login and get token (adjust as needed for your test setup)
 async function loginAndGetToken(email, password) {
@@ -9,14 +71,279 @@ async function loginAndGetToken(email, password) {
   return res.body.token;
 }
 
+beforeAll(() => {
+  // Default mock for pool.query to prevent undefined errors
+  pool.query.mockImplementation(() => Promise.resolve({ rows: [] }));
+});
+
+beforeEach(() => {
+  jest.clearAllMocks();
+
+  // Mock User.findById and jwt.verify for JWT authentication
+  const User = require('../models/User');
+  const jwt = require('jsonwebtoken');
+
+  const buyerUser = {
+    id: 'buyer-id',
+    first_name: 'Buyer',
+    last_name: 'User',
+    email: 'imjordanmakkar@gmail.com',
+    password: 'hashedPassword',
+    role: 'user',
+    is_verified: true,
+    is_approved: false
+  };
+  const sellerUser = {
+    id: 'seller-id',
+    first_name: 'Seller',
+    last_name: 'User',
+    email: 'rajmakkar08@gmail.com',
+    password: 'hashedPassword',
+    role: 'seller',
+    is_verified: true,
+    is_approved: true
+  };
+  const adminUser = {
+    id: 'admin-id',
+    first_name: 'Admin',
+    last_name: 'User',
+    email: 'admin@justbet.com',
+    password: 'hashedPassword',
+    role: 'admin',
+    is_verified: true,
+    is_approved: true
+  };
+  jwt.verify.mockImplementation((token) => {
+    if (token === 'buyer-token') {
+      return { id: 'buyer-id', email: 'imjordanmakkar@gmail.com', role: 'user' };
+    } else if (token === 'seller-token') {
+      return { id: 'seller-id', email: 'rajmakkar08@gmail.com', role: 'seller' };
+    } else if (token === 'admin-token') {
+      return { id: 'admin-id', email: 'admin@justbet.com', role: 'admin' };
+    }
+    throw new Error('Invalid token');
+  });
+  User.findById.mockImplementation((id) => {
+    if (id === 'buyer-id') return buyerUser;
+    if (id === 'seller-id') return sellerUser;
+    if (id === 'admin-id') return adminUser;
+    return null;
+  });
+
+  // Mock pool.query for specific queries
+  pool.query.mockImplementation((sql) => {
+    // Mock for admin pending sellers
+    if (sql && sql.toLowerCase().includes('from users') && sql.toLowerCase().includes('where is_seller_request_pending')) {
+      return Promise.resolve({
+        rows: [
+          {
+            id: 'seller-id',
+            first_name: 'Seller',
+            last_name: 'User',
+            email: 'rajmakkar08@gmail.com',
+            is_approved: false,
+            is_seller_request_pending: true
+          }
+        ]
+      });
+    }
+    // Mock for live_auctions
+    if (sql && sql.toLowerCase().includes('from live_auctions')) {
+      return Promise.resolve({
+        rows: [
+          {
+            id: 'auction-1',
+            title: 'Test Auction',
+            description: 'A test auction',
+            image_url: 'http://example.com/image.jpg',
+            starting_price: 10,
+            current_highest_bid: 15,
+            end_time: new Date(Date.now() + 7200000).toISOString(),
+            status: 'active',
+            max_participants: 10,
+            current_highest_bidder_id: null
+          }
+        ]
+      });
+    }
+    // Mock for settled_auctions
+    if (sql && sql.toLowerCase().includes('from settled_auctions')) {
+      return Promise.resolve({
+        rows: [
+          {
+            id: 'auction-2',
+            title: 'Settled Auction',
+            description: 'A settled auction',
+            image_url: 'http://example.com/image2.jpg',
+            starting_price: 20,
+            current_highest_bid: 25,
+            end_time: new Date(Date.now() - 7200000).toISOString(),
+            status: 'closed',
+            current_highest_bidder_id: null
+          }
+        ]
+      });
+    }
+    return Promise.resolve({ rows: [] });
+  });
+
+  // Mock LiveAuction.create for POST /api/seller/auctions
+  const LiveAuction = require('../models/LiveAuction');
+  LiveAuction.create.mockResolvedValue({
+    id: 'auction-1',
+    title: 'Test Auction',
+    description: 'A test auction',
+    image_url: 'http://example.com/image.jpg',
+    starting_price: 10,
+    start_time: new Date(Date.now() + 3600000).toISOString(),
+    end_time: new Date(Date.now() + 7200000).toISOString(),
+    status: 'active'
+  });
+
+  // Mock SettledAuction.findBySellerId if used
+  const SettledAuction = require('../models/SettledAuction');
+  SettledAuction.findBySellerId.mockResolvedValue([
+    {
+      id: 'auction-2',
+      title: 'Settled Auction',
+      description: 'A settled auction',
+      image_url: 'http://example.com/image2.jpg',
+      starting_price: 20,
+      current_highest_bid: 25,
+      end_time: new Date(Date.now() - 7200000).toISOString(),
+      status: 'closed',
+      current_highest_bidder_id: null
+    }
+  ]);
+});
+
 describe('Seller Endpoints', () => {
   let buyerToken, sellerToken, adminToken, sellerUserId;
 
   beforeAll(async () => {
+    // Set JWT secret for testing
+    process.env.JWT_SECRET = 'test-secret-key';
+    
+    // Mock successful login responses
+    const User = require('../models/User');
+    const bcrypt = require('bcrypt');
+    const jwt = require('jsonwebtoken');
+    
+    // Mock user data
+    const buyerUser = {
+      id: 'buyer-id',
+      first_name: 'Buyer',
+      last_name: 'User',
+      email: 'imjordanmakkar@gmail.com',
+      password: 'hashedPassword',
+      role: 'user',
+      is_verified: true,
+      is_approved: false
+    };
+    
+    const sellerUser = {
+      id: 'seller-id',
+      first_name: 'Seller',
+      last_name: 'User',
+      email: 'rajmakkar08@gmail.com',
+      password: 'hashedPassword',
+      role: 'seller',
+      is_verified: true,
+      is_approved: true
+    };
+    
+    const adminUser = {
+      id: 'admin-id',
+      first_name: 'Admin',
+      last_name: 'User',
+      email: 'admin@justbet.com',
+      password: 'hashedPassword',
+      role: 'admin',
+      is_verified: true,
+      is_approved: true
+    };
+
+    // Mock User.findByEmail for each login
+    User.findByEmail
+      .mockResolvedValueOnce(buyerUser)
+      .mockResolvedValueOnce(sellerUser)
+      .mockResolvedValueOnce(adminUser);
+    
+    // Mock bcrypt.compare to return true for all passwords
+    bcrypt.compare.mockResolvedValue(true);
+    
+    // Mock jwt.sign to return tokens
+    jwt.sign
+      .mockReturnValueOnce('buyer-token')
+      .mockReturnValueOnce('seller-token')
+      .mockReturnValueOnce('admin-token');
+
     // credentials
     buyerToken = await loginAndGetToken('imjordanmakkar@gmail.com', 'rajveer777');
     sellerToken = await loginAndGetToken('rajmakkar08@gmail.com', 'rajveer777');
     adminToken = await loginAndGetToken('admin@justbet.com', 'admin123');
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    // Mock User.findById for JWT authentication
+    const User = require('../models/User');
+    const jwt = require('jsonwebtoken');
+    
+    // Mock user data for JWT verification
+    const buyerUser = {
+      id: 'buyer-id',
+      first_name: 'Buyer',
+      last_name: 'User',
+      email: 'imjordanmakkar@gmail.com',
+      password: 'hashedPassword',
+      role: 'user',
+      is_verified: true,
+      is_approved: false
+    };
+    
+    const sellerUser = {
+      id: 'seller-id',
+      first_name: 'Seller',
+      last_name: 'User',
+      email: 'rajmakkar08@gmail.com',
+      password: 'hashedPassword',
+      role: 'seller',
+      is_verified: true,
+      is_approved: true
+    };
+    
+    const adminUser = {
+      id: 'admin-id',
+      first_name: 'Admin',
+      last_name: 'User',
+      email: 'admin@justbet.com',
+      password: 'hashedPassword',
+      role: 'admin',
+      is_verified: true,
+      is_approved: true
+    };
+
+    // Mock jwt.verify to return appropriate user IDs
+    jwt.verify.mockImplementation((token) => {
+      if (token === 'buyer-token') {
+        return { id: 'buyer-id', email: 'imjordanmakkar@gmail.com', role: 'user' };
+      } else if (token === 'seller-token') {
+        return { id: 'seller-id', email: 'rajmakkar08@gmail.com', role: 'seller' };
+      } else if (token === 'admin-token') {
+        return { id: 'admin-id', email: 'admin@justbet.com', role: 'admin' };
+      }
+      throw new Error('Invalid token');
+    });
+
+    // Mock User.findById to return appropriate user data
+    User.findById.mockImplementation((id) => {
+      if (id === 'buyer-id') return buyerUser;
+      if (id === 'seller-id') return sellerUser;
+      if (id === 'admin-id') return adminUser;
+      return null;
+    });
   });
 
   describe('POST /api/seller/request', () => {
