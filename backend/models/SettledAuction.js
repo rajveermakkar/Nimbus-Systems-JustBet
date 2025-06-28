@@ -29,13 +29,16 @@ const SettledAuction = {
     const sellerResult = await pool.query(sellerQuery, [auction.seller_id]);
     const seller = sellerResult.rows[0];
     
-    // Combine auction and seller data
+    // Combine auction and seller data with nested seller object
     return {
       ...auction,
-      first_name: seller?.first_name,
-      last_name: seller?.last_name,
-      email: seller?.email,
-      business_name: seller?.business_name
+      seller: seller ? {
+        id: auction.seller_id,
+        first_name: seller.first_name,
+        last_name: seller.last_name,
+        email: seller.email,
+        business_name: seller.business_name
+      } : null
     };
   },
 

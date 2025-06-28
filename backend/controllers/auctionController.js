@@ -196,17 +196,30 @@ async function updateAuction(req, res) {
     if (auction.seller_id !== user.id) {
       return res.status(403).json({ error: 'You can only update your own auctions.' });
     }
+    
     const fields = req.body;
+    
+    // If the auction was previously approved and is being updated, set status back to pending
+    if (auction.status === 'approved') {
+      fields.status = 'pending';
+    }
+    
     const updated = await SettledAuction.updateAuction(id, fields);
     if (!updated) {
       return res.status(400).json({ error: 'No valid fields to update.' });
     }
+    
     // Reschedule auction if end time was changed
     if (fields.endTime && fields.endTime !== auction.end_time) {
       console.log(`Rescheduling auction ${id} due to end time change: ${auction.end_time} -> ${fields.endTime}`);
       settledAuctionCron.scheduleAuctionProcessing(id, fields.endTime);
     }
-    res.json({ auction: updated, message: 'Auction updated.' });
+    
+    const message = auction.status === 'approved' 
+      ? 'Auction updated and set to pending for admin approval.' 
+      : 'Auction updated.';
+      
+    res.json({ auction: updated, message });
   } catch (error) {
     console.error('Error updating auction:', error);
     res.status(500).json({ error: 'Server error' });
@@ -277,7 +290,7 @@ async function placeBid(req, res) {
     // Determine minimum bid amount
     const currentBid = auction.current_highest_bid || auction.starting_price;
     const minIncrement = auction.min_bid_increment || 1;
-    const minBidAmount = currentBid + minIncrement;
+    const minBidAmount = Number(currentBid) + Number(minIncrement);
 
     if (bidAmount < minBidAmount) {
       return res.status(400).json({ 
@@ -285,12 +298,8 @@ async function placeBid(req, res) {
       });
     }
 
-    // Check reserve price if set
-    if (auction.reserve_price && bidAmount < Number(auction.reserve_price)) {
-      return res.status(400).json({ 
-        error: `Bid must meet the reserve price of $${Number(auction.reserve_price).toFixed(2)}` 
-      });
-    }
+    // Remove reserve price validation - users can bid below reserve
+    // Reserve price is only checked at auction end to determine if there's a winner
 
     // Store the bid
     const bid = await Bid.create({

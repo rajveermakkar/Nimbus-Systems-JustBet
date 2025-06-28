@@ -140,8 +140,8 @@ const auctionService = {
   startAuctionPolling(auctionId, callback, interval = 10000) {
     const poll = async () => {
       try {
-        const auction = await this.getSettledAuction(auctionId);
-        callback(auction);
+        const response = await api.get(`/auctions/settled/${auctionId}`);
+        callback(response.data); // Return the full response structure {auction: {...}, bids: [...], totalBids: number}
       } catch (error) {
         console.error('Auction polling error:', error);
       }

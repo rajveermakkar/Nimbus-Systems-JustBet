@@ -144,12 +144,24 @@ async function updateLiveAuction(req, res) {
     if (auction.seller_id !== user.id) {
       return res.status(403).json({ error: 'You can only update your own live auctions.' });
     }
+    
     const fields = req.body;
+    
+    // If the auction was previously approved and is being updated, set status back to pending
+    if (auction.status === 'approved') {
+      fields.status = 'pending';
+    }
+    
     const updated = await LiveAuction.updateAuction(id, fields);
     if (!updated) {
       return res.status(400).json({ error: 'No valid fields to update.' });
     }
-    res.json({ auction: updated, message: 'Live auction updated.' });
+    
+    const message = auction.status === 'approved' 
+      ? 'Live auction updated and set to pending for admin approval.' 
+      : 'Live auction updated.';
+      
+    res.json({ auction: updated, message });
   } catch (error) {
     console.error('Error updating live auction:', error);
     res.status(500).json({ error: 'Server error' });
