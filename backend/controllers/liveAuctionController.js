@@ -344,6 +344,32 @@ async function getLiveAuctionsForSeller(req, res) {
   }
 }
 
+// DELETE /api/seller/auctions/live/:id - delete a live auction (seller only)
+async function deleteLiveAuction(req, res) {
+  try {
+    const user = req.user;
+    if (!user || user.role !== 'seller') {
+      return res.status(403).json({ error: 'Only sellers can delete live auctions.' });
+    }
+    const { id } = req.params;
+    const auction = await LiveAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ error: 'Live auction not found.' });
+    }
+    if (auction.seller_id !== user.id) {
+      return res.status(403).json({ error: 'You can only delete your own live auctions.' });
+    }
+    if (auction.status === 'closed') {
+      return res.status(400).json({ error: 'Cannot delete a closed auction.' });
+    }
+    await LiveAuction.deleteById(id);
+    res.json({ message: 'Live auction deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting live auction:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   createLiveAuction,
   getLiveAuctionsByStatus,
@@ -356,5 +382,6 @@ module.exports = {
   restartLiveAuction,
   getLiveAuctionBids,
   getLiveAuctionByIdForSeller,
-  getLiveAuctionsForSeller
+  getLiveAuctionsForSeller,
+  deleteLiveAuction
 }; 
