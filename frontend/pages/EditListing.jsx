@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Button from "../src/components/Button";
 import Toast from "../src/components/Toast";
+import { ConfirmModal } from "../src/components/SessionExpiryModal";
 
 function EditListing({ showToast: _showToast }) {
   const { id } = useParams();
@@ -24,6 +25,8 @@ function EditListing({ showToast: _showToast }) {
   const fileInputRef = useRef();
   const navigate = useNavigate();
   const [toast, setToast] = useState({ show: false, message: '', type: 'info', duration: 3000 });
+  const [auctionStatus, setAuctionStatus] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const showToast = (message, type = 'info', duration = 3000) => {
     setToast({ show: true, message, type, duration });
@@ -86,27 +89,26 @@ function EditListing({ showToast: _showToast }) {
       setFetching(true);
       const token = localStorage.getItem("justbetToken");
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      
-      // Try the correct endpoint first based on URL parameter
+      // Always use seller endpoints for both auction types
+      let res, data;
       if (auctionTypeFromURL === 'settled') {
-        // Try settled auction first
-        let res = await fetch(`${apiUrl}/api/auctions/${id}`, {
+        res = await fetch(`${apiUrl}/api/seller/auctions/settled/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
         if (res.ok) {
-          const data = await res.json();
+          data = await res.json();
+          // Some endpoints wrap in .auction, some don't
+          const auctionData = data.auction || data;
           setAuctionType("settled");
-          populateForm(data, "settled");
+          populateForm(auctionData, "settled");
           return;
         }
-        // If settled fails, try live auction
+        // fallback: try live auction endpoint
         res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
         if (res.ok) {
-          const data = await res.json();
+          data = await res.json();
           if (data.max_participants) {
             setAuctionType("live");
             populateForm(data, "live");
@@ -114,29 +116,27 @@ function EditListing({ showToast: _showToast }) {
           }
         }
       } else {
-        // Try live auction first (default)
-        let res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
+        // Try live auction first
+        res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
         if (res.ok) {
-          const data = await res.json();
-          // Check if it's actually a live auction by looking for max_participants
+          data = await res.json();
           if (data.max_participants) {
             setAuctionType("live");
             populateForm(data, "live");
             return;
           }
         }
-        // If not live auction or doesn't have max_participants, try settled auction
+        // fallback: try settled auction endpoint
         res = await fetch(`${apiUrl}/api/seller/auctions/settled/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
         if (res.ok) {
-          const data = await res.json();
+          data = await res.json();
+          const auctionData = data.auction || data;
           setAuctionType("settled");
-          populateForm(data, "settled");
+          populateForm(auctionData, "settled");
           return;
         }
       }
@@ -158,11 +158,10 @@ function EditListing({ showToast: _showToast }) {
     setStartingPrice(auction.starting_price?.toString() || "");
     setReservePrice(auction.reserve_price?.toString() || "");
     setStartTime(auction.start_time ? toLocalDatetimeValue(auction.start_time) : "");
-    
+    setAuctionStatus(auction.status || "");
     if (type === "settled") {
       setEndTime(auction.end_time ? toLocalDatetimeValue(auction.end_time) : "");
     } else {
-      // Calculate duration for live auctions
       if (auction.start_time && auction.end_time) {
         const start = new Date(auction.start_time);
         const end = new Date(auction.end_time);
@@ -315,6 +314,36 @@ function EditListing({ showToast: _showToast }) {
     } catch (err) {
       setError(err.message || "Failed to update listing");
       showToast(err.message || "Failed to update listing", "error");
+      setLoading(false);
+    }
+  }
+
+  async function handleDelete() {
+    setShowConfirm(true);
+  }
+
+  async function confirmDelete() {
+    setShowConfirm(false);
+    setLoading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("justbetToken");
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const endpoint = auctionType === "live"
+        ? `${apiUrl}/api/seller/auctions/live/${id}`
+        : `${apiUrl}/api/seller/auctions/settled/${id}`;
+      const res = await fetch(endpoint, {
+        method: "DELETE",
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.message || "Failed to delete listing");
+      showToast("Listing deleted successfully!", "success");
+      setTimeout(() => navigate("/seller/dashboard?tab=listings"), 500);
+    } catch (err) {
+      setError(err.message || "Failed to delete listing");
+      showToast(err.message || "Failed to delete listing", "error");
+    } finally {
       setLoading(false);
     }
   }
@@ -490,10 +519,31 @@ function EditListing({ showToast: _showToast }) {
             <Button type="submit" variant="primary" size="sm" disabled={loading}>
               {loading ? "Updating..." : "Update Listing"}
             </Button>
+            {auctionStatus !== 'closed' && (
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={handleDelete}
+                disabled={loading}
+                className="bg-red-600 hover:bg-red-700 text-white border border-red-700 transition-colors"
+              >
+                Delete Listing
+              </Button>
+            )}
           </div>
         </form>
         <p className="text-xs text-white/60 mt-2 text-center">Note: Editing this listing will mark it as Pending and it will require admin re-approval.</p>
       </div>
+      <ConfirmModal
+        open={showConfirm}
+        title="Delete Listing?"
+        message="Are you sure you want to delete this listing? This cannot be undone."
+        onConfirm={confirmDelete}
+        onCancel={() => setShowConfirm(false)}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

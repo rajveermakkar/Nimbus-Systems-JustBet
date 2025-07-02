@@ -53,6 +53,12 @@ const LiveAuction = {
   async findBySeller(sellerId) {
     const result = await pool.query('SELECT * FROM live_auctions WHERE seller_id = $1', [sellerId]);
     return result.rows;
+  },
+
+  // Delete live auction by ID
+  async deleteById(id) {
+    const result = await pool.query('DELETE FROM live_auctions WHERE id = $1 RETURNING *', [id]);
+    return result.rows[0];
   }
 };
 

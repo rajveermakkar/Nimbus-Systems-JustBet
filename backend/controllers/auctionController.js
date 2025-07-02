@@ -468,6 +468,32 @@ async function processSpecificAuction(req, res) {
   }
 }
 
+// DELETE /api/seller/auctions/settled/:id - delete a settled auction (seller only)
+async function deleteAuction(req, res) {
+  try {
+    const user = req.user;
+    if (!user || user.role !== 'seller') {
+      return res.status(403).json({ error: 'Only sellers can delete auctions.' });
+    }
+    const { id } = req.params;
+    const auction = await SettledAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ error: 'Auction not found.' });
+    }
+    if (auction.seller_id !== user.id) {
+      return res.status(403).json({ error: 'You can only delete your own auctions.' });
+    }
+    if (auction.status === 'closed') {
+      return res.status(400).json({ error: 'Cannot delete a closed auction.' });
+    }
+    await SettledAuction.deleteById(id);
+    res.json({ message: 'Auction deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting auction:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   createAuction,
   listPendingAuctions,
@@ -480,7 +506,8 @@ module.exports = {
   getAuctionWithBids,
   getAuctionByIdForSeller,
   getAuctionCountdownAPI,
-  processSpecificAuction
+  processSpecificAuction,
+  deleteAuction
 };
 
 module.exports.upload = upload.single('image');

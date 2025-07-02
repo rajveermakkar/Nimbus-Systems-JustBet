@@ -23,6 +23,7 @@ router.post('/auctions/settled/upload-image', jwtauth, roleAuth('seller'), uploa
 router.patch('/auctions/settled/:id', jwtauth, roleAuth('seller'), updateAuction);
 router.get('/auctions/settled/:id', jwtauth, roleAuth('seller'), auctionController.getAuctionByIdForSeller);
 router.get('/auctions/settled', jwtauth, roleAuth('seller'), getMyAuctions);
+router.delete('/auctions/settled/:id', jwtauth, roleAuth('seller'), auctionController.deleteAuction);
 
 // Live Auctions (Seller Only)
 router.post('/auctions/live', jwtauth, roleAuth('seller'), liveAuctionController.createLiveAuction);
@@ -31,6 +32,7 @@ router.patch('/auctions/live/:id', jwtauth, roleAuth('seller'), liveAuctionContr
 router.get('/auctions/live/:id', jwtauth, roleAuth('seller'), liveAuctionController.getLiveAuctionByIdForSeller);
 router.get('/auctions/live', jwtauth, roleAuth('seller'), liveAuctionController.getLiveAuctionsForSeller);
 router.post('/auctions/live/:id/restart', jwtauth, roleAuth('seller'), liveAuctionController.restartLiveAuction);
+router.delete('/auctions/live/:id', jwtauth, roleAuth('seller'), liveAuctionController.deleteLiveAuction);
 
 // Seller analytics and auction results
 router.get('/analytics', jwtauth, roleAuth('seller'), sellerController.getSellerAnalytics);

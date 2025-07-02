@@ -94,6 +94,12 @@ const SettledAuction = {
   async findBySeller(sellerId) {
     const result = await pool.query('SELECT * FROM settled_auctions WHERE seller_id = $1', [sellerId]);
     return result.rows;
+  },
+
+  // Delete auction by ID
+  async deleteById(id) {
+    const result = await pool.query('DELETE FROM settled_auctions WHERE id = $1 RETURNING *', [id]);
+    return result.rows[0];
   }
 };
 
