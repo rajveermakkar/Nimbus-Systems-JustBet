@@ -48,7 +48,7 @@ function SellerDashboard() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch analytics");
-      setAnalytics(data);
+      setAnalytics(data.analytics);
     } catch (err) {
       setError(err.message || "Failed to fetch analytics");
     } finally {
@@ -93,27 +93,22 @@ function SellerDashboard() {
       setLoading(true);
       const token = localStorage.getItem("justbetToken");
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      
-      // Fetch both live and settled auctions
+      // Fetch both live and settled auctions from new endpoints
       const [liveRes, settledRes] = await Promise.all([
-        fetch(`${apiUrl}/api/seller/live-auction`, {
+        fetch(`${apiUrl}/api/seller/auctions/live`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`${apiUrl}/api/seller/auctions`, {
+        fetch(`${apiUrl}/api/seller/auctions/settled`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
-      
       const liveData = await liveRes.json();
       const settledData = await settledRes.json();
-      
       if (!liveRes.ok) throw new Error(liveData.message || "Failed to fetch live listings");
       if (!settledRes.ok) throw new Error(settledData.message || "Failed to fetch settled listings");
-      
-      // Combine and add auction_type field
-      const liveListings = liveData.map(auction => ({ ...auction, auction_type: 'live' }));
-      const settledListings = settledData.map(auction => ({ ...auction, auction_type: 'settled' }));
-      
+      // Use .auctions property and use auction.type from backend
+      const liveListings = (liveData.auctions || []);
+      const settledListings = (settledData.auctions || []);
       setListings([...liveListings, ...settledListings]);
     } catch (err) {
       setError(err.message || "Failed to fetch listings");

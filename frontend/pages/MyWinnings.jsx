@@ -72,7 +72,9 @@ function MyWinnings() {
 
   const handleViewAuction = (winning) => {
     if (winning.status === "closed" || winning.status === "ended") {
-      navigate(`/ended-auction/${winning.auction_id}`);
+      navigate(`/ended-auction/${winning.auction_id}`, {
+        state: { fromMyWinnings: true }
+      });
     } else {
       navigate(`/auction/${winning.auction_type}/${winning.auction_id}`);
     }
@@ -159,7 +161,11 @@ function MyWinnings() {
                     <h3 className="font-semibold text-lg line-clamp-2">{winning.title}</h3>
                     
                     <div className="text-sm text-gray-300">
-                      <p>Seller: <span className="text-white">{winning.seller_name}</span></p>
+                      <p>Seller: <span className="text-white">{
+                        winning.seller
+                          ? `${winning.seller.first_name} ${winning.seller.last_name}${winning.seller.business_name ? ` (${winning.seller.business_name})` : ''}`
+                          : 'Unknown'
+                      }</span></p>
                       <p>Type: <span className="text-blue-400 font-semibold capitalize">{winning.auction_type}</span></p>
                       <p>Ended: <span className="text-white">{formatDate(winning.end_time)}</span></p>
                     </div>

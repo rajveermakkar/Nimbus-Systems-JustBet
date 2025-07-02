@@ -2,13 +2,13 @@ const { pool } = require('../db/init');
 
 const SettledAuction = {
   // Create a new auction listing in the database
-  async create({ sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, minBidIncrement = 1 }) {
+  async create({ sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, minBidIncrement }) {
     const query = `
       INSERT INTO settled_auctions (seller_id, title, description, image_url, start_time, end_time, starting_price, reserve_price, min_bid_increment, type)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
-    const result = await pool.query(query, [sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, minBidIncrement, 'settled']);
+    const result = await pool.query(query, [sellerId, title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, minBidIncrement !== undefined ? minBidIncrement : 5, 'settled']);
     return result.rows[0];
   },
 
@@ -29,13 +29,16 @@ const SettledAuction = {
     const sellerResult = await pool.query(sellerQuery, [auction.seller_id]);
     const seller = sellerResult.rows[0];
     
-    // Combine auction and seller data
+    // Combine auction and seller data with nested seller object
     return {
       ...auction,
-      first_name: seller?.first_name,
-      last_name: seller?.last_name,
-      email: seller?.email,
-      business_name: seller?.business_name
+      seller: seller ? {
+        id: auction.seller_id,
+        first_name: seller.first_name,
+        last_name: seller.last_name,
+        email: seller.email,
+        business_name: seller.business_name
+      } : null
     };
   },
 
@@ -45,10 +48,11 @@ const SettledAuction = {
     return result.rows;
   },
 
+  // Approve an auction (admin only)
   async approveAuction(id) {
     const query = `
       UPDATE settled_auctions
-      SET is_approved = true, status = 'approved', updated_at = CURRENT_TIMESTAMP
+      SET status = 'approved', updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
       RETURNING *
     `;
@@ -62,8 +66,8 @@ const SettledAuction = {
   },
 
   // Update auction fields by ID
-  async updateAuction(id, fields, wasApproved = false) {
-    const allowed = ['title', 'description', 'image_url', 'start_time', 'end_time', 'starting_price', 'reserve_price', 'current_highest_bid', 'current_highest_bidder_id', 'bid_count', 'min_bid_increment'];
+  async updateAuction(id, fields) {
+    const allowed = ['title', 'description', 'image_url', 'start_time', 'end_time', 'starting_price', 'reserve_price', 'current_highest_bid', 'current_highest_bidder_id', 'bid_count', 'min_bid_increment', 'status'];
     const updates = [];
     const values = [];
     let idx = 1;
@@ -73,11 +77,6 @@ const SettledAuction = {
         values.push(fields[key]);
         idx++;
       }
-    }
-    // If auction was previously approved, set is_approved=false and status='pending'
-    if (wasApproved && updates.length > 0) {
-      updates.push(`is_approved = false`);
-      updates.push(`status = 'pending'`);
     }
     if (updates.length === 0) return null;
     values.push(id);

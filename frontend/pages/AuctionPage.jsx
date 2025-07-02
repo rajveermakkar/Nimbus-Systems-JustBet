@@ -54,44 +54,21 @@ function AuctionPage() {
       const endTime = new Date(auction.end_time);
       const isEnded = auction.status === 'closed' || now > endTime;
       
-      console.log('Settled auction check:', {
-        auctionId: auction.id,
-        status: auction.status,
-        endTime: auction.end_time,
-        now: now.toISOString(),
-        isEnded,
-        hasWinnerAnnouncement: !!winnerAnnouncement,
-        winnerChecked
-      });
-      
       if (isEnded) {
         setWinnerChecked(true); // Mark as checked to prevent re-running
         
         const checkSettledWinner = async () => {
           try {
-            console.log('Checking for settled auction result...');
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/settled-auction-result/${auction.id}`, {
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auctions/settled/${auction.id}/result`, {
               headers: {
                 'Authorization': `Bearer ${user.token}`,
                 'Content-Type': 'application/json'
               }
             });
             
-            console.log('Settled auction result response:', response.status);
-            
             if (response.ok) {
               const result = await response.json();
-              console.log('Settled auction result:', result);
               if (result.result) {
-                console.log('Winner announcement data:', {
-                  result: result.result,
-                  currentUser: user?.id,
-                  winnerId: result.result.winner_id,
-                  isCurrentUserWinner: result.result.winner_id === user?.id,
-                  winnerName: result.result.winner_name,
-                  finalBid: result.result.final_bid
-                });
-                
                 setWinnerAnnouncement({
                   winner: result.result.winner_id ? {
                     user_id: result.result.winner_id,
@@ -117,7 +94,6 @@ function AuctionPage() {
                   message = 'Auction ended';
                 }
                 
-                console.log('Setting winner announcement toast:', message);
                 setToast({ show: true, message, type: 'info' });
 
                 // Auto-redirect after 3 seconds
@@ -129,12 +105,10 @@ function AuctionPage() {
                 }, 3000);
               } else {
                 // No result yet, but auction has ended - show generic ended message
-                console.log('No settled auction result yet');
                 setToast({ show: true, message: 'Auction has ended. Winner will be announced shortly.', type: 'info' });
               }
             } else if (response.status === 404) {
               // No result yet, but auction has ended - show generic ended message
-              console.log('Settled auction result not found (404)');
               setToast({ show: true, message: 'Auction has ended. Winner will be announced shortly.', type: 'info' });
             }
           } catch (error) {
@@ -188,7 +162,7 @@ function AuctionPage() {
       let isLive = false;
       if (type === 'settled') {
         const settledData = await auctionService.getSettledAuction(id);
-        auctionData = settledData.auction || settledData;
+        auctionData = settledData;
         isLive = false;
       } else if (type === 'live') {
         const liveData = await auctionService.getLiveAuction(id);
@@ -202,29 +176,26 @@ function AuctionPage() {
       // Fetch bid history for live auctions
       if (type === 'live') {
         try {
-          const response = await fetch(`/api/live-auctions/${id}/bids`);
+          const response = await fetch(`/api/auctions/live/${id}/bids`);
           if (response.ok) {
             const data = await response.json();
             setRecentBids(data.bids || []);
           }
         } catch (bidError) {
+          console.error('[AuctionPage] Error fetching live bids:', bidError);
           setRecentBids([]);
         }
       } else {
         setRecentBids(auctionData.recentBids || []);
       }
     } catch (err) {
-      console.error('Error fetching auction:', err);
-      
-      // Check if this might be an ended auction
-      if (type === 'live') {
+      console.error('[AuctionPage] Error fetching auction:', err);
+      if (type === 'settled') {
         try {
-          // Try to check if this is an ended auction by checking the database directly
-          const response = await fetch(`/api/live-auctions/${id}`);
+          const response = await fetch(`/api/auctions/settled/${id}`);
           if (response.ok) {
             const auctionData = await response.json();
-            if (auctionData.status === 'closed') {
-              // Pass auction data and winner announcement through navigation state
+            if (auctionData.status === 'closed' || auctionData.auction?.status === 'closed') {
               navigate(`/ended-auction/${id}`, { 
                 replace: true,
                 state: { 
@@ -236,10 +207,9 @@ function AuctionPage() {
             }
           }
         } catch (checkError) {
-          console.error('Error checking auction status:', checkError);
+          console.error('[AuctionPage] Error checking auction status:', checkError);
         }
       }
-      
       setError('Failed to load auction. Please try again.');
       setAuction(null);
       setIsLiveAuction(false);
@@ -328,15 +298,6 @@ function AuctionPage() {
           setPlacingBid(false);
           setBidAmount('');
           
-          console.log('Live auction end data:', {
-            data: data,
-            result: data.result,
-            winner: data.result.winner,
-            currentUser: user?.id,
-            winnerId: data.result.winner?.user_id,
-            isCurrentUserWinner: data.result.winner?.user_id === user?.id
-          });
-          
           // Handle different auction end scenarios
           let message = '';
           if (data.result.winner) {
@@ -350,7 +311,6 @@ function AuctionPage() {
             message = 'Auction ended';
           }
           
-          console.log('Setting live auction winner toast:', message);
           setToast({ show: true, message, type: 'info' });
           // Update auction status to show it's ended
           setAuction(prevAuction => ({
@@ -378,8 +338,8 @@ function AuctionPage() {
     if (type === 'settled') {
       fetchAuction();
       stopPolling = auctionService.startAuctionPolling(id, (response) => {
-        setAuction(response.auction);
-        setRecentBids(response.recentBids || []);
+        setAuction(response.auction || response);
+        setRecentBids(response.bids || response.recentBids || []);
       }, 5000); // 5 seconds
     } else if (type === 'live') {
       setLoading(true);
@@ -404,7 +364,7 @@ function AuctionPage() {
           }
           
           try {
-            const response = await fetch(`/api/live-auctions/${id}/bids`);
+            const response = await fetch(`/api/auctions/live/${id}/bids`);
             if (response.ok) {
               const bidsData = await response.json();
               setRecentBids(bidsData.bids || []);
@@ -419,7 +379,7 @@ function AuctionPage() {
           
           // Check if this might be an ended auction
           try {
-            const response = await fetch(`/api/live-auctions/${id}`);
+            const response = await fetch(`/api/auctions/live/${id}`);
             if (response.ok) {
               const auctionData = await response.json();
               if (auctionData.status === 'closed') {
@@ -467,18 +427,14 @@ function AuctionPage() {
       setBidError('Please log in to place a bid.');
       return;
     }
-    
     if (isLiveAuction && !isConnected) {
       setBidError('Not connected to live auction. Please refresh the page.');
       return;
     }
-    
-    // Check if auction is closed or ended by time
     if (isAuctionEndedValue) {
       setBidError('This auction has already ended.');
       return;
     }
-    
     const amount = parseFloat(bidAmount);
     if (!amount || amount <= 0) {
       setBidError('Please enter a valid bid amount.');
@@ -492,14 +448,11 @@ function AuctionPage() {
       setBidError(`Minimum bid increment is ${formatPrice(validMinIncrement)}`);
       return;
     }
-    
     try {
       setPlacingBid(true);
       setBidError('');
       setBidSuccess('');
-      
       if (isLiveAuction) {
-        // Place bid through Socket.IO for live auctions
         socketService.placeLiveBid(id, amount, (response) => {
           if (response.success) {
             setBidSuccess('Live bid placed successfully!');
@@ -513,16 +466,15 @@ function AuctionPage() {
           setPlacingBid(false);
         });
       } else {
-        // Place bid through REST API for settled auctions
-        await auctionService.placeSettledBid(id, amount);
+        const bidRes = await auctionService.placeSettledBid(id, amount);
         setBidSuccess('Bid placed successfully!');
         setBidAmount('');
-        fetchAuction();
         setToast({ show: true, message: `Bid placed successfully! Your bid: ${formatPrice(amount)}`, type: 'success' });
         setTimeout(() => setBidSuccess(''), 3000);
         setPlacingBid(false);
       }
     } catch (err) {
+      console.error('[AuctionPage] Error placing bid:', err);
       setBidError(err.response?.data?.message || 'Failed to place bid. Please try again.');
       setToast({ show: true, message: err.response?.data?.message || 'Failed to place bid. Please try again.', type: 'error' });
       setPlacingBid(false);
@@ -712,7 +664,6 @@ function AuctionPage() {
         <WinnerDeclaration
           winnerAnnouncement={winnerAnnouncement}
           onClose={() => {
-            console.log('Closing winner announcement modal');
             setWinnerAnnouncement(null);
           }}
           auctionType={isLiveAuction ? 'live' : 'settled'}
@@ -750,7 +701,7 @@ function AuctionPage() {
             <div className="rounded-lg bg-white/10 shadow p-4">
               <h1 className="text-lg font-bold mb-1 text-left mb-2">{auction.title}</h1>
               <div className="mb-1 text-xs text-gray-300 text-left mt-2">
-                Seller: <span className="font-semibold text-white">{auction.business_name || `${auction.first_name} ${auction.last_name}` || auction.email || 'Unknown'}</span>
+                Seller: <span className="font-semibold text-white">{auction.seller?.first_name + ' ' + auction.seller?.last_name + (auction.seller?.business_name ? ` (${auction.seller.business_name})` : '')}</span>
               </div>
               <div className="text-sm text-gray-200 whitespace-pre-line text-left mt-2">
                 {auction.description}

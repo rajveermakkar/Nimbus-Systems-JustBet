@@ -142,8 +142,17 @@ const sellerController = {
       const liveResult = await pool.query(liveQuery, [sellerId]);
       const settledResult = await pool.query(settledQuery, [sellerId]);
 
-      const live = liveResult.rows[0];
-      const settled = settledResult.rows[0];
+      // Fallback defaults if no rows
+      const zeroStats = {
+        total: 0,
+        completed: 0,
+        active: 0,
+        with_bids: 0,
+        revenue: 0,
+        avg_price: 0
+      };
+      const live = liveResult.rows[0] || zeroStats;
+      const settled = settledResult.rows[0] || zeroStats;
 
       // Calculate totals
       const totalAuctions = parseInt(live.total) + parseInt(settled.total);
@@ -174,7 +183,7 @@ const sellerController = {
         }
       };
 
-      res.json(analytics);
+      res.json({ analytics });
     } catch (error) {
       res.status(500).json({ error: 'Something went wrong' });
     }
@@ -193,11 +202,15 @@ const sellerController = {
         for (const result of liveResults.rows) {
           const auctionRes = await pool.query('SELECT * FROM live_auctions WHERE id = $1 AND seller_id = $2', [result.auction_id, sellerId]);
           const auction = auctionRes.rows[0];
-          let winnerName = 'No Winner';
+          let winner = null;
           if (result.winner_id) {
             const winnerRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [result.winner_id]);
             if (winnerRes.rows[0]) {
-              winnerName = winnerRes.rows[0].first_name + ' ' + winnerRes.rows[0].last_name;
+              winner = {
+                id: result.winner_id,
+                first_name: winnerRes.rows[0].first_name,
+                last_name: winnerRes.rows[0].last_name
+              };
             }
           }
           if (auction) {
@@ -210,7 +223,7 @@ const sellerController = {
               starting_price: auction.starting_price,
               end_time: auction.end_time,
               status: auction.status,
-              winner_name: winnerName
+              winner
             });
           }
         }
@@ -221,11 +234,15 @@ const sellerController = {
         for (const result of settledResults.rows) {
           const auctionRes = await pool.query('SELECT * FROM settled_auctions WHERE id = $1 AND seller_id = $2', [result.auction_id, sellerId]);
           const auction = auctionRes.rows[0];
-          let winnerName = 'No Winner';
+          let winner = null;
           if (result.winner_id) {
             const winnerRes = await pool.query('SELECT first_name, last_name FROM users WHERE id = $1', [result.winner_id]);
             if (winnerRes.rows[0]) {
-              winnerName = winnerRes.rows[0].first_name + ' ' + winnerRes.rows[0].last_name;
+              winner = {
+                id: result.winner_id,
+                first_name: winnerRes.rows[0].first_name,
+                last_name: winnerRes.rows[0].last_name
+              };
             }
           }
           if (auction) {
@@ -238,7 +255,7 @@ const sellerController = {
               starting_price: auction.starting_price,
               end_time: auction.end_time,
               status: auction.status,
-              winner_name: winnerName
+              winner
             });
           }
         }

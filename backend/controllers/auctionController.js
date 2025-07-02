@@ -13,19 +13,19 @@ async function createAuction(req, res) {
     const user = req.user;
     // Only sellers can create auctions
     if (!user || user.role !== 'seller') {
-      return res.status(403).json({ message: 'Only sellers can create auctions.' });
+      return res.status(403).json({ error: 'Only sellers can create auctions.' });
     }
-    const { title, description, imageUrl, startTime, endTime, startingPrice, reservePrice } = req.body;
+    const { title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, minBidIncrement } = req.body;
 
     // Validate required fields are present and not blank
     if (!title || typeof title !== 'string' || title.trim() === '') {
-      return res.status(400).json({ message: 'Title is required.' });
+      return res.status(400).json({ error: 'Title is required.' });
     }
     if (!startTime || !endTime) {
-      return res.status(400).json({ message: 'Start and end time are required.' });
+      return res.status(400).json({ error: 'Start and end time are required.' });
     }
     if (!startingPrice || isNaN(Number(startingPrice)) || Number(startingPrice) <= 0) {
-      return res.status(400).json({ message: 'Starting price must be a positive number.' });
+      return res.status(400).json({ error: 'Starting price must be a positive number.' });
     }
 
     const start = new Date(startTime);
@@ -33,22 +33,22 @@ async function createAuction(req, res) {
     const now = new Date();
     now.setHours(0, 0, 0, 0); // Set to start of today
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return res.status(400).json({ message: 'Invalid date format for start or end date.' });
+      return res.status(400).json({ error: 'Invalid date format for start or end date.' });
     }
     if (start < now) {
-      return res.status(400).json({ message: 'Start date must be today or in the future.' });
+      return res.status(400).json({ error: 'Start date must be today or in the future.' });
     }
     if (end <= start) {
-      return res.status(400).json({ message: 'End date must be after the start date.' });
+      return res.status(400).json({ error: 'End date must be after the start date.' });
     }
     if (end < new Date()) {
-      return res.status(400).json({ message: 'End date must be in the future.' });
+      return res.status(400).json({ error: 'End date must be in the future.' });
     }
 
     let reserve = reservePrice;
     if (reserve !== undefined && reserve !== null && reserve !== '') {
       if (isNaN(Number(reserve)) || Number(reserve) < 0) {
-        return res.status(400).json({ message: 'Reserve price must be a non-negative number.' });
+        return res.status(400).json({ error: 'Reserve price must be a non-negative number.' });
       }
     } else {
       reserve = null;
@@ -63,16 +63,17 @@ async function createAuction(req, res) {
       startTime: start,
       endTime: end,
       startingPrice: Number(startingPrice),
-      reservePrice: reserve !== null ? Number(reserve) : null
+      reservePrice: reserve !== null ? Number(reserve) : null,
+      minBidIncrement: minBidIncrement !== undefined ? minBidIncrement : 5
     });
     
     // Schedule the auction for processing when it ends
     settledAuctionCron.scheduleAuctionProcessing(auction.id, end);
     
-    res.status(201).json(auction);
+    res.status(201).json({ auction });
   } catch (error) {
     console.error('Error creating auction:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -81,13 +82,13 @@ async function listPendingAuctions(req, res) {
   try {
     const user = req.user;
     if (!user || user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only admins can view pending auctions.' });
+      return res.status(403).json({ error: 'Only admins can view pending auctions.' });
     }
     const auctions = await SettledAuction.findPending();
-    res.json(auctions);
+    res.json({ auctions });
   } catch (error) {
     console.error('Error fetching pending auctions:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -96,22 +97,22 @@ async function approveAuction(req, res) {
   try {
     const user = req.user;
     if (!user || user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only admins can approve auctions.' });
+      return res.status(403).json({ error: 'Only admins can approve auctions.' });
     }
     const { id } = req.params;
     const auction = await SettledAuction.approveAuction(id);
     if (!auction) {
-      return res.status(404).json({ message: 'Auction not found.' });
+      return res.status(404).json({ error: 'Auction not found.' });
     }
     
     // Schedule the auction for processing when it ends
     settledAuctionCron.scheduleAuctionProcessing(id, auction.end_time);
     console.log(`Scheduled approved auction ${id} to end at ${new Date(auction.end_time).toLocaleString()}`);
     
-    res.json(auction);
+    res.json({ auction });
   } catch (error) {
     console.error('Error approving auction:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -159,19 +160,23 @@ async function getAllApprovedAuctions(req, res) {
       // Combine auction and seller data
       const auctionWithSeller = {
         ...auction,
-        first_name: seller?.first_name,
-        last_name: seller?.last_name,
-        email: seller?.email,
-        business_name: seller?.business_name
+        seller: seller ? {
+          id: seller.id,
+          first_name: seller.first_name,
+          last_name: seller.last_name,
+          email: seller.email,
+          business_name: seller.business_name
+        } : null,
+        type: 'settled'
       };
       
       auctionsWithSellers.push(auctionWithSeller);
     }
     
-    res.json(auctionsWithSellers);
+    res.json({ auctions: auctionsWithSellers });
   } catch (error) {
     console.error('Error fetching approved auctions:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -180,27 +185,28 @@ async function updateAuction(req, res) {
   try {
     const user = req.user;
     if (!user || user.role !== 'seller') {
-      return res.status(403).json({ message: 'Only sellers can update auctions.' });
+      return res.status(403).json({ error: 'Only sellers can update auctions.' });
     }
     const { id } = req.params;
     // Find auction and check ownership
     const auction = await SettledAuction.findById(id);
     if (!auction) {
-      return res.status(404).json({ message: 'Auction not found.' });
+      return res.status(404).json({ error: 'Auction not found.' });
     }
     if (auction.seller_id !== user.id) {
-      return res.status(403).json({ message: 'You can only update your own auctions.' });
+      return res.status(403).json({ error: 'You can only update your own auctions.' });
     }
-    // Only allow updates if not approved yet
-    // if (auction.is_approved) {
-    //   return res.status(400).json({ message: 'Cannot edit an approved auction.' });
-    // }
     
     const fields = req.body;
-    // If auction was approved, re-approval must be needed for editing
-    const updated = await SettledAuction.updateAuction(id, fields, auction.is_approved);
+    
+    // If the auction was previously approved and is being updated, set status back to pending
+    if (auction.status === 'approved') {
+      fields.status = 'pending';
+    }
+    
+    const updated = await SettledAuction.updateAuction(id, fields);
     if (!updated) {
-      return res.status(400).json({ message: 'No valid fields to update.' });
+      return res.status(400).json({ error: 'No valid fields to update.' });
     }
     
     // Reschedule auction if end time was changed
@@ -209,14 +215,14 @@ async function updateAuction(req, res) {
       settledAuctionCron.scheduleAuctionProcessing(id, fields.endTime);
     }
     
-    let msg = 'Auction updated.';
-    if (auction.is_approved) {
-      msg = 'Auction updated. Changes require admin re-approval.';
-    }
-    res.json({ auction: updated, message: msg });
+    const message = auction.status === 'approved' 
+      ? 'Auction updated and set to pending for admin approval.' 
+      : 'Auction updated.';
+      
+    res.json({ auction: updated, message });
   } catch (error) {
     console.error('Error updating auction:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -225,15 +231,15 @@ async function getMyAuctions(req, res) {
   try {
     const user = req.user;
     if (!user || user.role !== 'seller') {
-      return res.status(403).json({ message: 'Only sellers can view their own listings.' });
+      return res.status(403).json({ error: 'Only sellers can view their own listings.' });
     }
     // Only get auctions that are not closed
     const query = 'SELECT * FROM settled_auctions WHERE seller_id = $1 AND status != $2';
     const result = await pool.query(query, [user.id, 'closed']);
-    res.json(result.rows);
+    res.json({ auctions: result.rows });
   } catch (error) {
     console.error('Error fetching seller auctions:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -247,12 +253,12 @@ async function placeBid(req, res) {
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(id)) {
-      return res.status(400).json({ message: 'Invalid auction ID format.' });
+      return res.status(400).json({ error: 'Invalid auction ID format.' });
     }
 
     // Validate bid amount
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      return res.status(400).json({ message: 'Valid bid amount is required.' });
+      return res.status(400).json({ error: 'Valid bid amount is required.' });
     }
 
     const bidAmount = Number(amount);
@@ -260,44 +266,40 @@ async function placeBid(req, res) {
     // Get auction details
     const auction = await SettledAuction.findById(id);
     if (!auction) {
-      return res.status(404).json({ message: 'Auction not found.' });
+      return res.status(404).json({ error: 'Auction not found.' });
     }
 
     // Check if auction is approved and active
-    if (!auction.is_approved || auction.status !== 'approved') {
-      return res.status(400).json({ message: 'Auction is not open for bidding.' });
+    if (auction.status !== 'approved') {
+      return res.status(400).json({ error: 'Auction is not open for bidding.' });
     }
 
     // Check if auction has ended
     const now = new Date();
     const endTime = new Date(auction.end_time);
     if (now > endTime) {
-      return res.status(400).json({ message: 'Auction has ended.' });
+      return res.status(400).json({ error: 'Auction has ended.' });
     }
 
     // Check if auction has started
     const startTime = new Date(auction.start_time);
     if (now < startTime) {
-      return res.status(400).json({ message: 'Auction has not started yet.' });
+      return res.status(400).json({ error: 'Auction has not started yet.' });
     }
 
     // Determine minimum bid amount
     const currentBid = auction.current_highest_bid || auction.starting_price;
     const minIncrement = auction.min_bid_increment || 1;
-    const minBidAmount = currentBid + minIncrement;
+    const minBidAmount = Number(currentBid) + Number(minIncrement);
 
     if (bidAmount < minBidAmount) {
       return res.status(400).json({ 
-        message: `Bid must be at least $${minBidAmount.toFixed(2)}` 
+        error: `Bid must be at least $${minBidAmount.toFixed(2)}` 
       });
     }
 
-    // Check reserve price if set
-    if (auction.reserve_price && bidAmount < Number(auction.reserve_price)) {
-      return res.status(400).json({ 
-        message: `Bid must meet the reserve price of $${Number(auction.reserve_price).toFixed(2)}` 
-      });
-    }
+    // Remove reserve price validation - users can bid below reserve
+    // Reserve price is only checked at auction end to determine if there's a winner
 
     // Store the bid
     const bid = await Bid.create({
@@ -315,13 +317,13 @@ async function placeBid(req, res) {
 
     res.json({
       message: 'Bid placed successfully',
-      bid: bid,
+      bid,
       auction: updatedAuction
     });
 
   } catch (error) {
     console.error('Error placing bid:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -333,22 +335,22 @@ async function getBids(req, res) {
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(id)) {
-      return res.status(400).json({ message: 'Invalid auction ID format.' });
+      return res.status(400).json({ error: 'Invalid auction ID format.' });
     }
 
     // Check if auction exists
     const auction = await SettledAuction.findById(id);
     if (!auction) {
-      return res.status(404).json({ message: 'Auction not found.' });
+      return res.status(404).json({ error: 'Auction not found.' });
     }
 
     // Get bids with bidder details
     const bids = await Bid.findByAuctionIdWithBidders(id);
-    res.json(bids);
+    res.json({ bids });
 
   } catch (error) {
     console.error('Error fetching bids:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -360,18 +362,18 @@ async function getAuctionWithBids(req, res) {
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(id)) {
-      return res.status(400).json({ message: 'Invalid auction ID format.' });
+      return res.status(400).json({ error: 'Invalid auction ID format.' });
     }
 
     // Get auction with seller details
     const auction = await SettledAuction.findByIdWithSeller(id);
     if (!auction) {
-      return res.status(404).json({ message: 'Auction not found.' });
+      return res.status(404).json({ error: 'Auction not found.' });
     }
 
     // Only allow viewing if auction is approved or closed
     if (auction.status !== 'approved' && auction.status !== 'closed') {
-      return res.status(403).json({ message: 'This auction is not available.' });
+      return res.status(403).json({ error: 'This auction is not available.' });
     }
     // Get recent bids with bidder details (last 10)
     const bids = await Bid.findByAuctionIdWithBidders(id);
@@ -385,12 +387,12 @@ async function getAuctionWithBids(req, res) {
     }
     res.json({
       auction: auctionWithWinner,
-      recentBids: recentBids,
+      bids: recentBids,
       totalBids: bids.length
     });
   } catch (error) {
     console.error('Error fetching auction with bids:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -401,12 +403,12 @@ async function getAuctionByIdForSeller(req, res) {
     const query = 'SELECT * FROM settled_auctions WHERE id = $1 AND seller_id = $2';
     const result = await pool.query(query, [id, user.id]);
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Auction not found.' });
+      return res.status(404).json({ error: 'Auction not found.' });
     }
-    res.json(result.rows[0]);
+    res.json({ auction: result.rows[0] });
   } catch (error) {
     console.error('Error fetching auction:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -421,7 +423,7 @@ async function getAuctionCountdownAPI(req, res) {
       auction = await SettledAuction.findById(id);
     }
     if (!auction) {
-      return res.status(404).json({ message: 'Auction not found.' });
+      return res.status(404).json({ error: 'Auction not found.' });
     }
     const auctionType = getAuctionType(auction);
     const countdown = getAuctionCountdown(auction);
@@ -431,7 +433,7 @@ async function getAuctionCountdownAPI(req, res) {
     });
   } catch (error) {
     console.error('Error getting auction countdown:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -440,20 +442,20 @@ async function processSpecificAuction(req, res) {
   try {
     const user = req.user;
     if (!user || user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only admins can manually process auctions.' });
+      return res.status(403).json({ error: 'Only admins can manually process auctions.' });
     }
     const { id } = req.params;
     
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(id)) {
-      return res.status(400).json({ message: 'Invalid auction ID format.' });
+      return res.status(400).json({ error: 'Invalid auction ID format.' });
     }
     
     // Check if auction exists
     const auction = await SettledAuction.findById(id);
     if (!auction) {
-      return res.status(404).json({ message: 'Auction not found.' });
+      return res.status(404).json({ error: 'Auction not found.' });
     }
     
     // Process the auction
@@ -462,7 +464,7 @@ async function processSpecificAuction(req, res) {
     res.json({ message: `Auction ${id} processed successfully` });
   } catch (error) {
     console.error('Error manually processing auction:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
 

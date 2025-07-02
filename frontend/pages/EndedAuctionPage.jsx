@@ -29,7 +29,8 @@ function EndedAuctionPage() {
       winnerChecked,
       loading,
       error,
-      navigationState: location.state
+      navigationState: location.state,
+      fromMyWinnings: location.state?.fromMyWinnings
     });
   }, [auction, winnerAnnouncement, winnerChecked, loading, error, location.state]);
 
@@ -43,7 +44,10 @@ function EndedAuctionPage() {
 
   // Check for auction winner when page loads
   useEffect(() => {
-    if (auction && !winnerAnnouncement && !winnerChecked) {
+    // Don't show winner announcement if user is coming from "My Winnings"
+    const fromMyWinnings = location.state?.fromMyWinnings;
+    
+    if (auction && !winnerAnnouncement && !winnerChecked && !fromMyWinnings) {
       console.log('EndedAuctionPage: Checking for winner announcement, auction:', auction.id);
       setWinnerChecked(true); // Mark as checked to prevent re-running
       
@@ -54,7 +58,7 @@ function EndedAuctionPage() {
           if (type === 'settled') {
             resultUrl = `${import.meta.env.VITE_BACKEND_URL}/api/auth/settled-auction-result/${auction.id}`;
           } else {
-            resultUrl = `${import.meta.env.VITE_BACKEND_URL}/api/auth/live-auction-result/${auction.id}`;
+            resultUrl = `${import.meta.env.VITE_BACKEND_URL}/api/auctions/live/${auction.id}/result`;
           }
           console.log('EndedAuctionPage: Checking auction result at', resultUrl, 'for auction type:', type);
           const response = await fetch(resultUrl, {
@@ -68,19 +72,16 @@ function EndedAuctionPage() {
             const result = await response.json();
             console.log('EndedAuctionPage: Auction result:', result);
             if (result.result) {
-              setWinnerAnnouncement({
-                winner: result.result.winner_id ? {
-                  user_id: result.result.winner_id,
-                  user_name: result.result.winner_name,
-                  amount: result.result.final_bid
-                } : null,
-                status: result.result.status,
-                finalBid: result.result.final_bid
-              });
-              // Show toast notification
+              let winnerName = result.result.winner?.first_name && result.result.winner?.last_name
+                ? `${result.result.winner.first_name} ${result.result.winner.last_name}`
+                : result.result.winner?.email
+                  ? result.result.winner.email
+                  : result.result.winner_id
+                    ? `User ${result.result.winner_id.slice(0, 8)}`
+                    : 'Unknown';
               let message = '';
               if (result.result.winner_id) {
-                message = `🏆 Winner: ${result.result.winner_name} won with ${formatPrice(result.result.final_bid)}!`;
+                message = `🏆 Winner: ${winnerName} won with ${formatPrice(result.result.final_bid)}!`;
                 if (result.result.winner_id === user?.id) {
                   message = `🎉 Congratulations! You won this auction with ${formatPrice(result.result.final_bid)}!`;
                 }
@@ -92,9 +93,20 @@ function EndedAuctionPage() {
                 message = 'Auction ended';
               }
               setToast({ show: true, message, type: 'info' });
+              setWinnerAnnouncement({
+                winner: result.result.winner_id ? {
+                  id: result.result.winner_id,
+                  first_name: result.result.winner?.first_name,
+                  last_name: result.result.winner?.last_name,
+                  email: result.result.winner?.email,
+                  amount: result.result.final_bid
+                } : null,
+                status: result.result.status,
+                finalBid: result.result.final_bid
+              });
               return;
             }
-          } else {
+          
             console.log('EndedAuctionPage: No auction result found for auction type:', type, 'auction ID:', auction.id);
             // Show a generic message if no result exists yet
             setToast({ show: true, message: 'Auction has ended. Winner will be announced shortly.', type: 'info' });
@@ -108,8 +120,11 @@ function EndedAuctionPage() {
       return () => {
         clearInterval(interval);
       };
+    } else if (fromMyWinnings) {
+      console.log('EndedAuctionPage: User came from My Winnings, skipping winner announcement');
+      setWinnerChecked(true); // Mark as checked to prevent re-running
     }
-  }, [auction?.id, auction?.type, winnerAnnouncement, winnerChecked, user?.token]);
+  }, [auction?.id, auction?.type, winnerAnnouncement, winnerChecked, user?.token, location.state]);
 
   useEffect(() => {
     async function fetchAuction() {

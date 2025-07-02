@@ -55,7 +55,11 @@ function Login({ showToast }) {
       if (!justLoggedIn) {
         showToast && showToast('You are already logged in.', 'info');
       }
-      navigate('/dashboard');
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     }
   }, [user, navigate, showToast, justLoggedIn]);
 

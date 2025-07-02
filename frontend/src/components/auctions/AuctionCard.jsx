@@ -139,12 +139,9 @@ function AuctionCard({ auction, actionLabel }) {
           </span>
           <span className="text-left">Seller:</span>
           <span className="font-semibold text-white text-left">
-            {auction.business_name
-              || (auction.first_name && auction.last_name ? `${auction.first_name} ${auction.last_name}` : null)
-              || auction.seller_name
-              || auction.seller
-              || auction.email
-              || 'Unknown'}
+            {auction.seller
+              ? `${auction.seller.first_name} ${auction.seller.last_name}${auction.seller.business_name ? ` (${auction.seller.business_name})` : ''}`
+              : auction.email || 'Unknown'}
           </span>
           {auction.category && <><span className="text-left">Category:</span><span className="text-white text-left">{auction.category}</span></>}
         </div>

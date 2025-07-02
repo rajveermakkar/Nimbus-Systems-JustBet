@@ -40,11 +40,29 @@ function EditListing({ showToast: _showToast }) {
     { value: "1440", label: "1 day" }
   ];
 
+  // Helper function to create timezone-aware ISO string
+  const toTimezoneISOString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    
+    const offset = date.getTimezoneOffset();
+    const offsetHours = Math.abs(Math.floor(offset / 60));
+    const offsetMinutes = Math.abs(offset % 60);
+    const offsetSign = offset <= 0 ? '+' : '-';
+    const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetString}`;
+  };
+
   // Calculate end time based on start time and duration for live auctions
   const calculateEndTime = (startTime, durationMinutes) => {
     const start = new Date(startTime);
     const endTime = new Date(start.getTime() + durationMinutes * 60000);
-    return endTime.toISOString().slice(0, 16);
+    return toTimezoneISOString(endTime);
   };
 
   // Convert UTC date string to local datetime-local value
@@ -55,11 +73,11 @@ function EditListing({ showToast: _showToast }) {
     return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
-  // Convert local datetime-local value to UTC ISO string
-  function toUTCISOString(localValue) {
+  // Convert local datetime-local value to timezone-aware ISO string
+  function toTimezoneISOStringFromLocal(localValue) {
     if (!localValue) return '';
     const date = new Date(localValue);
-    return date.toISOString();
+    return toTimezoneISOString(date);
   }
 
   // Fetch auction data
@@ -83,7 +101,7 @@ function EditListing({ showToast: _showToast }) {
           return;
         }
         // If settled fails, try live auction
-        res = await fetch(`${apiUrl}/api/live-auction/${id}`, {
+        res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -97,7 +115,7 @@ function EditListing({ showToast: _showToast }) {
         }
       } else {
         // Try live auction first (default)
-        let res = await fetch(`${apiUrl}/api/live-auction/${id}`, {
+        let res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -111,7 +129,7 @@ function EditListing({ showToast: _showToast }) {
           }
         }
         // If not live auction or doesn't have max_participants, try settled auction
-        res = await fetch(`${apiUrl}/api/auctions/${id}`, {
+        res = await fetch(`${apiUrl}/api/seller/auctions/settled/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -228,7 +246,10 @@ function EditListing({ showToast: _showToast }) {
       if (imageFiles.length > 0) {
         const formData = new FormData();
         formData.append("image", imageFiles[0]);
-        const uploadRes = await fetch(`${apiUrl}/api/seller/auctions/upload-image`, {
+        const uploadEndpoint = auctionType === "live"
+          ? `${apiUrl}/api/seller/auctions/live/upload-image`
+          : `${apiUrl}/api/seller/auctions/settled/upload-image`;
+        const uploadRes = await fetch(uploadEndpoint, {
           method: "POST",
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -242,17 +263,28 @@ function EditListing({ showToast: _showToast }) {
       let finalStartTime, finalEndTime;
       
       if (auctionType === "live") {
-        finalStartTime = toUTCISOString(startTime);
-        finalEndTime = toUTCISOString(calculateEndTime(startTime, Number(duration)));
+        finalStartTime = toTimezoneISOStringFromLocal(startTime);
+        finalEndTime = calculateEndTime(startTime, Number(duration));
+        
+        // Debug logging
+        console.log('EditListing time conversion debug:', {
+          originalStartTime: startTime,
+          duration: duration,
+          finalStartTime: finalStartTime,
+          finalEndTime: finalEndTime,
+          localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          startDateLocal: new Date(startTime).toLocaleString(),
+          endDateLocal: new Date(finalEndTime).toLocaleString()
+        });
       } else {
-        finalStartTime = toUTCISOString(startTime);
-        finalEndTime = toUTCISOString(endTime);
+        finalStartTime = toTimezoneISOStringFromLocal(startTime);
+        finalEndTime = toTimezoneISOStringFromLocal(endTime);
       }
       
       // Choose the correct endpoint based on auction type
       const endpoint = auctionType === "live" 
-        ? `${apiUrl}/api/seller/live-auction/${id}`
-        : `${apiUrl}/api/seller/auctions/${id}`;
+        ? `${apiUrl}/api/seller/auctions/live/${id}`
+        : `${apiUrl}/api/seller/auctions/settled/${id}`;
       
       const res = await fetch(endpoint, {
         method: "PATCH",

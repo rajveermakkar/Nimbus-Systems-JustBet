@@ -16,16 +16,13 @@ router.get('/pending-sellers', adminController.getPendingSellers);
 // Approve or reject a seller
 router.patch('/sellers/:userId/approve', adminController.handleSellerApproval);
 
-// List all pending auctions (admin only)
-router.get('`/auctions/pending`', auctionController.listPendingAuctions);
+// Settled Auctions (Admin Only)
+router.get('/auctions/settled/pending', auctionController.listPendingAuctions);
+router.patch('/auctions/settled/:id/approve', auctionController.approveAuction);
 
-// Approve an auction (admin only)
-router.post('/auctions/:id/approve', auctionController.approveAuction);
-
-// Admin: Get live auctions by status
-router.get('/live-auction', liveAuctionController.getAdminLiveAuctions);
-
-// Approve a live auction (admin only)
-router.patch('/live-auction/:id/approve', liveAuctionController.approveLiveAuction);
+// Live Auctions (Admin Only)
+router.get('/auctions/live', liveAuctionController.getAdminLiveAuctions);
+router.get('/auctions/live/pending', liveAuctionController.getAdminLiveAuctions);
+router.patch('/auctions/live/:id/approve', liveAuctionController.approveLiveAuction);
 
 module.exports = router; 

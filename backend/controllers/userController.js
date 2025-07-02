@@ -244,16 +244,14 @@ const userController = {
         return errorResponse(res, 404, 'User not found');
       }
 
-      res.json({
-        user: {
-          id: user.id,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          email: user.email,
-          role: user.role,
-          createdAt: user.created_at
-        }
-      });
+      res.json({ user: {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.created_at
+      }});
     } catch (error) {
       console.error('Profile error:', error);
       errorResponse(res, 500, 'Something went wrong');
@@ -539,13 +537,16 @@ const userController = {
       }
 
       const auctionResult = result.rows[0];
-      
-      // Add winner name if there is a winner
+      let winner = null;
       if (auctionResult.winner_id) {
-        auctionResult.winner_name = `${auctionResult.first_name} ${auctionResult.last_name}`;
+        winner = {
+          id: auctionResult.winner_id,
+          first_name: auctionResult.first_name,
+          last_name: auctionResult.last_name,
+          email: auctionResult.email
+        };
       }
-
-      res.json({ result: auctionResult });
+      res.json({ result: { ...auctionResult, winner } });
     } catch (error) {
       console.error('Get settled auction result error:', error);
       errorResponse(res, 500, 'Something went wrong');
@@ -577,13 +578,16 @@ const userController = {
       }
 
       const auctionResult = result.rows[0];
-      
-      // Add winner name if there is a winner
+      let winner = null;
       if (auctionResult.winner_id) {
-        auctionResult.winner_name = `${auctionResult.first_name} ${auctionResult.last_name}`;
+        winner = {
+          id: auctionResult.winner_id,
+          first_name: auctionResult.first_name,
+          last_name: auctionResult.last_name,
+          email: auctionResult.email
+        };
       }
-
-      res.json({ result: auctionResult });
+      res.json({ result: { ...auctionResult, winner } });
     } catch (error) {
       console.error('Get live auction result error:', error);
       errorResponse(res, 500, 'Something went wrong');
@@ -690,14 +694,12 @@ const userController = {
       if (!result || !auction) {
         return res.status(404).json({ error: 'Auction not found or you did not win this auction' });
       }
-      res.json({
-        auction: {
-          ...auction,
-          final_bid: result.final_bid,
-          seller_name: sellerName,
-          type: auctionType
-        }
-      });
+      res.json({ auction: {
+        ...auction,
+        final_bid: result.final_bid,
+        seller_name: sellerName,
+        type: auctionType
+      }});
     } catch (error) {
       console.error('Get won auction error:', error);
       res.status(500).json({ error: 'Something went wrong' });

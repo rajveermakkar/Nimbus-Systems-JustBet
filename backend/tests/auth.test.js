@@ -56,32 +56,10 @@ jest.mock('../models/User', () => ({
 
 // Mock RefreshToken model
 jest.mock('../models/RefreshToken', () => ({
-  create: jest.fn().mockResolvedValue({ rows: [{ id: 'mock-refresh-token-id' }] }),
+  create: jest.fn(),
   findByToken: jest.fn(),
-  deleteByToken: jest.fn(),
-  deleteByUserId: jest.fn(),
+  delete: jest.fn(),
   deleteByUser: jest.fn()
-}));
-
-// Mock LiveAuction model
-jest.mock('../models/LiveAuction', () => ({
-  create: jest.fn(),
-  findById: jest.fn(),
-  updateAuction: jest.fn(),
-  findBySellerId: jest.fn()
-}));
-
-// Mock LiveAuctionBid model
-jest.mock('../models/LiveAuctionBid', () => ({
-  create: jest.fn(),
-  findByAuctionId: jest.fn(),
-  findByAuctionIdWithNames: jest.fn(),
-  deleteOldestBid: jest.fn()
-}));
-
-// Mock LiveAuctionResult model
-jest.mock('../models/LiveAuctionResult', () => ({
-  create: jest.fn()
 }));
 
 // Import the registration function

@@ -39,7 +39,14 @@ function CompletedAuctionDetails() {
         throw new Error('No authentication token found');
       }
 
-      const auctionUrl = `${import.meta.env.VITE_BACKEND_URL}/api/${type === 'live' ? 'live-auction' : 'auctions'}/${id}`;
+      // Use seller-specific routes for sellers viewing their own auctions
+      let auctionUrl;
+      if (type === 'live') {
+        auctionUrl = `${import.meta.env.VITE_BACKEND_URL}/api/seller/auctions/live/${id}`;
+      } else {
+        auctionUrl = `${import.meta.env.VITE_BACKEND_URL}/api/seller/auctions/settled/${id}`;
+      }
+      
       const auctionResponse = await fetch(auctionUrl, {
         headers: {
           'Authorization': `Bearer ${token}`

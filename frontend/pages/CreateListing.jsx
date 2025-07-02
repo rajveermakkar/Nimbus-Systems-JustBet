@@ -32,11 +32,34 @@ function CreateListing() {
     { value: "1440", label: "1 day" }
   ];
 
+  // Helper function to create timezone-aware ISO string
+  const toTimezoneISOString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    
+    const offset = date.getTimezoneOffset();
+    const offsetHours = Math.abs(Math.floor(offset / 60));
+    const offsetMinutes = Math.abs(offset % 60);
+    const offsetSign = offset <= 0 ? '+' : '-';
+    const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetString}`;
+  };
+
   // Calculate end time based on start time and duration for live auctions
   const calculateEndTime = (startTime, durationMinutes) => {
+    // Create a Date object from the datetime-local input (which is in local timezone)
     const start = new Date(startTime);
+    
+    // Add the duration in minutes
     const endTime = new Date(start.getTime() + durationMinutes * 60000);
-    return endTime.toISOString().slice(0, 16);
+    
+    // Return timezone-aware ISO string
+    return toTimezoneISOString(endTime);
   };
 
   // Only allow one: imageUrl or imageFiles
@@ -108,7 +131,10 @@ function CreateListing() {
       if (imageFiles.length > 0) {
         const formData = new FormData();
         formData.append("image", imageFiles[0]);
-        const uploadRes = await fetch(`${apiUrl}/api/seller/auctions/upload-image`, {
+        const uploadEndpoint = auctionType === "live"
+          ? `${apiUrl}/api/seller/auctions/live/upload-image`
+          : `${apiUrl}/api/seller/auctions/settled/upload-image`;
+        const uploadRes = await fetch(uploadEndpoint, {
           method: "POST",
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -121,17 +147,39 @@ function CreateListing() {
       let finalStartTime, finalEndTime;
       
       if (auctionType === "live") {
-        finalStartTime = startTime;
+        // Convert start time to ISO string with timezone information
+        const startDate = new Date(startTime);
+        finalStartTime = toTimezoneISOString(startDate);
+        
+        // Calculate end time
         finalEndTime = calculateEndTime(startTime, Number(duration));
+        
+        // Debug logging
+        console.log('Time conversion debug:', {
+          originalStartTime: startTime,
+          startDate: startDate,
+          finalStartTime: finalStartTime,
+          duration: duration,
+          finalEndTime: finalEndTime,
+          localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          startDateLocal: startDate.toLocaleString(),
+          endDateLocal: new Date(finalEndTime).toLocaleString(),
+          timezoneOffset: startDate.getTimezoneOffset(),
+          offsetString: finalStartTime.split('T')[1].split('+')[1] || finalStartTime.split('T')[1].split('-')[1]
+        });
       } else {
-        finalStartTime = startTime;
-        finalEndTime = endTime;
+        // For settled auctions, convert both times to ISO strings with timezone
+        const startDate = new Date(startTime);
+        const endDate = new Date(endTime);
+        
+        finalStartTime = toTimezoneISOString(startDate);
+        finalEndTime = toTimezoneISOString(endDate);
       }
       
       // Choose the correct endpoint based on auction type
       const endpoint = auctionType === "live" 
-        ? `${apiUrl}/api/seller/live-auction`
-        : `${apiUrl}/api/seller/auctions`;
+        ? `${apiUrl}/api/seller/auctions/live`
+        : `${apiUrl}/api/seller/auctions/settled`;
       
       const res = await fetch(endpoint, {
         method: "POST",
