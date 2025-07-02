@@ -89,27 +89,26 @@ function EditListing({ showToast: _showToast }) {
       setFetching(true);
       const token = localStorage.getItem("justbetToken");
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      
-      // Try the correct endpoint first based on URL parameter
+      // Always use seller endpoints for both auction types
+      let res, data;
       if (auctionTypeFromURL === 'settled') {
-        // Try settled auction first
-        let res = await fetch(`${apiUrl}/api/auctions/${id}`, {
+        res = await fetch(`${apiUrl}/api/seller/auctions/settled/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
         if (res.ok) {
-          const data = await res.json();
+          data = await res.json();
+          // Some endpoints wrap in .auction, some don't
+          const auctionData = data.auction || data;
           setAuctionType("settled");
-          populateForm(data, "settled");
+          populateForm(auctionData, "settled");
           return;
         }
-        // If settled fails, try live auction
+        // fallback: try live auction endpoint
         res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
         if (res.ok) {
-          const data = await res.json();
+          data = await res.json();
           if (data.max_participants) {
             setAuctionType("live");
             populateForm(data, "live");
@@ -117,29 +116,27 @@ function EditListing({ showToast: _showToast }) {
           }
         }
       } else {
-        // Try live auction first (default)
-        let res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
+        // Try live auction first
+        res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
         if (res.ok) {
-          const data = await res.json();
-          // Check if it's actually a live auction by looking for max_participants
+          data = await res.json();
           if (data.max_participants) {
             setAuctionType("live");
             populateForm(data, "live");
             return;
           }
         }
-        // If not live auction or doesn't have max_participants, try settled auction
+        // fallback: try settled auction endpoint
         res = await fetch(`${apiUrl}/api/seller/auctions/settled/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
         if (res.ok) {
-          const data = await res.json();
+          data = await res.json();
+          const auctionData = data.auction || data;
           setAuctionType("settled");
-          populateForm(data, "settled");
+          populateForm(auctionData, "settled");
           return;
         }
       }

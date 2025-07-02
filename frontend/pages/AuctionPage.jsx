@@ -576,6 +576,34 @@ function AuctionPage() {
     setWinnerAnnouncement(null); // Reset winner announcement for new auction
   }, [id]);
 
+  // Show message if auction has not started yet and user is seller
+  const now = new Date();
+  const auctionStart = auction ? new Date(auction.start_time) : null;
+  if (
+    auction &&
+    user &&
+    user.role === 'seller' &&
+    auctionStart &&
+    now < auctionStart
+  ) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white px-4">
+        <div className="flex flex-col items-center w-full mb-4">
+          <img src={EndpointSVG} alt="Auction Not Started" className="w-full max-w-xs h-auto mb-2" style={{maxWidth: '320px'}} />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">Auction has not started yet</h1>
+        <p className="text-white/80 mb-6 text-center max-w-md mx-auto">This auction will be available to view and bid on once it starts.<br/>Start Time: <span className="font-semibold text-blue-300">{auctionStart.toLocaleString()}</span></p>
+        <Button
+          variant="primary"
+          onClick={() => navigate('/seller/dashboard?tab=listings')}
+          className="mx-auto"
+        >
+          Back to My Listings
+        </Button>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">

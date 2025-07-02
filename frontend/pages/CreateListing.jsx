@@ -214,6 +214,14 @@ function CreateListing() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white py-8">
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => setToast(t => ({ ...t, show: false }))}
+        />
+      )}
       {loading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white/10 p-8 rounded-xl flex flex-col items-center">
