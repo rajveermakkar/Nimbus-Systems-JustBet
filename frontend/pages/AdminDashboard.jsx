@@ -1,6 +1,7 @@
 import React, { useContext, useState, useRef, useEffect } from "react";
 import { UserContext } from "../src/context/UserContext";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 function AdminDashboard() {
   const { user, setUser } = useContext(UserContext);
@@ -46,9 +47,13 @@ function AdminDashboard() {
   ];
 
   // Logout handler
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/logout`, {}, { withCredentials: true });
+    } catch (e) {}
     localStorage.removeItem("justbetToken");
+    localStorage.removeItem("justbetUser");
+    setUser(null);
     navigate("/login");
   };
 
