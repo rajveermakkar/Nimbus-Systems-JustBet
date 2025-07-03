@@ -158,6 +158,49 @@ const User = {
   async countPendingSellerRequests() {
     const result = await pool.query("SELECT COUNT(*) FROM users WHERE role = 'seller' AND is_approved = false");
     return parseInt(result.rows[0].count, 10);
+  },
+
+  // Progressive ban logic
+  async banUser(userId, reason) {
+    const user = await this.findById(userId);
+    let banCount = (user.ban_count || 0) + 1;
+    let isBanned = true;
+    let banExpiresAt = null;
+    if (banCount === 1) {
+      banExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 1 week
+    } else if (banCount === 2) {
+      banExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    } // banCount >= 3 is permanent (banExpiresAt stays null)
+    const query = `
+      UPDATE users
+      SET is_banned = $1,
+          ban_count = $2,
+          ban_expires_at = $3,
+          ban_reason = $4
+      WHERE id = $5
+      RETURNING *
+    `;
+    const result = await pool.query(query, [isBanned, banCount, banExpiresAt, reason, userId]);
+    return result.rows[0];
+  },
+
+  async unbanUser(userId) {
+    const user = await this.findById(userId);
+    // Only allow unban if not permanent ban
+    if (user.ban_count < 3) {
+      const query = `
+        UPDATE users
+        SET is_banned = false,
+            ban_expires_at = NULL,
+            ban_reason = NULL
+        WHERE id = $1
+        RETURNING *
+      `;
+      const result = await pool.query(query, [userId]);
+      return result.rows[0];
+    } else {
+      throw new Error('Cannot unban a permanently banned user.');
+    }
   }
 };
 

@@ -112,6 +112,16 @@ const userController = {
         return errorResponse(res, 401, 'Please verify your email first');
       }
 
+      // Check if user is banned
+      if (user.is_banned) {
+        if (user.ban_expires_at && new Date(user.ban_expires_at) < new Date()) {
+          // Auto-unban if temporary ban expired
+          await User.unbanUser(user.id);
+        } else {
+          return errorResponse(res, 403, user.ban_count >= 3 ? 'User is permanently banned.' : `User is banned until ${user.ban_expires_at}`);
+        }
+      }
+
       // Generate token
       const token = jwt.sign(
         { 

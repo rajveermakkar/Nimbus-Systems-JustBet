@@ -32,4 +32,8 @@ router.patch('/auctions/settled/:id/reject', adminController.rejectSettledAuctio
 // Get stats (total users and listings)
 router.get('/stats', adminController.getStats);
 
+// Ban/unban user (Admin Only)
+router.post('/users/:userId/ban', adminController.banUser);
+router.post('/users/:userId/unban', adminController.unbanUser);
+
 module.exports = router; 

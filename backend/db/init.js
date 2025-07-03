@@ -115,6 +115,22 @@ const updateUsersTable = async () => {
         ADD COLUMN is_approved BOOLEAN DEFAULT false
       `);
     }
+
+    // Check for ban-related columns
+    const banCountCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'ban_count'
+    `);
+    if (banCountCheck.rows.length === 0) {
+      await pool.query(`
+        ALTER TABLE users 
+        ADD COLUMN ban_count INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN is_banned BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN ban_expires_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN ban_reason TEXT
+      `);
+    }
   } catch (error) {
     console.error('Error updating users table:', error);
     throw error;
@@ -181,6 +197,10 @@ const initDatabase = async () => {
           business_address TEXT,
           business_phone VARCHAR(50),
           is_approved BOOLEAN DEFAULT false,
+          ban_count INTEGER NOT NULL DEFAULT 0,
+          is_banned BOOLEAN NOT NULL DEFAULT false,
+          ban_expires_at TIMESTAMP WITH TIME ZONE,
+          ban_reason TEXT,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );

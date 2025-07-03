@@ -190,6 +190,43 @@ const adminController = {
     } catch (error) {
       res.status(500).json({ error: 'Error fetching stats' });
     }
+  },
+
+  // Ban a user (progressive ban logic)
+  async banUser(req, res) {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+      if (!reason || reason.trim() === '') {
+        return res.status(400).json({ error: 'Ban reason is required' });
+      }
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      const bannedUser = await User.banUser(userId, reason);
+      res.json({ user: bannedUser, message: bannedUser.ban_count >= 3 ? 'User permanently banned.' : `User banned for ${bannedUser.ban_count === 1 ? '1 week' : '30 days'}.` });
+    } catch (error) {
+      res.status(500).json({ error: error.message || 'Error banning user' });
+    }
+  },
+
+  // Unban a user (if not permanent)
+  async unbanUser(req, res) {
+    try {
+      const { userId } = req.params;
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      if (user.ban_count >= 3) {
+        return res.status(400).json({ error: 'Cannot unban a permanently banned user.' });
+      }
+      const unbannedUser = await User.unbanUser(userId);
+      res.json({ user: unbannedUser, message: 'User unbanned.' });
+    } catch (error) {
+      res.status(500).json({ error: error.message || 'Error unbanning user' });
+    }
   }
 };
 

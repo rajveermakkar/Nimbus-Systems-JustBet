@@ -73,6 +73,10 @@
 - **PATCH /api/admin/auctions/live/:id/approve** — Approve a live auction.
 - **PATCH /api/admin/auctions/live/:id/reject** — Reject a live auction. Body: `{ rejectionReason }`
 
+### User Management
+- **POST /api/admin/users/:userId/ban** — Ban a user (progressive: 1st offense 1 week, 2nd 30 days, 3rd permanent). Body: `{ reason }`
+- **POST /api/admin/users/:userId/unban** — Unban a user (only if not permanently banned).
+
 ---
 
 ## Authenticated User Endpoints
