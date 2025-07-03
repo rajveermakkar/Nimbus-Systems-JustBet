@@ -25,4 +25,11 @@ router.get('/auctions/live', liveAuctionController.getAdminLiveAuctions);
 router.get('/auctions/live/pending', liveAuctionController.getAdminLiveAuctions);
 router.patch('/auctions/live/:id/approve', liveAuctionController.approveLiveAuction);
 
+// Reject auctions (Admin Only)
+router.patch('/auctions/live/:id/reject', adminController.rejectLiveAuction);
+router.patch('/auctions/settled/:id/reject', adminController.rejectSettledAuction);
+
+// Get stats (total users and listings)
+router.get('/stats', adminController.getStats);
+
 module.exports = router; 

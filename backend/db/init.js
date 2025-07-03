@@ -487,6 +487,9 @@ const initDatabase = async () => {
       `);
     }
     
+    // Add rejection fields to auction tables if they don't exist
+    await updateAuctionTablesWithRejectionFields();
+    
     console.log('Database initialization complete!');
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -502,6 +505,48 @@ const testConnection = async () => {
     client.release();
   } catch (error) {
     console.error('Database connection error:', error);
+    throw error;
+  }
+};
+
+// Add rejection fields to auction tables if they don't exist
+const updateAuctionTablesWithRejectionFields = async () => {
+  try {
+    // Check and add rejection fields to settled_auctions table
+    const settledRejectionFieldsCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'settled_auctions' AND column_name = 'rejection_reason'
+    `);
+
+    if (settledRejectionFieldsCheck.rows.length === 0) {
+      await pool.query(`
+        ALTER TABLE settled_auctions 
+        ADD COLUMN rejection_reason TEXT,
+        ADD COLUMN rejected_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN rejected_by UUID REFERENCES users(id)
+      `);
+      console.log('Added rejection fields to settled_auctions table');
+    }
+
+    // Check and add rejection fields to live_auctions table
+    const liveRejectionFieldsCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'live_auctions' AND column_name = 'rejection_reason'
+    `);
+
+    if (liveRejectionFieldsCheck.rows.length === 0) {
+      await pool.query(`
+        ALTER TABLE live_auctions 
+        ADD COLUMN rejection_reason TEXT,
+        ADD COLUMN rejected_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN rejected_by UUID REFERENCES users(id)
+      `);
+      console.log('Added rejection fields to live_auctions table');
+    }
+  } catch (error) {
+    console.error('Error updating auction tables with rejection fields:', error);
     throw error;
   }
 };
