@@ -60,15 +60,18 @@
 
 - **GET /api/admin/pending-sellers** — Get all pending seller approval requests.
 - **PATCH /api/admin/sellers/:userId/approve** — Approve or reject a seller request.
+- **GET /api/admin/stats** — Get comprehensive statistics (users, auctions, pending requests).
 
 ### Settled Auctions
 - **GET /api/admin/auctions/settled/pending** — Get all pending settled auctions.
 - **PATCH /api/admin/auctions/settled/:id/approve** — Approve a settled auction.
+- **PATCH /api/admin/auctions/settled/:id/reject** — Reject a settled auction. Body: `{ rejectionReason }`
 
 ### Live Auctions
 - **GET /api/admin/auctions/live** — Get all live auctions by status (pending, approved, etc.).
 - **GET /api/admin/auctions/live/pending** — Get all pending live auctions.
 - **PATCH /api/admin/auctions/live/:id/approve** — Approve a live auction.
+- **PATCH /api/admin/auctions/live/:id/reject** — Reject a live auction. Body: `{ rejectionReason }`
 
 ---
 
@@ -87,6 +90,8 @@
 - For creating or updating auctions, required fields are specified in the body. Refer to the endpoint description for details.
 - Seller endpoints require the user to have an approved seller role.
 - Admin endpoints require the user to have an admin role.
+- Auction rejection requires a `rejectionReason` field in the request body to provide explanation for the rejection.
+- The stats endpoint returns comprehensive data including user counts (buyers, sellers, pending requests) and auction counts (pending, approved, rejected, closed) for both live and settled auctions.
 
 ---
 

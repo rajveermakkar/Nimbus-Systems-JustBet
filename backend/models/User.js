@@ -140,6 +140,24 @@ const User = {
     `;
     const result = await pool.query(query);
     return result.rows;
+  },
+
+  // Count total users
+  async countAll() {
+    const result = await pool.query('SELECT COUNT(*) FROM users');
+    return parseInt(result.rows[0].count, 10);
+  },
+
+  // Count users by role
+  async countByRole(role) {
+    const result = await pool.query('SELECT COUNT(*) FROM users WHERE role = $1', [role]);
+    return parseInt(result.rows[0].count, 10);
+  },
+
+  // Count pending seller requests
+  async countPendingSellerRequests() {
+    const result = await pool.query("SELECT COUNT(*) FROM users WHERE role = 'seller' AND is_approved = false");
+    return parseInt(result.rows[0].count, 10);
   }
 };
 

@@ -59,6 +59,34 @@ const LiveAuction = {
   async deleteById(id) {
     const result = await pool.query('DELETE FROM live_auctions WHERE id = $1 RETURNING *', [id]);
     return result.rows[0];
+  },
+
+  // Count total live auctions
+  async countAll() {
+    const result = await pool.query('SELECT COUNT(*) FROM live_auctions');
+    return parseInt(result.rows[0].count, 10);
+  },
+
+  // Reject a live auction (admin only)
+  async rejectAuction(id, rejectionReason, rejectedBy) {
+    const query = `
+      UPDATE live_auctions
+      SET status = 'rejected', 
+          rejection_reason = $1,
+          rejected_at = CURRENT_TIMESTAMP,
+          rejected_by = $2,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING *
+    `;
+    const result = await pool.query(query, [rejectionReason, rejectedBy, id]);
+    return result.rows[0];
+  },
+
+  // Count live auctions by status
+  async countByStatus(status) {
+    const result = await pool.query('SELECT COUNT(*) FROM live_auctions WHERE status = $1', [status]);
+    return parseInt(result.rows[0].count, 10);
   }
 };
 
