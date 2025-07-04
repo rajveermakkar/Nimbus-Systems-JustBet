@@ -9,7 +9,7 @@ const api = axios.create({
   withCredentials: true
 });
 
-function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick }) {
+function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClick }) {
   console.log('[UserDetailsPanel] user:', user);
   const [toast, setToast] = useState(null);
   const [role, setRole] = useState(user.role);
@@ -69,7 +69,21 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick }) {
       <div className="flex-1 min-h-0 overflow-y-auto pr-2">
         <div className="flex flex-col items-center mb-6">
           <img src={avatarUrl} alt="avatar" className="w-24 h-24 rounded-full border-2 border-white/30 mb-2" />
-          <div className="text-2xl font-bold text-white mb-1">{user.first_name} {user.last_name}</div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-2xl font-bold text-white">{user.first_name} {user.last_name}</span>
+            {user.role === 'seller' && user.is_approved && (
+              <span className="bg-green-700/80 text-green-200 px-3 py-1 rounded text-xs font-semibold">Approved Seller</span>
+            )}
+            {user.role === 'seller' && !user.is_approved && (
+              <span className="bg-yellow-700/80 text-yellow-200 px-3 py-1 rounded text-xs font-semibold">Pending Seller</span>
+            )}
+            {user.role === 'buyer' && (
+              <span className="bg-blue-700/80 text-blue-200 px-3 py-1 rounded text-xs font-semibold">Buyer</span>
+            )}
+            {user.role === 'admin' && (
+              <span className="bg-purple-700/80 text-purple-200 px-3 py-1 rounded text-xs font-semibold">Admin</span>
+            )}
+          </div>
           <div className="text-gray-300 text-sm mb-2">{user.email}</div>
         </div>
         <div className="max-w-2xl mx-auto flex flex-col gap-2 text-left">
@@ -122,6 +136,10 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick }) {
               <span className="px-3 py-1 rounded bg-blue-900/60 text-blue-200 font-semibold text-sm">Settled: {stats.settled || 0}</span>
               <span className="px-3 py-1 rounded bg-red-900/60 text-red-200 font-semibold text-sm">Live: {stats.live || 0}</span>
             </div>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {/* Seller stats badges... */}
+            </div>
+            <hr className="my-4 border-white/10 w-1/2 mx-auto" />
             <h3 className="text-lg font-bold mb-2 text-white">Listings</h3>
             {auctionsLoading ? <div className="text-gray-300">Loading auctions...</div> : auctionsError ? <div className="text-red-400">{auctionsError}</div> : (
               <div className="overflow-x-auto">
@@ -162,7 +180,7 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick }) {
                           {auction.status === 'closed' && auction.winner ? (
                             <span
                               className="text-green-300 font-semibold underline cursor-pointer"
-                              onClick={e => { e.stopPropagation(); onAuctionClick && onAuctionClick({ ...auction.winner, isUser: true }); }}
+                              onClick={e => { e.stopPropagation(); onUserClick && onUserClick(auction.winner); }}
                               title="View Winner Profile"
                             >
                               {auction.winner.first_name} {auction.winner.last_name}
@@ -184,7 +202,7 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick }) {
                 <thead>
                   <tr className="text-left text-gray-300">
                     <th className="p-2 w-16">Image</th>
-                    <th className="p-2">Title</th>
+                    <th className="p-2 text-left">Title</th>
                     <th className="p-2">Type</th>
                     <th className="p-2">Status</th>
                     <th className="p-2">Price</th>
@@ -205,7 +223,7 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick }) {
                           <div className="w-12 h-12 flex items-center justify-center bg-black/20 rounded text-gray-400">-</div>
                         )}
                       </td>
-                      <td className="p-2 font-semibold text-white align-middle">{auction.title}</td>
+                      <td className="p-2 font-semibold text-white align-middle text-left">{auction.title}</td>
                       <td className="p-2 align-middle">
                         <span className={`px-2 py-1 rounded font-semibold text-xs ${auction.type === 'live' ? 'bg-red-900/60 text-red-200' : 'bg-blue-900/60 text-blue-200'}`}>{auction.type === 'live' ? 'Live' : 'Settled'}</span>
                       </td>

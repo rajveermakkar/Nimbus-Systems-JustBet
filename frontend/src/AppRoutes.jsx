@@ -283,11 +283,15 @@ function AppRoutes() {
             <CompletedAuctionDetails />
           </ProtectedRoute>
         } />
-        <Route path="/admin/dashboard" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminDashboard showToast={showToast} />
-          </ProtectedRoute>
-        } />
+        <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
+        <Route path="/admin/manage-users" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
+        <Route path="/admin/manage-users/:userId" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
+        <Route path="/admin/manage-auctions" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
+        <Route path="/admin/manage-auctions/:type/:auctionId" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
+        <Route path="/admin/approve-users" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
+        <Route path="/admin/approve-users/:userId" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
+        <Route path="/admin/earnings" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
+        <Route path="/admin/db-health" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
         <Route path="/not-authorized" element={<NotAuthorized showToast={showToast} />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

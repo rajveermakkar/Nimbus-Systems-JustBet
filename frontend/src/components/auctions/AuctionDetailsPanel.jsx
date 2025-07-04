@@ -1,9 +1,9 @@
 import React from 'react';
 
-function AuctionDetailsPanel({ auction, onViewSeller, onBack }) {
+function AuctionDetailsPanel({ auction, onViewSeller, onBack, onUserClick }) {
   if (!auction) return null;
-  // Placeholder for result info (can be extended)
-  const result = null;
+  // Winner info
+  const winner = auction.winner;
   return (
     <div className="relative w-full h-full flex flex-col p-8">
       <button
@@ -47,18 +47,24 @@ function AuctionDetailsPanel({ auction, onViewSeller, onBack }) {
               <div><b>Starting Price:</b> ${auction.starting_price}</div>
               {auction.reserve_price && <div><b>Reserve Price:</b> ${auction.reserve_price}</div>}
             </div>
-            {result && (
-              <>
-                <hr className="border-white/10 my-2" />
-                {result.winner ? (
-                  <div className="font-semibold text-green-300"><b>Winner:</b> {result.winner.first_name} {result.winner.last_name} ({result.winner.email})</div>
-                ) : (
-                  <div className="text-yellow-300 font-semibold"><b>No winner (reserve not met or no valid bids)</b></div>
-                )}
-                <div><b>Final Bid:</b> {result.final_bid ?? '-'}</div>
-                <div><b>Reserve Met:</b> {result.reserve_met ? 'Yes' : 'No'}</div>
-                <div><b>Result Status:</b> {result.status}</div>
-              </>
+            {/* Winner Details */}
+            <hr className="border-white/10 my-2" />
+            {winner ? (
+              <div className="bg-green-900/30 rounded-lg p-4 mt-2">
+                <div className="font-semibold text-green-300 mb-1">Winner:</div>
+                <div className="text-white">
+                  <span
+                    className="text-green-200 cursor-pointer hover:text-green-400"
+                    onClick={() => onUserClick && onUserClick(winner)}
+                    title="View Winner Profile"
+                  >
+                    {winner.first_name} {winner.last_name}
+                  </span>
+                  {winner.email && <span className="ml-2 text-gray-400">({winner.email})</span>}
+                </div>
+              </div>
+            ) : (
+              <div className="text-yellow-300 font-semibold mt-2">No winner (reserve not met or no valid bids)</div>
             )}
           </div>
         </div>
