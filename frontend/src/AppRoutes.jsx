@@ -191,7 +191,7 @@ function AppRoutes() {
   const handleLogout = () => {
     setShowSessionModal(false);
     setUser(null);
-    setToast({ show: true, message: 'Logged out.', type: 'info', duration: 3000 });
+    setToast({ show: true, message: 'Logged out successfully!', type: 'success', duration: 3000 });
   };
 
   const showToast = (message, type = 'info', duration = 3000) => {

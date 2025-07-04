@@ -25,16 +25,15 @@ function Navbar() {
     localStorage.removeItem("justbetToken");
     localStorage.removeItem("justbetUser");
     setUser(null);
-    navigate('/login');
+    sessionStorage.setItem("showLogoutSuccess", "true");
+    setTimeout(() => {
+      navigate('/login');
+    }, 500);
   }
 
   return (
     <nav
-      className={`w-full sticky top-0 z-50 transition-colors duration-300
-        ${scrolled
-          ? "bg-[#181c2f]/80 backdrop-blur-md"
-          : "bg-gradient-to-r from-[#000000] to-[#2A2A72]"}
-        py-2`}
+      className={`w-full sticky top-0 z-50 transition-colors duration-300 ${scrolled ? "bg-[#181c2f]/80 backdrop-blur-md" : "bg-gradient-to-r from-[#000000] to-[#2A2A72]"} py-2 transition-opacity duration-300`}
     >
       <div className="max-w-5xl mx-auto flex items-center justify-between px-2">
         <Link to="/" className="flex items-center gap-1 select-none">

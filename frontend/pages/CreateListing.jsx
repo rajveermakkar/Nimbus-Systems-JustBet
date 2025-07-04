@@ -3,6 +3,10 @@ import { useNavigate } from "react-router-dom";
 import Button from "../src/components/Button";
 import Toast from "../src/components/Toast";
 import Select from 'react-select';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
+
+const DEV_MODE = false; // Set to false for production, true for dev/testing
 
 function CreateListing() {
   const [title, setTitle] = useState("");
@@ -13,8 +17,8 @@ function CreateListing() {
   const [reservePrice, setReservePrice] = useState("");
   const [auctionType, setAuctionType] = useState("live"); // "live" or "settled"
   const [duration, setDuration] = useState(""); // For live auctions
-  const [startTime, setStartTime] = useState(""); // For settled auctions
-  const [endTime, setEndTime] = useState(""); // For settled auctions
+  const [startTime, setStartTime] = useState(null); // For both types - using Date object
+  const [endTime, setEndTime] = useState(null); // For settled auctions - using Date object
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'info', duration: 3000 });
@@ -52,13 +56,7 @@ function CreateListing() {
 
   // Calculate end time based on start time and duration for live auctions
   const calculateEndTime = (startTime, durationMinutes) => {
-    // Create a Date object from the datetime-local input (which is in local timezone)
-    const start = new Date(startTime);
-    
-    // Add the duration in minutes
-    const endTime = new Date(start.getTime() + durationMinutes * 60000);
-    
-    // Return timezone-aware ISO string
+    const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
     return toTimezoneISOString(endTime);
   };
 
@@ -75,6 +73,9 @@ function CreateListing() {
     if (e.target.files.length > 0) setImageUrl("");
   }
 
+  const startOfToday = new Date();
+  startOfToday.setHours(0,0,0,0);
+
   function validate() {
     if (!title.trim()) return "Product title is required.";
     if (!description.trim()) return "Description is required.";
@@ -86,24 +87,24 @@ function CreateListing() {
       if (!duration) return "Duration is required for live auctions.";
       
       const now = new Date();
-      now.setHours(0, 0, 0, 0); // Start of today
-      const start = new Date(startTime);
+      const minStartTime = DEV_MODE ? now : new Date(now.getTime() + 24 * 60 * 60 * 1000);
       
-      if (isNaN(start.getTime())) return "Invalid date format for start date.";
-      if (start < now) return "Start date must be today or in the future.";
+      if (startTime < minStartTime) return DEV_MODE ? "Start date must be today or in the future." : "Start date must be at least 24 hours from now (admin approval can take 10-12 hours).";
     } else {
       if (!startTime) return "Start date/time is required for settled auctions.";
       if (!endTime) return "End date/time is required for settled auctions.";
       
       const now = new Date();
-      now.setHours(0, 0, 0, 0); // Start of today
-      const start = new Date(startTime);
-      const end = new Date(endTime);
+      const minStartTime = DEV_MODE ? now : new Date(now.getTime() + 24 * 60 * 60 * 1000);
       
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) return "Invalid date format for start or end date.";
-      if (start < now) return "Start date must be today or in the future.";
-      if (end <= start) return "End date must be after the start date.";
-      if (end < new Date()) return "End date must be in the future.";
+      if (startTime < minStartTime) return DEV_MODE ? "Start date must be today or in the future." : "Start date must be at least 24 hours from now (admin approval can take 10-12 hours).";
+      if (endTime <= startTime) return "End date must be after the start date.";
+      if (endTime < new Date()) return "End date must be in the future.";
+    }
+    
+    if (DEV_MODE && startTime && startTime < new Date()) {
+      showToast('Start time must be in the future.', 'error');
+      return false;
     }
     
     return null;
@@ -148,8 +149,7 @@ function CreateListing() {
       
       if (auctionType === "live") {
         // Convert start time to ISO string with timezone information
-        const startDate = new Date(startTime);
-        finalStartTime = toTimezoneISOString(startDate);
+        finalStartTime = toTimezoneISOString(startTime);
         
         // Calculate end time
         finalEndTime = calculateEndTime(startTime, Number(duration));
@@ -157,23 +157,19 @@ function CreateListing() {
         // Debug logging
         console.log('Time conversion debug:', {
           originalStartTime: startTime,
-          startDate: startDate,
           finalStartTime: finalStartTime,
           duration: duration,
           finalEndTime: finalEndTime,
           localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          startDateLocal: startDate.toLocaleString(),
+          startDateLocal: startTime.toLocaleString(),
           endDateLocal: new Date(finalEndTime).toLocaleString(),
-          timezoneOffset: startDate.getTimezoneOffset(),
+          timezoneOffset: startTime.getTimezoneOffset(),
           offsetString: finalStartTime.split('T')[1].split('+')[1] || finalStartTime.split('T')[1].split('-')[1]
         });
       } else {
         // For settled auctions, convert both times to ISO strings with timezone
-        const startDate = new Date(startTime);
-        const endDate = new Date(endTime);
-        
-        finalStartTime = toTimezoneISOString(startDate);
-        finalEndTime = toTimezoneISOString(endDate);
+        finalStartTime = toTimezoneISOString(startTime);
+        finalEndTime = toTimezoneISOString(endTime);
       }
       
       // Choose the correct endpoint based on auction type
@@ -190,12 +186,12 @@ function CreateListing() {
         body: JSON.stringify({
           title,
           description,
-          imageUrl: finalImageUrl,
-          startingPrice,
-          reservePrice,
-          startTime: finalStartTime,
-          endTime: finalEndTime,
-          maxParticipants: auctionType === "live" ? 50 : undefined // Add maxParticipants for live auctions
+          image_url: finalImageUrl,
+          starting_price: startingPrice,
+          reserve_price: reservePrice,
+          start_time: finalStartTime,
+          end_time: finalEndTime,
+          max_participants: auctionType === "live" ? 50 : undefined // Add max_participants for live auctions
         })
       });
       if (!res.ok) {
@@ -351,7 +347,24 @@ function CreateListing() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs mb-1 text-left">Start Date/Time *</label>
-                  <input type="datetime-local" className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                  <DatePicker
+                    selected={startTime}
+                    onChange={(date) => setStartTime(date)}
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    timeIntervals={1}
+                    dateFormat="MMMM d, yyyy h:mm aa"
+                    placeholderText="Select start date and time"
+                    minDate={DEV_MODE ? startOfToday : new Date(Date.now() + 24 * 60 * 60 * 1000)}
+                    filterTime={(time) => {
+                      if (DEV_MODE) return true;
+                      const now = new Date();
+                      const minTime = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                      return time.getTime() >= minTime.getTime();
+                    }}
+                    className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm"
+                    wrapperClassName="w-full"
+                  />
                   <p className="text-xs text-white/50 mt-1">Set when you want the auction to start (after approval)</p>
                 </div>
                 <div className="flex-1">
@@ -433,12 +446,34 @@ function CreateListing() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs mb-1 text-left">Start Date/Time *</label>
-                  <input type="datetime-local" className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                  <DatePicker
+                    selected={startTime}
+                    onChange={(date) => setStartTime(date)}
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    timeIntervals={1}
+                    dateFormat="MMMM d, yyyy h:mm aa"
+                    placeholderText="Select start date and time"
+                    minDate={DEV_MODE ? startOfToday : new Date(Date.now() + 24 * 60 * 60 * 1000)}
+                    className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm"
+                    wrapperClassName="w-full"
+                  />
                   <p className="text-xs text-white/50 mt-1">Set when you want the auction to start (after approval)</p>
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs mb-1 text-left">End Date/Time *</label>
-                  <input type="datetime-local" className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                  <DatePicker
+                    selected={endTime}
+                    onChange={(date) => setEndTime(date)}
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    timeIntervals={1}
+                    dateFormat="MMMM d, yyyy h:mm aa"
+                    placeholderText="Select end date and time"
+                    minDate={startTime ? new Date(startTime.getTime() + 60 * 1000) : undefined}
+                    className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm"
+                    wrapperClassName="w-full"
+                  />
                   <p className="text-xs text-white/50 mt-1">Auction will end at this time</p>
                 </div>
               </div>
@@ -453,6 +488,10 @@ function CreateListing() {
             </Button>
           </div>
         </form>
+        <p className="text-xs text-white/60 mt-2 text-center">
+          Note: Start date must be at least 24 hours from now. Admin approval can take 10-12 hours, 
+          so please plan accordingly to ensure your auction starts on time.
+        </p>
         <p className="text-xs text-white/60 mt-2 text-center">Note: Your listing will be marked as Pending until approved by an admin.</p>
       </div>
     </div>

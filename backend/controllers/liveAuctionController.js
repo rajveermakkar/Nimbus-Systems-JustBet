@@ -147,8 +147,8 @@ async function updateLiveAuction(req, res) {
     
     const fields = req.body;
     
-    // If the auction was previously approved and is being updated, set status back to pending
-    if (auction.status === 'approved') {
+    // If the auction was previously approved or rejected and is being updated, set status back to pending
+    if (auction.status === 'approved' || auction.status === 'rejected') {
       fields.status = 'pending';
     }
     
@@ -157,7 +157,7 @@ async function updateLiveAuction(req, res) {
       return res.status(400).json({ error: 'No valid fields to update.' });
     }
     
-    const message = auction.status === 'approved' 
+    const message = (auction.status === 'approved' || auction.status === 'rejected')
       ? 'Live auction updated and set to pending for admin approval.' 
       : 'Live auction updated.';
       
