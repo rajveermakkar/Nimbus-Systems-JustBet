@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const { pool } = require('../db/init');
+const { pool, queryWithRetry } = require('../db/init');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
 const jwtauthMiddleware = require('../middleware/jwtauth');
 const User = require('../models/User');
@@ -18,7 +18,7 @@ router.post('/resend-verification', async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT * FROM users WHERE email = $1',
       [email]
     );
@@ -36,7 +36,7 @@ router.post('/resend-verification', async (req, res) => {
     const verificationToken = uuidv4();
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await pool.query(
+    await queryWithRetry(
       `UPDATE users 
        SET verification_token = $1,
            verification_token_expires = $2
@@ -71,7 +71,7 @@ router.get('/user-status', async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT id, email, is_verified FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
@@ -129,7 +129,7 @@ router.get('/user/:id', jwtauthMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await pool.query(
+    const result = await queryWithRetry(
       'SELECT id, first_name, last_name, email FROM users WHERE id = $1',
       [id]
     );

@@ -1,8 +1,46 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useMemo } from "react";
 import { UserContext } from "../src/context/UserContext";
 import Button from "../src/components/Button";
 import { useNavigate, useLocation } from "react-router-dom";
 import Toast from "../src/components/Toast";
+
+// Tooltip component for rejection reason
+function Tooltip({ children, text }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span className="relative inline-block">
+      <span 
+        onClick={() => setShow(!show)}
+        className="cursor-pointer"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setShow(!show);
+          }
+        }}
+      >
+        {children}
+      </span>
+      {show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setShow(false)}>
+          <div className="bg-red-500/40 backdrop-blur-md rounded-2xl shadow-2xl p-6 max-w-sm w-full border border-red-500/30" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-3">
+              <h3 className="text-lg font-bold text-red-400">Rejection Reason</h3>
+              <button 
+                onClick={() => setShow(false)}
+                className="text-white/70 hover:text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-white/90 text-sm whitespace-pre-line">{text}</p>
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
 
 function SellerDashboard() {
   const { user } = useContext(UserContext);
@@ -28,12 +66,14 @@ function SellerDashboard() {
 
   // Format date
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZoneName: 'short'
     });
   };
 
@@ -87,33 +127,45 @@ function SellerDashboard() {
     }
   };
 
-  // Fetch listings
-  const fetchListings = async () => {
+  // Fetch listings - simple function
+  const fetchListings = async (isPolling = false) => {
     try {
-      setLoading(true);
+      if (!isPolling) {
+        setLoading(true);
+      }
+      
       const token = localStorage.getItem("justbetToken");
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      // Fetch both live and settled auctions from new endpoints
-      const [liveRes, settledRes] = await Promise.all([
-        fetch(`${apiUrl}/api/seller/auctions/live`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${apiUrl}/api/seller/auctions/settled`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
+      
+      // Fetch both live and settled auctions
+      const liveRes = await fetch(`${apiUrl}/api/seller/auctions/live`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const settledRes = await fetch(`${apiUrl}/api/seller/auctions/settled`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
       const liveData = await liveRes.json();
       const settledData = await settledRes.json();
+      
       if (!liveRes.ok) throw new Error(liveData.message || "Failed to fetch live listings");
       if (!settledRes.ok) throw new Error(settledData.message || "Failed to fetch settled listings");
-      // Use .auctions property and use auction.type from backend
-      const liveListings = (liveData.auctions || []);
-      const settledListings = (settledData.auctions || []);
-      setListings([...liveListings, ...settledListings]);
+      
+      // Combine the listings
+      const liveListings = liveData.auctions || [];
+      const settledListings = settledData.auctions || [];
+      const allListings = [...liveListings, ...settledListings];
+      
+      setListings(allListings);
+      
     } catch (err) {
-      setError(err.message || "Failed to fetch listings");
+      if (!isPolling) {
+        setError(err.message || "Failed to fetch listings");
+      }
     } finally {
-      setLoading(false);
+      if (!isPolling) {
+        setLoading(false);
+      }
     }
   };
 
@@ -125,10 +177,29 @@ function SellerDashboard() {
       } else if (activeTab === 'results') {
         fetchAuctionResults();
       } else if (activeTab === 'listings') {
-        fetchListings();
+        fetchListings(false); // Initial load, not polling
       }
     }
   }, [activeTab, user]);
+
+
+
+  // Simple polling for listings - just fetch data every 5 seconds
+  useEffect(() => {
+    if (!user || !user.isApproved || activeTab !== 'listings') return;
+
+    // Initial fetch
+    fetchListings(false);
+
+    // Simple polling every 5 seconds
+    const interval = setInterval(() => {
+      if (activeTab === 'listings') {
+        fetchListings(true);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [user, activeTab]);
 
   const handleToastClose = () => {
     setToast({ show: false, message: '', type: 'info' });
@@ -441,17 +512,24 @@ function SellerDashboard() {
                         <div className="text-xs mb-3">
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              listing.auction_type === 'live' 
+                              listing.type === 'live' || listing.auction_type === 'live'
                                 ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
                                 : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                             }`}>
-                              {listing.auction_type}
+                              {listing.type === 'live' || listing.auction_type === 'live' ? 'Live' : 'Settled'}
                             </span>
-                            <span>Status: {(listing.is_approved || listing.status === 'approved') ? (
-                              <span className="text-green-400">Approved</span>
+                            {/* Status badge logic */}
+                            {listing.status === 'rejected' ? (
+                              <Tooltip text={listing.rejection_reason || 'No reason provided'}>
+                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30 cursor-pointer transition-all duration-300">
+                                  Rejected <i className="fa-solid fa-circle-info ml-1"></i>
+                                </span>
+                              </Tooltip>
+                            ) : (listing.is_approved || listing.status === 'approved') ? (
+                              <span className="text-green-400 transition-colors duration-300">Approved</span>
                             ) : (
-                              <span className="text-yellow-300">Pending</span>
-                            )}</span>
+                              <span className="text-yellow-300 transition-colors duration-300">Pending</span>
+                            )}
                           </div>
                         </div>
                         <div className="flex gap-2">

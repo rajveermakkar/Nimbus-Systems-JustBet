@@ -190,6 +190,76 @@ const adminController = {
     } catch (error) {
       res.status(500).json({ error: 'Error fetching stats' });
     }
+  },
+
+  // Get all users (admin only)
+  async getAllUsers(req, res) {
+    try {
+      const users = await User.getAll();
+      res.json({ users });
+    } catch (error) {
+      res.status(500).json({ error: 'Error fetching users' });
+    }
+  },
+
+  // Get all settled auctions (admin only)
+  async getAllSettledAuctions(req, res) {
+    try {
+      const { pool } = require('../db/init');
+      const result = await pool.query('SELECT * FROM settled_auctions ORDER BY start_time DESC');
+      const auctions = result.rows;
+      // Attach seller info
+      const auctionsWithSellers = [];
+      for (const auction of auctions) {
+        const sellerQuery = 'SELECT first_name, last_name, email, business_name FROM users WHERE id = $1';
+        const sellerResult = await pool.query(sellerQuery, [auction.seller_id]);
+        const seller = sellerResult.rows[0];
+        auctionsWithSellers.push({
+          ...auction,
+          seller: seller ? {
+            id: auction.seller_id,
+            first_name: seller.first_name,
+            last_name: seller.last_name,
+            email: seller.email,
+            business_name: seller.business_name
+          } : null,
+          type: 'settled'
+        });
+      }
+      res.json({ auctions: auctionsWithSellers });
+    } catch (error) {
+      res.status(500).json({ error: 'Error fetching all settled auctions' });
+    }
+  },
+
+  // Get all live auctions (admin only)
+  async getAllLiveAuctions(req, res) {
+    try {
+      const { pool } = require('../db/init');
+      const result = await pool.query('SELECT * FROM live_auctions ORDER BY start_time DESC');
+      const auctions = result.rows;
+      // Attach seller info
+      const auctionsWithSellers = [];
+      for (const auction of auctions) {
+        const sellerQuery = 'SELECT first_name, last_name, email, business_name FROM users WHERE id = $1';
+        const sellerResult = await pool.query(sellerQuery, [auction.seller_id]);
+        const seller = sellerResult.rows[0];
+        auctionsWithSellers.push({
+          ...auction,
+          seller: seller ? {
+            id: auction.seller_id,
+            first_name: seller.first_name,
+            last_name: seller.last_name,
+            email: seller.email,
+            business_name: seller.business_name
+          } : null,
+          type: 'live'
+        });
+      }
+      res.json({ auctions: auctionsWithSellers });
+    } catch (error) {
+      res.status(500).json({ error: 'Error fetching all live auctions' });
+    }
   }
 };
 

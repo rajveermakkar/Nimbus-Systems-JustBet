@@ -199,8 +199,8 @@ async function updateAuction(req, res) {
     
     const fields = req.body;
     
-    // If the auction was previously approved and is being updated, set status back to pending
-    if (auction.status === 'approved') {
+    // If the auction was previously approved or rejected and is being updated, set status back to pending
+    if (auction.status === 'approved' || auction.status === 'rejected') {
       fields.status = 'pending';
     }
     
@@ -215,7 +215,7 @@ async function updateAuction(req, res) {
       settledAuctionCron.scheduleAuctionProcessing(id, fields.endTime);
     }
     
-    const message = auction.status === 'approved' 
+    const message = (auction.status === 'approved' || auction.status === 'rejected')
       ? 'Auction updated and set to pending for admin approval.' 
       : 'Auction updated.';
       

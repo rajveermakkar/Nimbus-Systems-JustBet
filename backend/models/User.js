@@ -1,4 +1,4 @@
-const { pool } = require('../db/init');
+const { pool, queryWithRetry } = require('../db/init');
 const bcrypt = require('bcrypt');
 
 const User = {
@@ -10,19 +10,19 @@ const User = {
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id, first_name, last_name, email, role, is_approved, created_at
     `;
-    const result = await pool.query(query, [firstName, lastName, email.toLowerCase(), hashedPassword, role, isApproved]);
+    const result = await queryWithRetry(query, [firstName, lastName, email.toLowerCase(), hashedPassword, role, isApproved]);
     return result.rows[0];
   },
 
   // Find user by email
   async findByEmail(email) {
-    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
+    const result = await queryWithRetry('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
     return result.rows[0];
   },
 
   // Find user by ID
   async findById(id) {
-    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    const result = await queryWithRetry('SELECT * FROM users WHERE id = $1', [id]);
     return result.rows[0];
   },
 
@@ -36,7 +36,7 @@ const User = {
       WHERE id = $2
       RETURNING id, email, is_verified
     `;
-    const result = await pool.query(query, [isVerified, userId]);
+    const result = await queryWithRetry(query, [isVerified, userId]);
     return result.rows[0];
   },
 
@@ -49,7 +49,7 @@ const User = {
       WHERE id = $3
       RETURNING id, email, verification_token_expires
     `;
-    const result = await pool.query(query, [token, expiresAt, userId]);
+    const result = await queryWithRetry(query, [token, expiresAt, userId]);
     return result.rows[0];
   },
 
@@ -62,7 +62,7 @@ const User = {
       WHERE id = $3
       RETURNING id, email, reset_token_expires
     `;
-    const result = await pool.query(query, [token, expiresAt, userId]);
+    const result = await queryWithRetry(query, [token, expiresAt, userId]);
     return result.rows[0];
   },
 
@@ -77,7 +77,7 @@ const User = {
       WHERE id = $2
       RETURNING id, email
     `;
-    const result = await pool.query(query, [hashedPassword, userId]);
+    const result = await queryWithRetry(query, [hashedPassword, userId]);
     return result.rows[0];
   },
 
@@ -88,7 +88,7 @@ const User = {
       WHERE verification_token = $1 
       AND verification_token_expires > NOW()
     `;
-    const result = await pool.query(query, [token]);
+    const result = await queryWithRetry(query, [token]);
     return result.rows[0];
   },
 
@@ -99,7 +99,7 @@ const User = {
       WHERE reset_token = $1 
       AND reset_token_expires > NOW()
     `;
-    const result = await pool.query(query, [token]);
+    const result = await queryWithRetry(query, [token]);
     return result.rows[0];
   },
 
@@ -117,7 +117,7 @@ const User = {
       RETURNING id, email, role, is_approved, business_name, business_description, 
                 business_address, business_phone
     `;
-    const result = await pool.query(query, [
+    const result = await queryWithRetry(query, [
       role, 
       isApproved, 
       businessDetails?.businessName || null,
@@ -138,26 +138,32 @@ const User = {
       FROM users
       WHERE role = 'seller' AND is_approved = false
     `;
-    const result = await pool.query(query);
+    const result = await queryWithRetry(query);
     return result.rows;
   },
 
   // Count total users
   async countAll() {
-    const result = await pool.query('SELECT COUNT(*) FROM users');
+    const result = await queryWithRetry('SELECT COUNT(*) FROM users');
     return parseInt(result.rows[0].count, 10);
   },
 
   // Count users by role
   async countByRole(role) {
-    const result = await pool.query('SELECT COUNT(*) FROM users WHERE role = $1', [role]);
+    const result = await queryWithRetry('SELECT COUNT(*) FROM users WHERE role = $1', [role]);
     return parseInt(result.rows[0].count, 10);
   },
 
   // Count pending seller requests
   async countPendingSellerRequests() {
-    const result = await pool.query("SELECT COUNT(*) FROM users WHERE role = 'seller' AND is_approved = false");
+    const result = await queryWithRetry("SELECT COUNT(*) FROM users WHERE role = 'seller' AND is_approved = false");
     return parseInt(result.rows[0].count, 10);
+  },
+
+  // Get all users
+  async getAll() {
+    const result = await queryWithRetry('SELECT * FROM users ORDER BY created_at DESC');
+    return result.rows;
   }
 };
 

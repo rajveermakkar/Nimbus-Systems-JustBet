@@ -32,4 +32,32 @@ router.patch('/auctions/settled/:id/reject', adminController.rejectSettledAuctio
 // Get stats (total users and listings)
 router.get('/stats', adminController.getStats);
 
+// Get all users (admin only)
+router.get('/users', adminController.getAllUsers);
+
+// Get all settled auctions (admin only)
+router.get('/auctions/settled/all', adminController.getAllSettledAuctions);
+// Get all live auctions (admin only)
+router.get('/auctions/live/all', adminController.getAllLiveAuctions);
+
+// Database health monitoring endpoint
+router.get('/db-health', async (req, res) => {
+  try {
+    const dbMonitor = require('../utils/dbMonitor');
+    const metrics = await dbMonitor.getPerformanceMetrics();
+    
+    res.json({
+      success: true,
+      data: metrics
+    });
+  } catch (error) {
+    console.error('Database health check error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check database health',
+      details: error.message
+    });
+  }
+});
+
 module.exports = router; 

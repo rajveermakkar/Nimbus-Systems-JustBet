@@ -10,12 +10,18 @@ const pool = new Pool({
   ssl: process.env.DB_SSL === 'true' ? {
     rejectUnauthorized: false //for azure postgres server , not requrred for localhost
   } : false,
-  // Add connection pool settings
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
-  maxUses: 7500, // Close (and replace) a connection after it has been used 7500 times
+  // Improved connection pool settings for Azure
+  max: 20, // Reduced from 30 to leave more room for other connections
+  idleTimeoutMillis: 10000, // Close idle clients after 10 seconds (reduced from 30)
+  connectionTimeoutMillis: 5000, // Increased from 2 seconds to 5 seconds
+  maxUses: 1000, // Reduced from 7500 to refresh connections more frequently
+  allowExitOnIdle: true, // Allow the pool to exit when idle
 });
+
+// Helper to log pool stats
+function logPoolStats(context = '') {
+  console.log(`[POOL STATS${context ? ' - ' + context : ''}] total: ${pool.totalCount}, idle: ${pool.idleCount}, waiting: ${pool.waitingCount}`);
+}
 
 // Add error handling to prevent crashes
 pool.on('error', (err) => {
@@ -36,6 +42,7 @@ const queryWithRetry = async (text, params, maxRetries = 3) => {
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      logPoolStats('queryWithRetry');
       return await pool.query(text, params);
     } catch (error) {
       lastError = error;
@@ -46,10 +53,13 @@ const queryWithRetry = async (text, params, maxRetries = 3) => {
         error.code === 'ECONNRESET' || 
         error.code === 'ENOTFOUND' || 
         error.code === 'ETIMEDOUT' ||
-        error.message.includes('Connection terminated')
+        error.message.includes('Connection terminated') ||
+        error.message.includes('connection timeout') ||
+        error.message.includes('Connection terminated due to connection timeout')
       )) {
-        console.log(`Retrying database query in ${attempt * 1000}ms...`);
-        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Exponential backoff, max 5 seconds
+        console.log(`Retrying database query in ${delay}ms... (attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
       
@@ -63,6 +73,27 @@ const queryWithRetry = async (text, params, maxRetries = 3) => {
 
 // Export the retry wrapper
 module.exports.queryWithRetry = queryWithRetry;
+
+// Add connection health check
+const testConnection = async () => {
+  try {
+    logPoolStats('testConnection');
+    const result = await queryWithRetry('SELECT 1 as test');
+    console.log('Database connection test successful');
+    return true;
+  } catch (error) {
+    console.error('Database connection test failed:', error.message);
+    return false;
+  }
+};
+
+// Periodic connection health check (every 5 minutes)
+setInterval(async () => {
+  await testConnection();
+}, 5 * 60 * 1000);
+
+// Export the test function
+module.exports.testConnection = testConnection;
 
 // Add new columns to users table if they don't exist
 const updateUsersTable = async () => {
@@ -497,18 +528,6 @@ const initDatabase = async () => {
   }
 };
 
-// Test database connection
-const testConnection = async () => {
-  try {
-    const client = await pool.connect();
-    console.log('Database connection test successful');
-    client.release();
-  } catch (error) {
-    console.error('Database connection error:', error);
-    throw error;
-  }
-};
-
 // Add rejection fields to auction tables if they don't exist
 const updateAuctionTablesWithRejectionFields = async () => {
   try {
@@ -555,5 +574,6 @@ module.exports = {
   pool,
   initDatabase,
   testConnection,
-  queryWithRetry
+  queryWithRetry,
+  logPoolStats
 };

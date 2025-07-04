@@ -2,6 +2,9 @@ import React, { useContext, useState, useRef, useEffect } from "react";
 import { UserContext } from "../src/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import ViewDetailsModal from './ViewDetailsModal';
+import { ConfirmModal } from "../src/components/SessionExpiryModal";
+import Toast from "../src/components/Toast";
 
 function AdminDashboard() {
   const { user, setUser } = useContext(UserContext);
@@ -22,42 +25,357 @@ function AdminDashboard() {
     { key: "manage-users", label: "Manage Users", icon: "fa-users-cog" },
     { key: "manage-auctions", label: "Manage Auctions", icon: "fa-gavel" },
     { key: "approve-users", label: "Approve Users", icon: "fa-user-check" },
-    { key: "approve-auctions", label: "Approve Auctions", icon: "fa-check-circle" },
-    { key: "all-auctions", label: "All Auctions", icon: "fa-list" },
+
     { key: "earnings", label: "Earnings", icon: "fa-dollar-sign" },
+    { key: "db-health", label: "DB Health", icon: "fa-database" },
   ];
 
-  // Placeholder data for dashboard
-  const stats = [
-    { label: "Total Users", value: "2,340", icon: "fa-users", color: "text-blue-400" },
-    { label: "Auctions", value: "128", icon: "fa-gavel", color: "text-purple-400" },
-    { label: "Revenue", value: "$12.4k", icon: "fa-dollar-sign", color: "text-green-400" },
-    { label: "Active Sellers", value: "34", icon: "fa-store", color: "text-yellow-400" },
-  ];
-  const performers = [
-    { name: "Alice Smith", role: "Top Seller", percent: "29%" },
-    { name: "Bob Lee", role: "Most Bids", percent: "18%" },
-    { name: "Jane Doe", role: "Most Listings", percent: "15%" },
-  ];
-  const quickLinks = [
-    { label: "Manage Users", icon: "fa-user-cog", color: "bg-blue-900/60 text-blue-300" },
-    { label: "View Reports", icon: "fa-chart-line", color: "bg-purple-900/60 text-purple-300" },
-    { label: "Site Settings", icon: "fa-cogs", color: "bg-green-900/60 text-green-300" },
-    { label: "All Auctions", icon: "fa-gavel", color: "bg-yellow-900/60 text-yellow-300" },
-  ];
+  // --- STATE FOR ADMIN DATA ---
+  const [statsData, setStatsData] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState(null);
 
-  // Logout handler
-  const handleLogout = async () => {
-    try {
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/logout`, {}, { withCredentials: true });
-    } catch (e) {}
-    localStorage.removeItem("justbetToken");
-    localStorage.removeItem("justbetUser");
-    setUser(null);
-    navigate("/login");
+  const [pendingSellers, setPendingSellers] = useState([]);
+  const [pendingSellersLoading, setPendingSellersLoading] = useState(false);
+  const [pendingSellersError, setPendingSellersError] = useState(null);
+
+  const [pendingSettledAuctions, setPendingSettledAuctions] = useState([]);
+  const [pendingSettledLoading, setPendingSettledLoading] = useState(false);
+  const [pendingSettledError, setPendingSettledError] = useState(null);
+
+  const [pendingLiveAuctions, setPendingLiveAuctions] = useState([]);
+  const [pendingLiveLoading, setPendingLiveLoading] = useState(false);
+  const [pendingLiveError, setPendingLiveError] = useState(null);
+
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState(null); // {type, id}
+
+  // Add state for auction filter
+  const [auctionFilter, setAuctionFilter] = useState('all');
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewModalType, setViewModalType] = useState(null); // 'auction' or 'user'
+  const [viewModalData, setViewModalData] = useState(null);
+
+  // --- STATE FOR ALL USERS ---
+  const [allUsers, setAllUsers] = useState([]);
+  const [allUsersLoading, setAllUsersLoading] = useState(false);
+  const [allUsersError, setAllUsersError] = useState(null);
+
+  // --- STATE FOR ALL AUCTIONS ---
+  const [allSettledAuctions, setAllSettledAuctions] = useState([]);
+  const [allSettledLoading, setAllSettledLoading] = useState(false);
+  const [allSettledError, setAllSettledError] = useState(null);
+  const [allLiveAuctions, setAllLiveAuctions] = useState([]);
+  const [allLiveLoading, setAllLiveLoading] = useState(false);
+  const [allLiveError, setAllLiveError] = useState(null);
+
+  // --- STATE FOR DATABASE HEALTH ---
+  const [dbHealthData, setDbHealthData] = useState(null);
+  const [dbHealthLoading, setDbHealthLoading] = useState(false);
+  const [dbHealthError, setDbHealthError] = useState(null);
+
+  // --- MODAL FOR APPROVING AUCTION ---
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approveTarget, setApproveTarget] = useState(null); // {type, id}
+
+  // --- TOAST NOTIFICATIONS ---
+  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+
+  const showToast = (message, type = 'info', duration = 3000) => {
+    setToast({ show: true, message, type, duration });
   };
 
-  // Section content renderers
+  const handleToastClose = () => {
+    setToast({ show: false, message: '', type: 'info' });
+  };
+
+  // --- API HELPERS ---
+  const api = axios.create({
+    baseURL: import.meta.env.VITE_BACKEND_URL + "/api",
+    withCredentials: true
+  });
+
+  // Fetch dashboard stats
+  const fetchStats = async () => {
+    setStatsLoading(true); setStatsError(null);
+    try {
+      const res = await api.get("/admin/stats");
+      setStatsData(res.data);
+    } catch (e) {
+      setStatsError("Failed to load stats");
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Fetch pending sellers
+  const fetchPendingSellers = async () => {
+    setPendingSellersLoading(true); setPendingSellersError(null);
+    try {
+      const res = await api.get("/admin/pending-sellers");
+      setPendingSellers(res.data.pendingSellers || []);
+    } catch (e) {
+      setPendingSellersError("Failed to load pending sellers");
+    } finally {
+      setPendingSellersLoading(false);
+    }
+  };
+
+  // Approve/reject seller
+  const handleSellerApproval = async (userId, approved) => {
+    setActionLoading(true); setActionError(null);
+    try {
+      await api.patch(`/admin/sellers/${userId}/approve`, { approved });
+      
+      // Immediately update local state instead of refetching
+      setPendingSellers(prev => prev.filter(seller => seller.id !== userId));
+      
+      // Also update all users if we're in manage-users section
+      if (section === 'manage-users') {
+        setAllUsers(prev => prev.map(user => 
+          user.id === userId 
+            ? { ...user, is_approved: approved }
+            : user
+        ));
+      }
+      
+      // Update stats immediately if we're on dashboard
+      if (section === 'dashboard' && statsData) {
+        setStatsData(prev => ({
+          ...prev,
+          users: {
+            ...prev.users,
+            pendingSellerRequests: Math.max(0, (prev.users.pendingSellerRequests || 0) - 1)
+          }
+        }));
+      }
+      
+      // Show success message
+      showToast(`Seller ${approved ? 'approved' : 'rejected'} successfully!`, 'success');
+    } catch (e) {
+      setActionError("Failed to update seller approval");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Fetch pending settled auctions
+  const fetchPendingSettledAuctions = async () => {
+    setPendingSettledLoading(true); setPendingSettledError(null);
+    try {
+      const res = await api.get("/admin/auctions/settled/pending");
+      setPendingSettledAuctions(res.data.auctions || []);
+    } catch (e) {
+      setPendingSettledError("Failed to load pending settled auctions");
+    } finally {
+      setPendingSettledLoading(false);
+    }
+  };
+
+  // Approve/reject settled auction
+  const handleSettledAuctionApproval = async (id, approved, reason) => {
+    setActionLoading(true); setActionError(null);
+    try {
+      if (approved) {
+        await api.patch(`/admin/auctions/settled/${id}/approve`);
+      } else {
+        await api.patch(`/admin/auctions/settled/${id}/reject`, { rejectionReason: reason });
+      }
+      
+      // Immediately update local state instead of refetching
+      setPendingSettledAuctions(prev => prev.filter(auction => auction.id !== id));
+      
+      // Also update all auctions if we're in manage-auctions section
+      if (section === 'manage-auctions') {
+        setAllSettledAuctions(prev => prev.map(auction => 
+          auction.id === id 
+            ? { ...auction, status: approved ? 'approved' : 'rejected' }
+            : auction
+        ));
+      }
+      
+      // Show success message
+      showToast(`Settled auction ${approved ? 'approved' : 'rejected'} successfully!`, 'success');
+    } catch (e) {
+      setActionError("Failed to update settled auction");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Fetch pending live auctions
+  const fetchPendingLiveAuctions = async () => {
+    setPendingLiveLoading(true); setPendingLiveError(null);
+    try {
+      const res = await api.get("/admin/auctions/live?status=pending");
+      setPendingLiveAuctions(res.data.auctions || []);
+    } catch (e) {
+      setPendingLiveError("Failed to load pending live auctions");
+    } finally {
+      setPendingLiveLoading(false);
+    }
+  };
+
+  // Approve/reject live auction
+  const handleLiveAuctionApproval = async (id, approved, reason) => {
+    setActionLoading(true); setActionError(null);
+    try {
+      if (approved) {
+        await api.patch(`/admin/auctions/live/${id}/approve`);
+      } else {
+        await api.patch(`/admin/auctions/live/${id}/reject`, { rejectionReason: reason });
+      }
+      
+      // Immediately update local state instead of refetching
+      setPendingLiveAuctions(prev => prev.filter(auction => auction.id !== id));
+      
+      // Also update all auctions if we're in manage-auctions section
+      if (section === 'manage-auctions') {
+        setAllLiveAuctions(prev => prev.map(auction => 
+          auction.id === id 
+            ? { ...auction, status: approved ? 'approved' : 'rejected' }
+            : auction
+        ));
+      }
+      
+      // Show success message
+      showToast(`Live auction ${approved ? 'approved' : 'rejected'} successfully!`, 'success');
+    } catch (e) {
+      setActionError("Failed to update live auction");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Fetch all users
+  const fetchAllUsers = async () => {
+    setAllUsersLoading(true); setAllUsersError(null);
+    try {
+      const res = await api.get('/admin/users');
+      setAllUsers(res.data.users || []);
+    } catch (e) {
+      setAllUsersError('Failed to load users');
+    } finally {
+      setAllUsersLoading(false);
+    }
+  };
+
+  // Fetch all settled auctions
+  const fetchAllSettledAuctions = async () => {
+    setAllSettledLoading(true); setAllSettledError(null);
+    try {
+      const res = await api.get("/admin/auctions/settled/all");
+      setAllSettledAuctions(res.data.auctions || []);
+    } catch (e) {
+      setAllSettledError("Failed to load all settled auctions");
+    } finally {
+      setAllSettledLoading(false);
+    }
+  };
+
+  // Fetch all live auctions
+  const fetchAllLiveAuctions = async () => {
+    setAllLiveLoading(true); setAllLiveError(null);
+    try {
+      const res = await api.get("/admin/auctions/live/all");
+      setAllLiveAuctions(res.data.auctions || []);
+    } catch (e) {
+      setAllLiveError("Failed to load all live auctions");
+    } finally {
+      setAllLiveLoading(false);
+    }
+  };
+
+  // Fetch database health data
+  const fetchDbHealth = async () => {
+    setDbHealthLoading(true); setDbHealthError(null);
+    try {
+      const res = await api.get("/admin/db-health");
+      setDbHealthData(res.data.data);
+    } catch (e) {
+      setDbHealthError("Failed to load database health data");
+    } finally {
+      setDbHealthLoading(false);
+    }
+  };
+
+  // --- EFFECTS: FETCH DATA ON SECTION CHANGE ---
+  useEffect(() => {
+    // Log section change and what will be fetched
+    console.log(`[AdminDashboard] Section changed to: ${section}`);
+    if (section === "dashboard") fetchStats();
+    if (section === "manage-users") {
+      fetchPendingSellers();
+      fetchAllUsers();
+    }
+    if (section === "approve-users") fetchPendingSellers();
+    if (section === "manage-auctions") {
+      fetchAllSettledAuctions();
+      fetchAllLiveAuctions();
+    }
+
+    if (section === "db-health") fetchDbHealth();
+  }, [section]);
+
+  // --- MODAL FOR REJECTING AUCTION ---
+  const openRejectModal = (type, id) => {
+    setRejectTarget({ type, id });
+    setRejectionReason("");
+    setShowRejectModal(true);
+  };
+  const closeRejectModal = () => {
+    setShowRejectModal(false);
+    setRejectTarget(null);
+    setRejectionReason("");
+  };
+  const handleRejectConfirm = async () => {
+    if (!rejectionReason.trim()) return;
+    if (rejectTarget.type === "seller") {
+      await handleSellerApproval(rejectTarget.id, false);
+    } else if (rejectTarget.type === "settled") {
+      await handleSettledAuctionApproval(rejectTarget.id, false, rejectionReason);
+    } else if (rejectTarget.type === "live") {
+      await handleLiveAuctionApproval(rejectTarget.id, false, rejectionReason);
+    }
+    closeRejectModal();
+  };
+
+  // Helper to open view modal
+  const openViewModal = (type, data) => {
+    setViewModalType(type);
+    setViewModalData(data);
+    setViewModalOpen(true);
+  };
+  const closeViewModal = () => setViewModalOpen(false);
+
+  // Filtered auctions for manage/all auctions
+  const getFilteredAuctions = (auctions) => {
+    if (auctionFilter === 'all') return auctions;
+    return auctions.filter(a => (a.status || a.auction_status) === auctionFilter);
+  };
+
+  // Auctions today count
+  const auctionsToday = [...pendingSettledAuctions, ...pendingLiveAuctions].filter(a => {
+    const created = new Date(a.created_at || a.start_time);
+    const today = new Date();
+    return created.toDateString() === today.toDateString();
+  }).length;
+
+  // Top sellers by closed/approved listings
+  const sellerCounts = {};
+  [...pendingSettledAuctions, ...pendingLiveAuctions].forEach(a => {
+    if ((a.status || a.auction_status) === 'closed' || (a.status || a.auction_status) === 'approved') {
+      const key = a.seller?.email || a.seller_id;
+      if (!sellerCounts[key]) sellerCounts[key] = { ...a.seller, count: 0 };
+      sellerCounts[key].count++;
+    }
+  });
+  const topSellers = Object.values(sellerCounts).sort((a, b) => b.count - a.count).slice(0, 3);
+
+  // --- SECTION RENDERERS ---
   const renderSection = () => {
     switch (section) {
       case "dashboard":
@@ -69,65 +387,315 @@ function AdminDashboard() {
               <span className="text-gray-400 text-sm">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</span>
             </div>
             {/* Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              {stats.map((stat, idx) => (
-                <div key={idx} className="bg-[#23235b]/80 backdrop-blur-md rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2">
-                  <i className={`fa-solid ${stat.icon} text-2xl ${stat.color}`}></i>
-                  <div className="text-2xl font-bold text-white">{stat.value}</div>
-                  <div className="text-xs text-gray-300 font-semibold">{stat.label}</div>
+            {statsLoading ? <div className="text-gray-300">Loading stats...</div> : statsError ? <div className="text-red-400">{statsError}</div> : statsData && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                <div className="bg-[#23235b]/80 rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2">
+                  <i className="fa-solid fa-users text-2xl text-blue-400"></i>
+                  <div className="text-2xl font-bold text-white">{statsData.users?.total ?? '-'}</div>
+                  <div className="text-xs text-gray-300 font-semibold">Total Users</div>
                 </div>
-              ))}
+                <div className="bg-[#23235b]/80 rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2">
+                  <i className="fa-solid fa-gavel text-2xl text-purple-400"></i>
+                  <div className="text-2xl font-bold text-white">{statsData.auctions?.total ?? '-'}</div>
+                  <div className="text-xs text-gray-300 font-semibold">Total Auctions</div>
+                </div>
+                <div className="bg-[#23235b]/80 rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2">
+                  <i className="fa-solid fa-calendar-day text-2xl text-green-400"></i>
+                  <div className="text-2xl font-bold text-white">{auctionsToday}</div>
+                  <div className="text-xs text-gray-300 font-semibold">Auctions Today</div>
             </div>
-            {/* Activity/Chart & Top Performers */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Activity/Chart Placeholder */}
-              <div className="md:col-span-2 bg-[#23235b]/80 backdrop-blur-md rounded-2xl shadow border border-white/10 p-4 flex flex-col gap-2">
-                <h2 className="text-lg font-bold text-white mb-2">Auction Activity</h2>
-                <div className="h-32 flex items-center justify-center text-gray-400">[Chart Placeholder]</div>
-                <div className="flex justify-between text-xs text-gray-400 mt-2">
-                  <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                <div className="bg-[#23235b]/80 rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2">
+                  <i className="fa-solid fa-user-plus text-2xl text-yellow-400"></i>
+                  <div className="text-2xl font-bold text-white">{statsData.users?.pendingSellerRequests ?? '-'}</div>
+                  <div className="text-xs text-gray-300 font-semibold">Pending Seller Requests</div>
                 </div>
+                <div className="bg-[#23235b]/80 rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2">
+                  <i className="fa-solid fa-clock text-2xl text-orange-400"></i>
+                  <div className="text-2xl font-bold text-white">
+                    {(statsData.auctions?.live?.pending || 0) + (statsData.auctions?.settled?.pending || 0)}
               </div>
-              {/* Top Performers */}
-              <div className="bg-[#23235b]/80 backdrop-blur-md rounded-2xl shadow border border-white/10 p-4 flex flex-col gap-2">
-                <h2 className="text-lg font-bold text-white mb-2">Top Sellers</h2>
-                <ul className="flex flex-col gap-2">
-                  {performers.map((p, idx) => (
-                    <li key={idx} className="flex items-center gap-3">
-                      <div className="flex-1">
-                        <div className="font-semibold text-white">{p.name}</div>
-                        <div className="text-xs text-gray-400">{p.role}</div>
+                  <div className="text-xs text-gray-300 font-semibold">Pending Auctions</div>
                       </div>
-                      <div className="font-bold text-blue-400">{p.percent}</div>
-                    </li>
-                  ))}
-                </ul>
-                <button className="mt-2 text-blue-400 text-xs font-semibold hover:underline self-end">View More &rarr;</button>
               </div>
-            </div>
+            )}
             {/* Quick Links/Channels */}
             <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4">
-              {quickLinks.map((link, idx) => (
-                <div key={idx} className={`rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2 cursor-pointer hover:scale-105 transition ${link.color} backdrop-blur-md`}>
-                  <i className={`fa-solid ${link.icon} text-xl mb-2`}></i>
-                  <div className="font-semibold text-sm">{link.label}</div>
+              <div onClick={() => setSection('manage-users')} className="rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2 cursor-pointer hover:scale-105 transition bg-blue-900/60 text-blue-300 backdrop-blur-md">
+                <i className="fa-solid fa-user-cog text-xl mb-2"></i>
+                <div className="font-semibold text-sm">Manage Users</div>
+              </div>
+              <div onClick={() => { setSection('manage-auctions'); setAuctionFilter('all'); }} className="rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2 cursor-pointer hover:scale-105 transition bg-purple-900/60 text-purple-300 backdrop-blur-md">
+                <i className="fa-solid fa-gavel text-xl mb-2"></i>
+                <div className="font-semibold text-sm">Manage Auctions</div>
+              </div>
+              <div onClick={() => { setSection('manage-auctions'); setAuctionFilter('pending'); }} className="rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2 cursor-pointer hover:scale-105 transition bg-green-900/60 text-green-300 backdrop-blur-md">
+                <i className="fa-solid fa-check-circle text-xl mb-2"></i>
+                <div className="font-semibold text-sm">Approve Auctions</div>
+              </div>
                 </div>
-              ))}
+            {/* Top Sellers Leaderboard */}
+            <div className="bg-[#23235b]/80 rounded-2xl shadow border border-white/10 p-4 flex flex-col gap-2 mt-4">
+              <h2 className="text-lg font-bold text-white mb-2">Top Sellers (Most Closed/Approved Listings)</h2>
+              {topSellers.length === 0 ? (
+                <div className="text-gray-400">No sellers found.</div>
+              ) : (
+                <ol className="list-decimal ml-6">
+                  {topSellers.map((seller, idx) => (
+                    <li key={seller.email || seller.id} className="flex items-center gap-2 text-white">
+                      <span className="font-semibold">{seller.first_name} {seller.last_name}</span>
+                      <span className="text-xs text-gray-400">({seller.count} listings)</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
           </>
         );
       case "manage-users":
-        return <div className="text-xl font-bold text-white">Manage Users Section</div>;
-      case "manage-auctions":
-        return <div className="text-xl font-bold text-white">Manage Auctions Section</div>;
+        return (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">All Users</h2>
+            {allUsersLoading ? <div className="text-gray-300">Loading...</div> : allUsersError ? <div className="text-red-400">{allUsersError}</div> : (
+              <div className="overflow-y-auto max-h-[60vh]">
+                <table className="min-w-full bg-[#23235b]/80 rounded-xl overflow-hidden">
+                  <thead>
+                    <tr className="text-left text-gray-300">
+                      <th className="p-2">Name</th>
+                      <th className="p-2">Email</th>
+                      <th className="p-2">Role</th>
+                      <th className="p-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allUsers.length === 0 ? <tr><td colSpan={4} className="text-center text-gray-400 p-4">No users found</td></tr> : allUsers.map(user => (
+                      <tr key={user.id} className="border-b border-white/10">
+                        <td className="p-2">{user.first_name} {user.last_name}</td>
+                        <td className="p-2">{user.email}</td>
+                        <td className="p-2">{user.role}</td>
+                        <td className="p-2 flex gap-2">
+                          <button onClick={() => openViewModal('user', user)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
       case "approve-users":
-        return <div className="text-xl font-bold text-white">Approve Users Section</div>;
-      case "approve-auctions":
-        return <div className="text-xl font-bold text-white">Approve Auctions Section</div>;
-      case "all-auctions":
-        return <div className="text-xl font-bold text-white">All Auctions Section</div>;
+        return (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Pending Seller Requests</h2>
+            {pendingSellersLoading ? <div className="text-gray-300">Loading...</div> : pendingSellersError ? <div className="text-red-400">{pendingSellersError}</div> : (
+              <div className="overflow-y-auto max-h-[60vh]">
+                <table className="min-w-full bg-[#23235b]/80 rounded-xl overflow-hidden">
+                  <thead>
+                    <tr className="text-left text-gray-300">
+                      <th className="p-2">Name</th>
+                      <th className="p-2">Email</th>
+                      <th className="p-2">Business</th>
+                      <th className="p-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingSellers.length === 0 ? <tr><td colSpan={4} className="text-center text-gray-400 p-4">No pending sellers</td></tr> : pendingSellers.map(seller => (
+                      <tr key={seller.id} className="border-b border-white/10">
+                        <td className="p-2">{seller.first_name} {seller.last_name}</td>
+                        <td className="p-2">{seller.email}</td>
+                        <td className="p-2">{seller.business_name}</td>
+                        <td className="p-2 flex gap-2">
+                          <button onClick={() => openViewModal('user', seller)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                          <button disabled={actionLoading} onClick={() => handleSellerApproval(seller.id, true)} className="bg-green-700 hover:bg-green-800 text-white px-3 py-1 rounded text-xs">Approve</button>
+                          <button disabled={actionLoading} onClick={() => openRejectModal('seller', seller.id)} className="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded text-xs">Reject</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {actionError && <div className="text-red-400 mt-2">{actionError}</div>}
+          </div>
+        );
+      case "manage-auctions":
+        const filteredAuctions = getFilteredAuctions([
+          ...allSettledAuctions.map(a => ({ ...a, type: 'settled' })),
+          ...allLiveAuctions.map(a => ({ ...a, type: 'live' }))
+        ]);
+        return (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Manage Auctions</h2>
+            <div className="mb-4 flex items-center gap-2">
+              <label className="text-gray-300">Filter:</label>
+              <select value={auctionFilter} onChange={e => setAuctionFilter(e.target.value)} className="bg-[#23235b] text-white rounded px-2 py-1 border border-white/10">
+                <option value="all">All</option>
+                <option value="approved">Approved</option>
+                <option value="closed">Closed</option>
+                <option value="rejected">Rejected</option>
+                <option value="pending">Pending</option>
+              </select>
+            </div>
+            <div className="overflow-y-auto max-h-[60vh]">
+              <table className="min-w-full bg-[#23235b]/80 rounded-xl overflow-hidden">
+                <thead>
+                  <tr className="text-left text-gray-300">
+                    <th className="p-2">Title</th>
+                    <th className="p-2">Type</th>
+                    <th className="p-2">Status</th>
+                    <th className="p-2">Seller</th>
+                    <th className="p-2">Start</th>
+                    <th className="p-2">End</th>
+                    <th className="p-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAuctions.length === 0 ? <tr><td colSpan={7} className="text-center text-gray-400 p-4">No auctions found</td></tr> : filteredAuctions.map(auction => (
+                    <tr key={auction.id} className="border-b border-white/10">
+                      <td className="p-2">{auction.title}</td>
+                      <td className="p-2">{auction.type === 'live' ? 'Live' : 'Settled'}</td>
+                      <td className="p-2">{auction.status || auction.auction_status}</td>
+                      <td className="p-2">{auction.seller?.first_name} {auction.seller?.last_name}</td>
+                      <td className="p-2">{new Date(auction.start_time).toLocaleString()}</td>
+                      <td className="p-2">{new Date(auction.end_time).toLocaleString()}</td>
+                      <td className="p-2 flex gap-2">
+                        <button onClick={() => openViewModal('auction', auction)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                        {(auction.status === 'pending' || auction.auction_status === 'pending') && (
+                          <button disabled={actionLoading} onClick={() => openApproveModal(auction.type, auction.id)} className="bg-green-700 hover:bg-green-800 text-white px-3 py-1 rounded text-xs">Approve</button>
+                        )}
+                        {(auction.status === 'pending' || auction.auction_status === 'pending') && (
+                          <button disabled={actionLoading} onClick={() => openRejectModal(auction.type, auction.id)} className="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded text-xs">Reject</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+
       case "earnings":
-        return <div className="text-xl font-bold text-white">Earnings Section</div>;
+        return (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Earnings</h2>
+            <div className="text-gray-400">Coming Soon</div>
+          </div>
+        );
+      case "db-health":
+        return (
+          <div className="h-full overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4">Database Health Monitor</h2>
+            {dbHealthLoading ? (
+              <div className="text-gray-300">Loading database health data...</div>
+            ) : dbHealthError ? (
+              <div className="text-red-400">{dbHealthError}</div>
+            ) : dbHealthData ? (
+              <div className="space-y-6 pb-6">
+                {/* Connection Status */}
+                <div className="bg-[#23235b]/80 rounded-xl p-6 border border-white/10">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i className="fa-solid fa-plug"></i>
+                    Connection Status
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <span className="text-gray-300">Status:</span>
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                        dbHealthData.error ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
+                      }`}>
+                        {dbHealthData.error ? 'Error' : 'Healthy'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <span className="text-gray-300">Response Time:</span>
+                      <span className="text-white font-semibold">{dbHealthData.queryPerformance || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                      <span className="text-gray-300">Last Check:</span>
+                      <span className="text-white text-sm">
+                        {new Date(dbHealthData.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Connection Pool Stats */}
+                <div className="bg-[#23235b]/80 rounded-xl p-6 border border-white/10">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i className="fa-solid fa-database"></i>
+                    Connection Pool Statistics
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-4 bg-white/5 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-400">{dbHealthData.poolStats?.total || 0}</div>
+                      <div className="text-xs text-gray-400">Total Connections</div>
+                    </div>
+                    <div className="text-center p-4 bg-white/5 rounded-lg">
+                      <div className="text-2xl font-bold text-green-400">{dbHealthData.poolStats?.active || 0}</div>
+                      <div className="text-xs text-gray-400">Active Connections</div>
+                    </div>
+                    <div className="text-center p-4 bg-white/5 rounded-lg">
+                      <div className="text-2xl font-bold text-yellow-400">{dbHealthData.poolStats?.idle || 0}</div>
+                      <div className="text-xs text-gray-400">Idle Connections</div>
+                    </div>
+                    <div className="text-center p-4 bg-white/5 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-400">{dbHealthData.poolStats?.waiting || 0}</div>
+                      <div className="text-xs text-gray-400">Waiting Connections</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recommendations */}
+                <div className="bg-[#23235b]/80 rounded-xl p-6 border border-white/10">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i className="fa-solid fa-lightbulb"></i>
+                    Recommendations
+                  </h3>
+                  {dbHealthData.recommendations && dbHealthData.recommendations.length > 0 ? (
+                    <ul className="space-y-2">
+                      {dbHealthData.recommendations.map((rec, index) => (
+                        <li key={index} className="flex items-start gap-2 text-gray-300">
+                          <i className="fa-solid fa-arrow-right text-blue-400 mt-1 text-xs"></i>
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-gray-400">No recommendations at this time.</div>
+                  )}
+                </div>
+
+                {/* Error Details */}
+                {dbHealthData.error && (
+                  <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-red-400">
+                      <i className="fa-solid fa-exclamation-triangle"></i>
+                      Error Details
+                    </h3>
+                    <div className="text-red-300 text-sm">
+                      {dbHealthData.error}
+                    </div>
+                  </div>
+                )}
+
+                {/* Refresh Button */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={fetchDbHealth}
+                    disabled={dbHealthLoading}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition"
+                  >
+                    <i className="fa-solid fa-sync-alt"></i>
+                    {dbHealthLoading ? 'Refreshing...' : 'Refresh Data'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-gray-400">No database health data available.</div>
+            )}
+          </div>
+        );
       default:
         return null;
     }
@@ -140,7 +708,72 @@ function AdminDashboard() {
     }
   }, [section]);
 
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/logout`, {}, { withCredentials: true });
+    } catch (e) {}
+    localStorage.removeItem("justbetToken");
+    localStorage.removeItem("justbetUser");
+    setUser(null);
+    navigate("/login");
+  };
+
+  // --- MODAL FOR APPROVING AUCTION ---
+  const openApproveModal = (type, id) => {
+    setApproveTarget({ type, id });
+    setShowApproveModal(true);
+  };
+  const closeApproveModal = () => {
+    setShowApproveModal(false);
+    setApproveTarget(null);
+  };
+  const handleApproveConfirm = async () => {
+    if (!approveTarget) return;
+    if (approveTarget.type === 'live') {
+      await handleLiveAuctionApproval(approveTarget.id, true);
+    } else if (approveTarget.type === 'settled') {
+      await handleSettledAuctionApproval(approveTarget.id, true);
+    }
+    closeApproveModal();
+  };
+
+  // --- POLLING FOR NEW AUCTIONS ---
+  useEffect(() => {
+    let intervalId;
+    if (section === "manage-auctions") {
+      // Poll all auctions every 5 seconds
+      fetchAllSettledAuctions();
+      fetchAllLiveAuctions();
+      intervalId = setInterval(() => {
+        console.log('[AdminDashboard] Polling: Fetching all auctions...');
+        fetchAllSettledAuctions();
+        fetchAllLiveAuctions();
+      }, 5000);
+
+    } else if (section === "db-health") {
+      // Poll database health every 30 seconds
+      fetchDbHealth();
+      intervalId = setInterval(() => {
+        console.log('[AdminDashboard] Polling: Fetching database health...');
+        fetchDbHealth();
+      }, 30000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [section]);
+
   return (
+    <>
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={handleToastClose}
+        />
+      )}
     <div className="min-h-screen w-full bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] flex items-center justify-center py-6 px-2">
       <div className="w-full max-w-7xl flex overflow-hidden rounded-2xl" style={{height: mainHeight ? mainHeight : 'auto'}}>
         {/* Sidebar */}
@@ -152,7 +785,7 @@ function AdminDashboard() {
               <div className="text-xs text-gray-400">{user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Admin'}</div>
             </div>
             <nav className="flex flex-col gap-2 mt-6 mb-2">
-              {navLinks.map(link => (
+              {navLinks.filter(link => link.key !== "approve-auctions").map(link => (
                 <button
                   key={link.key}
                   onClick={() => setSection(link.key)}
@@ -170,7 +803,42 @@ function AdminDashboard() {
           {renderSection()}
         </main>
       </div>
+      {/* MODAL for rejection reason using ConfirmModal */}
+      <ConfirmModal
+        open={showRejectModal}
+        title="Reject Auction"
+        message={<>
+          <div className="mb-2">Please provide a reason for rejection:</div>
+          <textarea
+            className="w-full rounded p-2 text-white bg-purple-500/30 backdrop-blur-md placeholder-gray-300 border border-purple-200/30"
+            rows={3}
+            value={rejectionReason}
+            onChange={e => setRejectionReason(e.target.value)}
+            placeholder="Enter reason..."
+          />
+        </>}
+        onConfirm={handleRejectConfirm}
+        onCancel={closeRejectModal}
+        confirmText="Reject"
+        cancelText="Cancel"
+        confirmColor="red"
+        // Only enable Reject if reason is provided and not loading
+        confirmDisabled={!rejectionReason.trim() || actionLoading}
+      />
+      <ViewDetailsModal open={viewModalOpen} type={viewModalType} data={viewModalData} onClose={closeViewModal} />
+      {/* MODAL for approving auction using ConfirmModal */}
+      <ConfirmModal
+        open={showApproveModal}
+        title="Approve Auction"
+        message="Are you sure you want to approve this auction?"
+        onConfirm={handleApproveConfirm}
+        onCancel={closeApproveModal}
+        confirmText="Approve"
+        cancelText="Cancel"
+        confirmColor="green"
+      />
     </div>
+    </>
   );
 }
 

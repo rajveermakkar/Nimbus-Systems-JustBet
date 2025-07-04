@@ -3,6 +3,11 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Button from "../src/components/Button";
 import Toast from "../src/components/Toast";
 import { ConfirmModal } from "../src/components/SessionExpiryModal";
+import Select from 'react-select';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
+
+const DEV_MODE = false; // Set to false for production, true for dev/testing
 
 function EditListing({ showToast: _showToast }) {
   const { id } = useParams();
@@ -17,8 +22,8 @@ function EditListing({ showToast: _showToast }) {
   const [reservePrice, setReservePrice] = useState("");
   const [auctionType, setAuctionType] = useState(auctionTypeFromURL || "live"); // Use URL param as default
   const [duration, setDuration] = useState(""); // For live auctions
-  const [startTime, setStartTime] = useState(""); // For both types
-  const [endTime, setEndTime] = useState(""); // For settled auctions
+  const [startTime, setStartTime] = useState(null); // For both types - using Date object
+  const [endTime, setEndTime] = useState(null); // For settled auctions - using Date object
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -63,24 +68,14 @@ function EditListing({ showToast: _showToast }) {
 
   // Calculate end time based on start time and duration for live auctions
   const calculateEndTime = (startTime, durationMinutes) => {
-    const start = new Date(startTime);
-    const endTime = new Date(start.getTime() + durationMinutes * 60000);
+    const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
     return toTimezoneISOString(endTime);
   };
 
-  // Convert UTC date string to local datetime-local value
-  function toLocalDatetimeValue(utcString) {
-    if (!utcString) return '';
-    const date = new Date(utcString);
-    const pad = n => n.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  }
-
-  // Convert local datetime-local value to timezone-aware ISO string
-  function toTimezoneISOStringFromLocal(localValue) {
-    if (!localValue) return '';
-    const date = new Date(localValue);
-    return toTimezoneISOString(date);
+  // Convert UTC date string to Date object
+  function toDateObject(utcString) {
+    if (!utcString) return null;
+    return new Date(utcString);
   }
 
   // Fetch auction data
@@ -157,10 +152,10 @@ function EditListing({ showToast: _showToast }) {
     setImageUrl(auction.image_url || "");
     setStartingPrice(auction.starting_price?.toString() || "");
     setReservePrice(auction.reserve_price?.toString() || "");
-    setStartTime(auction.start_time ? toLocalDatetimeValue(auction.start_time) : "");
+    setStartTime(auction.start_time ? toDateObject(auction.start_time) : null);
     setAuctionStatus(auction.status || "");
     if (type === "settled") {
-      setEndTime(auction.end_time ? toLocalDatetimeValue(auction.end_time) : "");
+      setEndTime(auction.end_time ? toDateObject(auction.end_time) : null);
     } else {
       if (auction.start_time && auction.end_time) {
         const start = new Date(auction.start_time);
@@ -192,37 +187,52 @@ function EditListing({ showToast: _showToast }) {
     if (e.target.files.length > 0) setImageUrl("");
   }
 
+  const startOfToday = new Date();
+  startOfToday.setHours(0,0,0,0);
+
   function validate() {
+    console.log('=== VALIDATION DEBUG ===');
+    console.log('DEV_MODE:', DEV_MODE);
+    console.log('startTime:', startTime);
+    console.log('current time:', new Date());
+    console.log('startTime < new Date():', startTime && startTime < new Date());
+    
     if (!title.trim()) return "Product title is required.";
     if (!description.trim()) return "Description is required.";
     if (!imageUrl && imageFiles.length === 0) return "Please provide an image URL or upload an image.";
     if (!startingPrice || isNaN(Number(startingPrice)) || Number(startingPrice) <= 0) return "Starting price must be a positive number.";
+    
+    if (DEV_MODE && startTime && startTime < new Date()) {
+      console.log('DEV_MODE validation failed - past time detected');
+      showToast('Start time must be in the future.', 'error');
+      return false;
+    }
     
     if (auctionType === "live") {
       if (!startTime) return "Start date/time is required for live auctions.";
       if (!duration) return "Duration is required for live auctions.";
       
       const now = new Date();
-      now.setHours(0, 0, 0, 0); // Start of today
-      const start = new Date(startTime);
+      const minStartTime = DEV_MODE ? now : new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      console.log('minStartTime:', minStartTime);
+      console.log('startTime < minStartTime:', startTime < minStartTime);
       
-      if (isNaN(start.getTime())) return "Invalid date format for start date.";
-      if (start < now) return "Start date must be today or in the future.";
+      if (startTime < minStartTime) return DEV_MODE ? "Start date must be today or in the future." : "Start date must be at least 24 hours from now (admin approval can take 10-12 hours).";
     } else {
       if (!startTime) return "Start date/time is required for settled auctions.";
       if (!endTime) return "End date/time is required for settled auctions.";
       
       const now = new Date();
-      now.setHours(0, 0, 0, 0); // Start of today
-      const start = new Date(startTime);
-      const end = new Date(endTime);
+      const minStartTime = DEV_MODE ? now : new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      console.log('minStartTime:', minStartTime);
+      console.log('startTime < minStartTime:', startTime < minStartTime);
       
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) return "Invalid date format for start or end date.";
-      if (start < now) return "Start date must be today or in the future.";
-      if (end <= start) return "End date must be after the start date.";
-      if (end < new Date()) return "End date must be in the future.";
+      if (startTime < minStartTime) return DEV_MODE ? "Start date must be today or in the future." : "Start date must be at least 24 hours from now (admin approval can take 10-12 hours).";
+      if (endTime <= startTime) return "End date must be after the start date.";
+      if (endTime < new Date()) return "End date must be in the future.";
     }
     
+    console.log('Validation passed');
     return null;
   }
 
@@ -230,9 +240,13 @@ function EditListing({ showToast: _showToast }) {
     e.preventDefault();
     setError("");
     const err = validate();
+    if (err === false) {
+      // Validation failed with false return (past time in dev mode)
+      return;
+    }
     if (err) {
       setError(err);
-      showToast(err, "error");
+      showToast && showToast(err, "error");
       return;
     }
     setLoading(true);
@@ -258,32 +272,44 @@ function EditListing({ showToast: _showToast }) {
         finalImageUrl = uploadData.url;
       }
       
-      // Calculate times
+      // Now update the listing
       let finalStartTime, finalEndTime;
       
       if (auctionType === "live") {
-        finalStartTime = toTimezoneISOStringFromLocal(startTime);
-        finalEndTime = calculateEndTime(startTime, Number(duration));
+        // Convert start time to ISO string with timezone information
+        finalStartTime = toTimezoneISOString(startTime);
         
-        // Debug logging
-        console.log('EditListing time conversion debug:', {
-          originalStartTime: startTime,
-          duration: duration,
-          finalStartTime: finalStartTime,
-          finalEndTime: finalEndTime,
-          localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          startDateLocal: new Date(startTime).toLocaleString(),
-          endDateLocal: new Date(finalEndTime).toLocaleString()
-        });
+        // Calculate end time
+        finalEndTime = calculateEndTime(startTime, Number(duration));
       } else {
-        finalStartTime = toTimezoneISOStringFromLocal(startTime);
-        finalEndTime = toTimezoneISOStringFromLocal(endTime);
+        // For settled auctions, convert both times to ISO strings with timezone
+        finalStartTime = toTimezoneISOString(startTime);
+        finalEndTime = toTimezoneISOString(endTime);
       }
+      
+      console.log('=== TIMEZONE DEBUG ===');
+      console.log('Original startTime:', startTime);
+      console.log('finalStartTime (with timezone):', finalStartTime);
+      console.log('finalEndTime (with timezone):', finalEndTime);
       
       // Choose the correct endpoint based on auction type
       const endpoint = auctionType === "live" 
         ? `${apiUrl}/api/seller/auctions/live/${id}`
         : `${apiUrl}/api/seller/auctions/settled/${id}`;
+      
+      console.log('=== API REQUEST DEBUG ===');
+      console.log('Endpoint:', endpoint);
+      console.log('Method: PATCH');
+      console.log('Request body:', {
+        title,
+        description,
+        imageUrl: finalImageUrl,
+        startingPrice,
+        reservePrice,
+        startTime: finalStartTime,
+        endTime: finalEndTime,
+        maxParticipants: auctionType === "live" ? 50 : undefined
+      });
       
       const res = await fetch(endpoint, {
         method: "PATCH",
@@ -294,26 +320,43 @@ function EditListing({ showToast: _showToast }) {
         body: JSON.stringify({
           title,
           description,
-          imageUrl: finalImageUrl,
-          startingPrice,
-          reservePrice,
+          image_url: finalImageUrl,
+          starting_price: startingPrice,
+          reserve_price: reservePrice,
           start_time: finalStartTime,
           end_time: finalEndTime,
-          maxParticipants: auctionType === "live" ? 50 : undefined
+          max_participants: auctionType === "live" ? 50 : undefined
         })
       });
       
+      console.log('Response status:', res.status);
+      console.log('Response ok:', res.ok);
+      
       if (!res.ok) {
         const data = await res.json();
+        console.log('Error response:', data);
         throw new Error(data.message || "Failed to update listing");
       }
       
+      const responseData = await res.json();
+      console.log('Success response:', responseData);
+      console.log('Updated auction data:', responseData.auction);
+      console.log('Updated start_time:', responseData.auction?.start_time);
+      console.log('Updated end_time:', responseData.auction?.end_time);
       setLoading(false);
+      
+      // Check the response message to show appropriate toast
+      if (responseData.message && responseData.message.includes("pending")) {
+        showToast("Listing updated and submitted for approval!", "success");
+      } else {
       showToast("Listing updated successfully!", "success");
-      navigate("/seller/dashboard");
+      }
+      
+      navigate("/seller/dashboard?tab=listings");
     } catch (err) {
+      console.log('Exception caught:', err);
       setError(err.message || "Failed to update listing");
-      showToast(err.message || "Failed to update listing", "error");
+      showToast && showToast(err.message || "Failed to update listing", "error");
       setLoading(false);
     }
   }
@@ -323,37 +366,40 @@ function EditListing({ showToast: _showToast }) {
   }
 
   async function confirmDelete() {
-    setShowConfirm(false);
-    setLoading(true);
-    setError("");
     try {
+      setLoading(true);
       const token = localStorage.getItem("justbetToken");
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const endpoint = auctionType === "live"
         ? `${apiUrl}/api/seller/auctions/live/${id}`
         : `${apiUrl}/api/seller/auctions/settled/${id}`;
+      
       const res = await fetch(endpoint, {
         method: "DELETE",
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
+      if (!res.ok) {
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.message || "Failed to delete listing");
+        throw new Error(data.message || "Failed to delete listing");
+      }
+      
       showToast("Listing deleted successfully!", "success");
-      setTimeout(() => navigate("/seller/dashboard?tab=listings"), 500);
+      navigate("/seller/dashboard?tab=listings");
     } catch (err) {
       setError(err.message || "Failed to delete listing");
-      showToast(err.message || "Failed to delete listing", "error");
-    } finally {
+      showToast && showToast(err.message || "Failed to delete listing", "error");
       setLoading(false);
     }
+    setShowConfirm(false);
   }
 
   if (fetching) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-sm">Loading auction...</p>
+        <div className="bg-white/10 p-8 rounded-xl flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+          <p className="text-white text-lg font-semibold">Loading Listing...</p>
         </div>
       </div>
     );
@@ -365,16 +411,24 @@ function EditListing({ showToast: _showToast }) {
         <Toast
           message={toast.message}
           type={toast.type}
-          onClose={() => setToast({ ...toast, show: false })}
           duration={toast.duration}
+          onClose={() => setToast(t => ({ ...t, show: false }))}
         />
+      )}
+      {loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white/10 p-8 rounded-xl flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+            <p className="text-white text-lg font-semibold">Updating Listing...</p>
+          </div>
+        </div>
       )}
       <div className="w-full max-w-2xl mx-auto">
         <div className="bg-white/10 rounded-xl p-6 mb-6 border border-white/20">
           <h2 className="text-2xl font-bold flex items-center gap-2 mb-1">
             <i className="fa-solid fa-edit"></i> Edit Listing
           </h2>
-          <p className="text-white/70 text-sm text-left">Update your auction listing</p>
+          <p className="text-white/70 text-sm text-left">Update your auction listing details</p>
         </div>
         
         {error && (
@@ -482,19 +536,98 @@ function EditListing({ showToast: _showToast }) {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs mb-1 text-left">Start Date/Time *</label>
-                  <input type="datetime-local" className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                  <DatePicker
+                    selected={startTime}
+                    onChange={(date) => setStartTime(date)}
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    timeIntervals={1}
+                    dateFormat="MMMM d, yyyy h:mm aa"
+                    placeholderText="Select start date and time"
+                    minDate={DEV_MODE ? startOfToday : new Date(Date.now() + 24 * 60 * 60 * 1000)}
+                    filterTime={(time) => {
+                      if (DEV_MODE) return true;
+                      const now = new Date();
+                      const minTime = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                      return time.getTime() >= minTime.getTime();
+                    }}
+                    className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm"
+                    wrapperClassName="w-full"
+                  />
                   <p className="text-xs text-white/50 mt-1">Set when you want the auction to start (after approval)</p>
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs mb-1 text-left">Duration *</label>
-                  <select className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm" value={duration} onChange={e => setDuration(e.target.value)}>
-                    <option value="">Select duration</option>
-                    {durationOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    className="react-select-container"
+                    classNamePrefix="react-select"
+                    options={durationOptions}
+                    value={durationOptions.find(opt => opt.value === duration) || null}
+                    onChange={option => setDuration(option ? option.value : "")}
+                    placeholder="Select duration"
+                    isClearable
+                    styles={{
+                      control: (base, state) => ({
+                        ...base,
+                        backgroundColor: "rgba(255,255,255,0.05)",
+                        borderColor: state.isFocused ? "#a78bfa" : "#ffffff33",
+                        boxShadow: "none",
+                        color: "#fff",
+                        minHeight: "40px",
+                        borderRadius: "8px",
+                        fontSize: "1rem",
+                        fontFamily: "inherit",
+                        transition: "border-color 0.2s",
+                      }),
+                      valueContainer: (base) => ({
+                        ...base,
+                        padding: "0 12px"
+                      }),
+                      placeholder: (base) => ({
+                        ...base,
+                        color: "#bdb4e6",
+                        fontSize: "1rem"
+                      }),
+                      singleValue: (base) => ({
+                        ...base,
+                        color: "#fff",
+                        fontSize: "1rem"
+                      }),
+                      menu: (base) => ({
+                        ...base,
+                        backgroundColor: "#2a2a72",
+                        color: "#fff",
+                        borderRadius: "8px",
+                        marginTop: 2,
+                        fontSize: "1rem"
+                      }),
+                      option: (base, state) => ({
+                        ...base,
+                        backgroundColor: state.isSelected
+                          ? "#4f46e5"
+                          : state.isFocused
+                          ? "#3730a3"
+                          : "#2a2a72",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontSize: "1rem"
+                      }),
+                      dropdownIndicator: (base, state) => ({
+                        ...base,
+                        color: "#bdb4e6",
+                        "&:hover": { color: "#fff" }
+                      }),
+                      indicatorSeparator: (base) => ({
+                        ...base,
+                        backgroundColor: "#ffffff33"
+                      }),
+                      input: (base) => ({
+                        ...base,
+                        color: "#fff",
+                        fontSize: "1rem"
+                      }),
+                    }}
+                  />
                   <p className="text-xs text-white/50 mt-1">Auction will end after this duration</p>
                 </div>
               </div>
@@ -502,11 +635,46 @@ function EditListing({ showToast: _showToast }) {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-xs mb-1 text-left">Start Date/Time *</label>
-                  <input type="datetime-local" className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                  <DatePicker
+                    selected={startTime}
+                    onChange={(date) => setStartTime(date)}
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    timeIntervals={1}
+                    dateFormat="MMMM d, yyyy h:mm aa"
+                    placeholderText="Select start date and time"
+                    minDate={DEV_MODE ? startOfToday : new Date(Date.now() + 24 * 60 * 60 * 1000)}
+                    filterTime={(time) => {
+                      if (DEV_MODE) return true;
+                      const now = new Date();
+                      const minTime = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                      return time.getTime() >= minTime.getTime();
+                    }}
+                    className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm"
+                    wrapperClassName="w-full"
+                  />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs mb-1 text-left">End Date/Time *</label>
-                  <input type="datetime-local" className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                  <DatePicker
+                    selected={endTime}
+                    onChange={(date) => setEndTime(date)}
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    timeIntervals={1}
+                    dateFormat="MMMM d, yyyy h:mm aa"
+                    placeholderText="Select end date and time"
+                    minDate={startTime ? new Date(startTime.getTime() + 60 * 1000) : undefined}
+                    minTime={startTime ? new Date(startTime.getTime() + 60 * 1000) : undefined}
+                    maxTime={DEV_MODE ? undefined : new Date(new Date().setHours(23, 59, 0, 0))}
+                    filterTime={(time) => {
+                      if (!startTime) return true;
+                      const minTime = new Date(startTime.getTime() + 60 * 1000);
+                      return time.getTime() >= minTime.getTime();
+                    }}
+                    className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 text-sm"
+                    wrapperClassName="w-full"
+                  />
                 </div>
               </div>
             )}
@@ -517,7 +685,7 @@ function EditListing({ showToast: _showToast }) {
               Cancel
             </Button>
             <Button type="submit" variant="primary" size="sm" disabled={loading}>
-              {loading ? "Updating..." : "Update Listing"}
+              {loading ? "Updating..." : (auctionStatus === 'rejected' ? "Save and Request Approval" : "Update Listing")}
             </Button>
             {auctionStatus !== 'closed' && (
               <Button
@@ -533,7 +701,15 @@ function EditListing({ showToast: _showToast }) {
             )}
           </div>
         </form>
-        <p className="text-xs text-white/60 mt-2 text-center">Note: Editing this listing will mark it as Pending and it will require admin re-approval.</p>
+        <p className="text-xs text-white/60 mt-2 text-center">
+          Note: Start date must be at least 24 hours from now. Admin approval can take 10-12 hours, so please plan accordingly to ensure your auction starts on time.
+        </p>
+        <p className="text-xs text-white/60 mt-2 text-center">
+          {auctionStatus === 'rejected' 
+            ? "Note: Saving changes will submit this listing for admin approval again." 
+            : "Note: Editing this listing will mark it as Pending and it will require admin re-approval."
+          }
+        </p>
       </div>
       <ConfirmModal
         open={showConfirm}
