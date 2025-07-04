@@ -61,7 +61,6 @@
 - **GET /api/admin/pending-sellers** — Get all pending seller approval requests.
 - **PATCH /api/admin/sellers/:userId/approve** — Approve or reject a seller request.
 - **GET /api/admin/stats** — Get comprehensive statistics (users, auctions, pending requests).
-- **GET /api/admin/ban-stats** — Get ban statistics (total, active, permanent, recent, common reasons).
 
 ### Settled Auctions
 - **GET /api/admin/auctions/settled/pending** — Get all pending settled auctions.
@@ -73,11 +72,6 @@
 - **GET /api/admin/auctions/live/pending** — Get all pending live auctions.
 - **PATCH /api/admin/auctions/live/:id/approve** — Approve a live auction.
 - **PATCH /api/admin/auctions/live/:id/reject** — Reject a live auction. Body: `{ rejectionReason }`
-
-### User Management
-- **POST /api/admin/users/:userId/ban** — Ban a user (progressive: 1st offense 1 week, 2nd 30 days, 3rd permanent). Body: `{ reason }`
-- **POST /api/admin/users/:userId/unban** — Unban a user (only if not permanently banned).
-- **GET /api/admin/users/:userId/ban-history** — Get detailed ban history for a user.
 
 ---
 

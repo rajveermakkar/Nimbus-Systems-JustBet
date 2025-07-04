@@ -32,15 +32,6 @@ router.patch('/auctions/settled/:id/reject', adminController.rejectSettledAuctio
 // Get stats (total users and listings)
 router.get('/stats', adminController.getStats);
 
-<<<<<<< HEAD
-// Ban/unban user (Admin Only)
-router.post('/users/:userId/ban', adminController.banUser);
-router.post('/users/:userId/unban', adminController.unbanUser);
-router.get('/users/:userId/ban-history', adminController.getUserBanHistory);
-
-// Ban statistics endpoint for admin dashboard
-router.get('/ban-stats', adminController.banStats);
-=======
 // Get all users (admin only)
 router.get('/users', adminController.getAllUsers);
 
@@ -68,6 +59,5 @@ router.get('/db-health', async (req, res) => {
     });
   }
 });
->>>>>>> ac7dbc3292c3f05d2a0f02afa3a59395e27310aa
 
 module.exports = router; 
