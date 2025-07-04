@@ -6,7 +6,7 @@ import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 
-const DEV_MODE = false; // Set to false for production, true for dev/testing
+const DEV_MODE = true; // Set to false for production, true for dev/testing
 
 function CreateListing() {
   const [title, setTitle] = useState("");
@@ -186,12 +186,12 @@ function CreateListing() {
         body: JSON.stringify({
           title,
           description,
-          image_url: finalImageUrl,
-          starting_price: startingPrice,
-          reserve_price: reservePrice,
-          start_time: finalStartTime,
-          end_time: finalEndTime,
-          max_participants: auctionType === "live" ? 50 : undefined // Add max_participants for live auctions
+          imageUrl: finalImageUrl,
+          startingPrice: startingPrice,
+          reservePrice: reservePrice,
+          startTime: finalStartTime,
+          endTime: finalEndTime,
+          maxParticipants: auctionType === "live" ? 50 : undefined // Add maxParticipants for live auctions
         })
       });
       if (!res.ok) {
