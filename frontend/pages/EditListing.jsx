@@ -7,7 +7,7 @@ import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 
-const DEV_MODE = false; // Set to false for production, true for dev/testing
+const DEV_MODE = true; // Set to false for production, true for dev/testing
 
 function EditListing({ showToast: _showToast }) {
   const { id } = useParams();
