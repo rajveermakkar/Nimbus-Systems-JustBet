@@ -112,13 +112,14 @@ const userController = {
         return errorResponse(res, 401, 'Please verify your email first');
       }
 
-      // Check if user is banned
-      if (user.is_banned) {
-        if (user.ban_expires_at && new Date(user.ban_expires_at) < new Date()) {
+      // Check if user is banned (via user_bans table)
+      const activeBan = await User.getActiveBan(user.id);
+      if (activeBan) {
+        if (activeBan.expires_at && new Date(activeBan.expires_at) < new Date()) {
           // Auto-unban if temporary ban expired
-          await User.unbanUser(user.id);
+          await User.unbanUser(user.id, user.id); // self-unban (system)
         } else {
-          return errorResponse(res, 403, user.ban_count >= 3 ? 'User is permanently banned.' : `User is banned until ${user.ban_expires_at}`);
+          return errorResponse(res, 403, activeBan.expires_at ? `User is banned until ${activeBan.expires_at}` : 'User is permanently banned.');
         }
       }
 

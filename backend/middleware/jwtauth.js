@@ -26,12 +26,13 @@ const jwtauthMiddleware = async (req, res, next) => {
     }
 
     // Ban logic: block banned users, auto-unban if ban expired
-    if (user.is_banned) {
-      if (user.ban_expires_at && new Date(user.ban_expires_at) < new Date()) {
+    const activeBan = await User.getActiveBan(user.id);
+    if (activeBan) {
+      if (activeBan.expires_at && new Date(activeBan.expires_at) < new Date()) {
         // Auto-unban if temporary ban expired
-        await User.unbanUser(user.id);
+        await User.unbanUser(user.id, user.id); // self-unban (system)
       } else {
-        return res.status(403).json({ error: user.ban_count >= 3 ? 'User is permanently banned.' : `User is banned until ${user.ban_expires_at}` });
+        return res.status(403).json({ error: activeBan.expires_at ? `User is banned until ${activeBan.expires_at}` : 'User is permanently banned.' });
       }
     }
 

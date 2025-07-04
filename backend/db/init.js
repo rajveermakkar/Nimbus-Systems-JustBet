@@ -115,22 +115,6 @@ const updateUsersTable = async () => {
         ADD COLUMN is_approved BOOLEAN DEFAULT false
       `);
     }
-
-    // Check for ban-related columns
-    const banCountCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'users' AND column_name = 'ban_count'
-    `);
-    if (banCountCheck.rows.length === 0) {
-      await pool.query(`
-        ALTER TABLE users 
-        ADD COLUMN ban_count INTEGER NOT NULL DEFAULT 0,
-        ADD COLUMN is_banned BOOLEAN NOT NULL DEFAULT false,
-        ADD COLUMN ban_expires_at TIMESTAMP WITH TIME ZONE,
-        ADD COLUMN ban_reason TEXT
-      `);
-    }
   } catch (error) {
     console.error('Error updating users table:', error);
     throw error;
@@ -197,10 +181,6 @@ const initDatabase = async () => {
           business_address TEXT,
           business_phone VARCHAR(50),
           is_approved BOOLEAN DEFAULT false,
-          ban_count INTEGER NOT NULL DEFAULT 0,
-          is_banned BOOLEAN NOT NULL DEFAULT false,
-          ban_expires_at TIMESTAMP WITH TIME ZONE,
-          ban_reason TEXT,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
@@ -509,6 +489,30 @@ const initDatabase = async () => {
     
     // Add rejection fields to auction tables if they don't exist
     await updateAuctionTablesWithRejectionFields();
+    
+    // Create user_bans table if it doesn't exist
+    const userBansTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'user_bans'
+      );
+    `);
+    if (!userBansTableCheck.rows[0].exists) {
+      await pool.query(`
+        CREATE TABLE user_bans (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id),
+          admin_id UUID NOT NULL REFERENCES users(id),
+          reason TEXT NOT NULL,
+          ban_type VARCHAR(50) DEFAULT 'global',
+          issued_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP WITH TIME ZONE,
+          lifted_at TIMESTAMP WITH TIME ZONE,
+          lifted_by UUID REFERENCES users(id),
+          is_active BOOLEAN NOT NULL DEFAULT true
+        );
+      `);
+    }
     
     console.log('Database initialization complete!');
   } catch (error) {

@@ -197,6 +197,7 @@ const adminController = {
     try {
       const { userId } = req.params;
       const { reason } = req.body;
+      const adminId = req.user.id;
       if (!reason || reason.trim() === '') {
         return res.status(400).json({ error: 'Ban reason is required' });
       }
@@ -204,8 +205,8 @@ const adminController = {
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-      const bannedUser = await User.banUser(userId, reason);
-      res.json({ user: bannedUser, message: bannedUser.ban_count >= 3 ? 'User permanently banned.' : `User banned for ${bannedUser.ban_count === 1 ? '1 week' : '30 days'}.` });
+      const ban = await User.banUser(userId, adminId, reason);
+      res.json({ ban, message: ban.expires_at ? (ban.expires_at && new Date(ban.expires_at) - Date.now() > 20 * 24 * 60 * 60 * 1000 ? 'User banned for 30 days.' : 'User banned for 1 week.') : 'User permanently banned.' });
     } catch (error) {
       res.status(500).json({ error: error.message || 'Error banning user' });
     }
@@ -215,17 +216,59 @@ const adminController = {
   async unbanUser(req, res) {
     try {
       const { userId } = req.params;
+      const adminId = req.user.id;
       const user = await User.findById(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-      if (user.ban_count >= 3) {
-        return res.status(400).json({ error: 'Cannot unban a permanently banned user.' });
+      try {
+        const unbanned = await User.unbanUser(userId, adminId);
+        res.json({ ban: unbanned, message: 'User unbanned.' });
+      } catch (err) {
+        res.status(400).json({ error: err.message });
       }
-      const unbannedUser = await User.unbanUser(userId);
-      res.json({ user: unbannedUser, message: 'User unbanned.' });
     } catch (error) {
       res.status(500).json({ error: error.message || 'Error unbanning user' });
+    }
+  },
+
+  // Get user ban history
+  async getUserBanHistory(req, res) {
+    try {
+      const { userId } = req.params;
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      const banHistory = await User.getBanHistory(userId);
+      const totalBans = banHistory.length;
+      const activeBan = await User.getActiveBan(userId);
+      
+      res.json({ 
+        user: {
+          id: user.id,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          email: user.email,
+          role: user.role
+        }, 
+        banHistory,
+        totalBans,
+        hasActiveBan: !!activeBan,
+        activeBan: activeBan || null
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Error fetching ban history' });
+    }
+  },
+
+  // Get ban statistics
+  async banStats(req, res) {
+    try {
+      const stats = await User.getBanStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: 'Error fetching ban statistics' });
     }
   }
 };

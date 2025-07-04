@@ -35,5 +35,9 @@ router.get('/stats', adminController.getStats);
 // Ban/unban user (Admin Only)
 router.post('/users/:userId/ban', adminController.banUser);
 router.post('/users/:userId/unban', adminController.unbanUser);
+router.get('/users/:userId/ban-history', adminController.getUserBanHistory);
+
+// Ban statistics endpoint for admin dashboard
+router.get('/ban-stats', adminController.banStats);
 
 module.exports = router; 
