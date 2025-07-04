@@ -40,6 +40,9 @@ router.get('/auctions/settled/all', adminController.getAllSettledAuctions);
 // Get all live auctions (admin only)
 router.get('/auctions/live/all', adminController.getAllLiveAuctions);
 
+// Add new route for fetching all auctions by seller (admin only)
+router.get('/auctions/by-seller/:sellerId', adminController.getAuctionsBySeller);
+
 // Database health monitoring endpoint
 router.get('/db-health', async (req, res) => {
   try {
