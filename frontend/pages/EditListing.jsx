@@ -320,12 +320,12 @@ function EditListing({ showToast: _showToast }) {
         body: JSON.stringify({
           title,
           description,
-          image_url: finalImageUrl,
-          starting_price: startingPrice,
-          reserve_price: reservePrice,
-          start_time: finalStartTime,
-          end_time: finalEndTime,
-          max_participants: auctionType === "live" ? 50 : undefined
+          imageUrl: finalImageUrl,
+          startingPrice,
+          reservePrice,
+          startTime: finalStartTime,
+          endTime: finalEndTime,
+          maxParticipants: auctionType === "live" ? 50 : undefined
         })
       });
       
