@@ -69,21 +69,6 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
       <div className="flex-1 min-h-0 overflow-y-auto pr-2">
         <div className="flex flex-col items-center mb-6">
           <img src={avatarUrl} alt="avatar" className="w-24 h-24 rounded-full border-2 border-white/30 mb-2" />
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl font-bold text-white">{user.first_name} {user.last_name}</span>
-            {user.role === 'seller' && user.is_approved && (
-              <span className="bg-green-700/80 text-green-200 px-3 py-1 rounded text-xs font-semibold">Approved Seller</span>
-            )}
-            {user.role === 'seller' && !user.is_approved && (
-              <span className="bg-yellow-700/80 text-yellow-200 px-3 py-1 rounded text-xs font-semibold">Pending Seller</span>
-            )}
-            {user.role === 'buyer' && (
-              <span className="bg-blue-700/80 text-blue-200 px-3 py-1 rounded text-xs font-semibold">Buyer</span>
-            )}
-            {user.role === 'admin' && (
-              <span className="bg-purple-700/80 text-purple-200 px-3 py-1 rounded text-xs font-semibold">Admin</span>
-            )}
-          </div>
           <div className="text-gray-300 text-sm mb-2">{user.email}</div>
         </div>
         <div className="max-w-2xl mx-auto flex flex-col gap-2 text-left">
@@ -97,15 +82,18 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
             <option value="seller">Seller</option>
             <option value="admin">Admin</option>
           </select>
-          <div className="flex gap-4 text-sm text-gray-400 mb-2">
-            {user.role === 'buyer' && <span className="px-3 py-1 rounded bg-blue-900/60 text-blue-200 font-semibold">Buyer</span>}
-            {user.role === 'admin' && <span className="px-3 py-1 rounded bg-purple-900/60 text-purple-200 font-semibold">Admin</span>}
-            {user.role === 'seller' && (
-              <>
-                <span className="px-3 py-1 rounded bg-blue-900/60 text-blue-200 font-semibold">Seller</span>
-                <span className={`px-3 py-1 rounded font-semibold ${user.is_approved ? 'bg-green-900/60 text-green-200' : 'bg-yellow-900/60 text-yellow-200'}`}>{user.is_approved ? 'Approved Seller' : 'Pending Seller'}</span>
-              </>
-            )}
+          <div className="flex gap-2 mt-2">
+            {user.role === 'seller' ? (
+              user.is_approved ? (
+                <span className="px-3 py-1 rounded bg-green-900/60 text-green-200 font-semibold text-sm">Approved Seller</span>
+              ) : (
+                <span className="px-3 py-1 rounded bg-yellow-900/60 text-yellow-200 font-semibold text-sm">Pending Seller</span>
+              )
+            ) : user.role === 'buyer' ? (
+              <span className="px-3 py-1 rounded bg-blue-900/60 text-blue-200 font-semibold text-sm">Buyer</span>
+            ) : user.role === 'admin' ? (
+              <span className="px-3 py-1 rounded bg-purple-900/60 text-purple-200 font-semibold text-sm">Admin</span>
+            ) : null}
           </div>
           <hr className="border-white/10 my-4" />
           {user.business_name && <div><b>Business:</b> {user.business_name}</div>}
@@ -202,11 +190,11 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
                 <thead>
                   <tr className="text-left text-gray-300">
                     <th className="p-2 w-16">Image</th>
-                    <th className="p-2 text-left">Title</th>
-                    <th className="p-2">Type</th>
-                    <th className="p-2">Status</th>
-                    <th className="p-2">Price</th>
-                    <th className="p-2">Seller</th>
+                    <th className="p-2 text-center">Title</th>
+                    <th className="p-2 text-center">Type</th>
+                    <th className="p-2 text-center">Status</th>
+                    <th className="p-2 text-center">Price</th>
+                    <th className="p-2 text-center">Seller</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -223,7 +211,7 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
                           <div className="w-12 h-12 flex items-center justify-center bg-black/20 rounded text-gray-400">-</div>
                         )}
                       </td>
-                      <td className="p-2 font-semibold text-white align-middle text-left">{auction.title}</td>
+                      <td className="p-2 font-semibold text-white align-middle text-center">{auction.title}</td>
                       <td className="p-2 align-middle">
                         <span className={`px-2 py-1 rounded font-semibold text-xs ${auction.type === 'live' ? 'bg-red-900/60 text-red-200' : 'bg-blue-900/60 text-blue-200'}`}>{auction.type === 'live' ? 'Live' : 'Settled'}</span>
                       </td>

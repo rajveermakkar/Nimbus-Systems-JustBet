@@ -435,6 +435,11 @@ function AdminDashboard() {
     navigate(`/admin/manage-users/${user.id}`);
   };
   const openAuctionDetails = (auction) => {
+    if (location.pathname.startsWith('/admin/manage-users/')) {
+      fromUserRef.current = location.pathname;
+    } else {
+      fromUserRef.current = null;
+    }
     lastPathRef.current = location.pathname;
     setInlineDetails({ type: 'auction', data: auction });
     navigate(`/admin/manage-auctions/${auction.type}/${auction.id}`);
@@ -443,12 +448,18 @@ function AdminDashboard() {
   // When closing details, revert URL
   const closeDetails = () => {
     setInlineDetails({ type: null, data: null });
-    if (lastPathRef.current) {
-      navigate(lastPathRef.current);
-    } else if (section === 'manage-users') navigate('/admin/manage-users');
-    else if (section === 'approve-users') navigate('/admin/approve-users');
-    else if (section === 'manage-auctions') navigate('/admin/manage-auctions');
-    else navigate('/admin/dashboard');
+    if (section === 'manage-auctions' && fromUserRef.current) {
+      navigate(fromUserRef.current);
+      fromUserRef.current = null;
+    } else if (section === 'manage-auctions') {
+      navigate('/admin/manage-auctions');
+    } else if (section === 'manage-users') {
+      navigate('/admin/manage-users');
+    } else if (section === 'approve-users') {
+      navigate('/admin/approve-users');
+    } else {
+      navigate('/admin/dashboard');
+    }
   };
 
   // Measure main content height and set sidebar height to match
@@ -642,18 +653,20 @@ function AdminDashboard() {
                   <tr>
                     <th className="w-1/4 text-left px-4 py-2 font-bold text-base">Name</th>
                     <th className="w-1/3 text-left px-4 py-2 font-bold text-base">Email</th>
-                    <th className="w-1/6 text-left px-4 py-2 font-bold text-base">Role</th>
-                    <th className="w-32 text-center px-4 py-2 font-bold text-base">Actions</th>
+                    <th className="w-1/6 text-center px-4 py-2 font-bold text-base">Role</th>
+                    <th className="w-24 text-center px-4 py-2 font-bold text-base">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="h-full min-h-0 text-left text-sm">
                   {allUsers.length === 0 ? <tr><td colSpan={4} className="text-center text-gray-400 p-4">No users found</td></tr> : allUsers.map(user => (
                     <tr key={user.id} className="border-b border-white/10">
-                      <td className="p-2"><a href="#" onClick={e => { e.preventDefault(); openUserDetails(user); }}>{user.first_name} {user.last_name}</a></td>
-                      <td className="p-2">{user.email}</td>
-                      <td className="p-2">{user.role}</td>
-                      <td className="p-2 flex gap-2">
-                        <button onClick={() => openUserDetails(user)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                      <td className="p-2 font-semibold text-white align-middle text-left">{user.first_name} {user.last_name}</td>
+                      <td className="p-2 align-middle text-left">{user.email}</td>
+                      <td className="p-2 align-middle text-center">{user.role}</td>
+                      <td className="p-2 align-middle text-center">
+                        <div className="flex justify-center">
+                          <button onClick={() => openUserDetails(user)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -670,8 +683,8 @@ function AdminDashboard() {
                 <thead>
                   <tr>
                     <th className="w-1/4 text-left px-4 py-2 font-bold text-base">Name</th>
-                    <th className="w-1/3 text-left px-4 py-2 font-bold text-base">Email</th>
-                    <th className="w-1/6 text-left px-4 py-2 font-bold text-base">Business</th>
+                    <th className="w-1/3 text-center px-4 py-2 font-bold text-base">Email</th>
+                    <th className="w-1/6 text-center px-4 py-2 font-bold text-base">Business</th>
                     <th className="w-32 text-center px-4 py-2 font-bold text-base">Actions</th>
                   </tr>
                 </thead>
@@ -681,10 +694,10 @@ function AdminDashboard() {
                       <td className="p-2"><a href="#" onClick={e => { e.preventDefault(); openUserDetails(seller); }}>{seller.first_name} {seller.last_name}</a></td>
                       <td className="p-2">{seller.email}</td>
                       <td className="p-2">{seller.business_name}</td>
-                      <td className="p-2 flex gap-2">
-                        <button onClick={() => openUserDetails(seller)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
-                        <button disabled={actionLoading} onClick={() => handleSellerApproval(seller.id, true)} className="bg-green-700 hover:bg-green-800 text-white px-3 py-1 rounded text-xs">Approve</button>
-                        <button disabled={actionLoading} onClick={() => openRejectModal('seller', seller.id)} className="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded text-xs">Reject</button>
+                      <td className="p-2 align-middle text-center">
+                        <div className="flex justify-center">
+                          <button onClick={() => openUserDetails(seller)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -702,38 +715,49 @@ function AdminDashboard() {
         return (
           <div className="flex flex-col flex-1 h-full min-h-0">
             <div className="flex-1 h-full min-h-0 overflow-auto">
+              <div className="mb-4 flex items-center gap-2">
+                <label className="text-gray-300">Filter:</label>
+                <select value={auctionFilter} onChange={e => setAuctionFilter(e.target.value)} className="bg-[#23235b] text-white rounded px-2 py-1 border border-white/10">
+                  <option value="all">All</option>
+                  <option value="approved">Approved</option>
+                  <option value="closed">Closed</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
               <table className="table-fixed w-full bg-transparent rounded-xl overflow-hidden text-sm">
                 <thead>
                   <tr>
-                    <th className="w-1/4 text-left px-3 py-1 font-bold">Title</th>
-                    <th className="w-1/5 text-left px-3 py-1 font-bold">Type</th>
-                    <th className="w-1/6 text-center px-3 py-1 font-bold">Status</th>
-                    <th className="w-32 text-center px-3 py-1 font-bold">Seller</th>
-                    <th className="w-1/4 text-left px-6 py-3 font-bold text-lg">Title</th>
-                    <th className="w-1/3 text-left px-6 py-3 font-bold text-lg">Type</th>
-                    <th className="w-1/6 text-center px-6 py-3 font-bold text-lg">Status</th>
-                    <th className="w-32 text-center px-6 py-3 font-bold text-lg">Seller</th>
-                    <th className="w-1/4 text-center px-6 py-3 font-bold text-lg">Start</th>
-                    <th className="w-1/4 text-center px-6 py-3 font-bold text-lg">End</th>
+                    <th className="w-1/9 text-left px-3 py-1 font-bold">Title</th>
+                    <th className="w-1/8 text-center px-3 py-1 font-bold ">Type</th>
+                    <th className="w-1/8 text-center px-3 py-1 font-bold">Status</th>
+                    <th className="w-26 text-center px-3 py-1 font-bold">Seller</th>
+
+                    <th className="w-1/8 text-center px-6 py-3 font-bold text-lg">Start</th>
+                    <th className="w-1/8 text-center px-6 py-3 font-bold text-lg">End</th>
                     <th className="w-32 text-center px-6 py-3 font-bold text-lg">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="h-full min-h-0">
+                <tbody className="h-full min-h-0 text-sm">
                   {filteredAuctions.length === 0 ? <tr><td colSpan={7} className="text-center text-gray-400 p-4">No auctions found</td></tr> : filteredAuctions.map(auction => (
                     <tr key={auction.id} className="border-b border-white/10">
-                      <td className="p-2"><a href="#" onClick={e => { e.preventDefault(); openAuctionDetails(auction); }}>{auction.title}</a></td>
-                      <td className="p-2">{auction.type === 'live' ? 'Live' : 'Settled'}</td>
-                      <td className="p-2">{auction.status || auction.auction_status}</td>
-                      <td className="p-2">{auction.seller?.first_name} {auction.seller?.last_name}</td>
+                      <td className="p-2 font-semibold text-white align-middle text-left">{auction.title}</td>
+                      <td className="p-2 align-middle text-center">{auction.type === 'live' ? 'Live' : 'Settled'}</td>
+                      <td className="p-2 align-middle text-center">{auction.status || auction.auction_status}</td>
+                      <td className="p-2 align-middle text-center">{auction.seller?.first_name} {auction.seller?.last_name}</td>
                       <td className="p-2">{new Date(auction.start_time).toLocaleString()}</td>
                       <td className="p-2">{new Date(auction.end_time).toLocaleString()}</td>
                       <td className="p-2 flex gap-2">
-                        <button onClick={() => openAuctionDetails(auction)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
-                        {(auction.status === 'pending' || auction.auction_status === 'pending') && (
-                          <button disabled={actionLoading} onClick={() => openApproveModal(auction.type, auction.id)} className="bg-green-700 hover:bg-green-800 text-white px-3 py-1 rounded text-xs">Approve</button>
-                        )}
-                        {(auction.status === 'pending' || auction.auction_status === 'pending') && (
-                          <button disabled={actionLoading} onClick={() => openRejectModal(auction.type, auction.id)} className="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded text-xs">Reject</button>
+                        {(auction.status === 'pending' || auction.auction_status === 'pending') ? (
+                          <div className="flex gap-2 justify-center">
+                            <button onClick={() => openAuctionDetails(auction)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                            <button disabled={actionLoading} onClick={() => openApproveModal(auction.type, auction.id)} className="bg-green-700 hover:bg-green-800 text-white px-3 py-1 rounded text-xs">Approve</button>
+                            <button disabled={actionLoading} onClick={() => openRejectModal(auction.type, auction.id)} className="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded text-xs">Reject</button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-center">
+                            <button onClick={() => openAuctionDetails(auction)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -871,6 +895,7 @@ function AdminDashboard() {
 
   // Add at the top of AdminDashboard (after other refs):
   const lastPathRef = useRef(location.pathname);
+  const fromUserRef = useRef(null);
 
   return (
     <div className={`w-full bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] flex items-center justify-center py-6 px-2 transition-opacity duration-300 ${isLoggingOut ? 'opacity-0' : 'opacity-100'}`}>
