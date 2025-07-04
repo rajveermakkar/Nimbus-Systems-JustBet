@@ -712,7 +712,10 @@ function AdminDashboard() {
   const handleLogout = async () => {
     try {
       await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/logout`, {}, { withCredentials: true });
-    } catch (e) {}
+      showToast("Logged out successfully!", "success");
+    } catch (e) {
+      showToast("Logged out successfully!", "success");
+    }
     localStorage.removeItem("justbetToken");
     localStorage.removeItem("justbetUser");
     setUser(null);
