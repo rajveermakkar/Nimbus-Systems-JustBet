@@ -260,6 +260,58 @@ const adminController = {
     } catch (error) {
       res.status(500).json({ error: 'Error fetching all live auctions' });
     }
+  },
+
+  // Get all auctions (live and settled) for a specific seller (admin only)
+  async getAuctionsBySeller(req, res) {
+    try {
+      const { sellerId } = req.params;
+      // First check if seller exists
+      const seller = await User.findById(sellerId);
+      if (!seller) {
+        return res.status(404).json({ error: 'Seller not found' });
+      }
+      // Fetch settled auctions for seller
+      const settledAuctions = await SettledAuction.findBySeller(sellerId);
+      // Fetch live auctions for seller
+      const liveAuctions = await LiveAuction.findBySeller(sellerId);
+      const { pool } = require('../db/init');
+      const attachSellerAndWinner = async (auction, type) => {
+        let winner = null;
+        if (auction.status === 'closed' && auction.current_highest_bidder_id) {
+          const winnerQuery = 'SELECT id, first_name, last_name, email FROM users WHERE id = $1';
+          const winnerResult = await pool.query(winnerQuery, [auction.current_highest_bidder_id]);
+          winner = winnerResult.rows[0] || null;
+        }
+        return {
+          ...auction,
+          seller: {
+            id: seller.id,
+            first_name: seller.first_name,
+            last_name: seller.last_name,
+            email: seller.email,
+            business_name: seller.business_name
+          },
+          winner,
+          type
+        };
+      };
+      const settledWithSeller = await Promise.all(settledAuctions.map(a => attachSellerAndWinner(a, 'settled')));
+      const liveWithSeller = await Promise.all(liveAuctions.map(a => attachSellerAndWinner(a, 'live')));
+      res.json({
+        auctions: [...settledWithSeller, ...liveWithSeller],
+        seller: {
+          id: seller.id,
+          first_name: seller.first_name,
+          last_name: seller.last_name,
+          email: seller.email,
+          business_name: seller.business_name
+        }
+      });
+    } catch (error) {
+      console.error('Error in getAuctionsBySeller:', error);
+      res.status(500).json({ error: 'Error fetching auctions for seller' });
+    }
   }
 };
 
