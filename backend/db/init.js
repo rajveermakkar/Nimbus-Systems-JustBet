@@ -521,6 +521,30 @@ const initDatabase = async () => {
     // Add rejection fields to auction tables if they don't exist
     await updateAuctionTablesWithRejectionFields();
     
+    // Create user_bans table if it doesn't exist
+    const userBansTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'user_bans'
+      );
+    `);
+    if (!userBansTableCheck.rows[0].exists) {
+      await pool.query(`
+        CREATE TABLE user_bans (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id),
+          admin_id UUID NOT NULL REFERENCES users(id),
+          reason TEXT NOT NULL,
+          ban_type VARCHAR(50) DEFAULT 'global',
+          issued_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP WITH TIME ZONE,
+          lifted_at TIMESTAMP WITH TIME ZONE,
+          lifted_by UUID REFERENCES users(id),
+          is_active BOOLEAN NOT NULL DEFAULT true
+        );
+      `);
+    }
+    
     console.log('Database initialization complete!');
   } catch (error) {
     console.error('Error initializing database:', error);

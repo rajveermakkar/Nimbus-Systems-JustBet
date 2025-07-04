@@ -160,6 +160,96 @@ const User = {
     return parseInt(result.rows[0].count, 10);
   },
 
+  // Get active ban for a user
+  async getActiveBan(userId) {
+    const query = `SELECT * FROM user_bans WHERE user_id = $1 AND is_active = true AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY issued_at DESC LIMIT 1`;
+    const result = await queryWithRetry(query, [userId]);
+    return result.rows[0];
+  },
+
+  // Count previous bans for progressive logic
+  async countPreviousBans(userId) {
+    const query = `SELECT COUNT(*) FROM user_bans WHERE user_id = $1`;
+    const result = await queryWithRetry(query, [userId]);
+    return parseInt(result.rows[0].count, 10);
+  },
+
+  // Progressive ban logic using user_bans table
+  async banUser(userId, adminId, reason) {
+    const previousBans = await this.countPreviousBans(userId);
+    let expiresAt = null;
+    if (previousBans === 0) {
+      expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 1 week
+    } else if (previousBans === 1) {
+      expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    } // 2+ is permanent (expiresAt stays null)
+    const query = `
+      INSERT INTO user_bans (user_id, admin_id, reason, expires_at)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `;
+    const result = await queryWithRetry(query, [userId, adminId, reason, expiresAt]);
+    return result.rows[0];
+  },
+
+  // Unban user (set is_active = false, lifted_at, lifted_by)
+  async unbanUser(userId, adminId) {
+    const activeBan = await this.getActiveBan(userId);
+    if (!activeBan) throw new Error('No active ban to lift.');
+    if (!activeBan.expires_at) throw new Error('Cannot unban a permanently banned user.');
+    const query = `
+      UPDATE user_bans
+      SET is_active = false, lifted_at = NOW(), lifted_by = $1
+      WHERE id = $2
+      RETURNING *
+    `;
+    const result = await queryWithRetry(query, [adminId, activeBan.id]);
+    return result.rows[0];
+  },
+
+  // Get ban history for a user
+  async getBanHistory(userId) {
+    const query = `
+      SELECT 
+        ub.*,
+        admin.first_name as admin_first_name,
+        admin.last_name as admin_last_name,
+        lifted_admin.first_name as lifted_by_first_name,
+        lifted_admin.last_name as lifted_by_last_name
+      FROM user_bans ub
+      LEFT JOIN users admin ON ub.admin_id = admin.id
+      LEFT JOIN users lifted_admin ON ub.lifted_by = lifted_admin.id
+      WHERE ub.user_id = $1
+      ORDER BY ub.issued_at DESC
+    `;
+    const result = await queryWithRetry(query, [userId]);
+    return result.rows;
+  },
+
+  // Get ban statistics for admin dashboard
+  async getBanStats() {
+    // Total bans
+    const totalBansRes = await queryWithRetry('SELECT COUNT(*) FROM user_bans');
+    // Active bans
+    const activeBansRes = await queryWithRetry('SELECT COUNT(*) FROM user_bans WHERE is_active = true AND (expires_at IS NULL OR expires_at > NOW())');
+    // Permanent bans
+    const permanentBansRes = await queryWithRetry('SELECT COUNT(*) FROM user_bans WHERE is_active = true AND expires_at IS NULL');
+    // Bans in last 7 days
+    const last7DaysRes = await queryWithRetry(`SELECT COUNT(*) FROM user_bans WHERE issued_at >= NOW() - INTERVAL '7 days'`);
+    // Bans in last 30 days
+    const last30DaysRes = await queryWithRetry(`SELECT COUNT(*) FROM user_bans WHERE issued_at >= NOW() - INTERVAL '30 days'`);
+    // Most common reasons
+    const commonReasonsRes = await queryWithRetry(`SELECT reason, COUNT(*) as count FROM user_bans GROUP BY reason ORDER BY count DESC LIMIT 5`);
+    return {
+      totalBans: parseInt(totalBansRes.rows[0].count, 10),
+      activeBans: parseInt(activeBansRes.rows[0].count, 10),
+      permanentBans: parseInt(permanentBansRes.rows[0].count, 10),
+      bansLast7Days: parseInt(last7DaysRes.rows[0].count, 10),
+      bansLast30Days: parseInt(last30DaysRes.rows[0].count, 10),
+      mostCommonReasons: commonReasonsRes.rows
+    };
+  },
+
   // Get all users
   async getAll() {
     const result = await queryWithRetry('SELECT * FROM users ORDER BY created_at DESC');

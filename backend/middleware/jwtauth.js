@@ -25,6 +25,17 @@ const jwtauthMiddleware = async (req, res, next) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Ban logic: block banned users, auto-unban if ban expired
+    const activeBan = await User.getActiveBan(user.id);
+    if (activeBan) {
+      if (activeBan.expires_at && new Date(activeBan.expires_at) < new Date()) {
+        // Auto-unban if temporary ban expired
+        await User.unbanUser(user.id, user.id); // self-unban (system)
+      } else {
+        return res.status(403).json({ error: activeBan.expires_at ? `User is banned until ${activeBan.expires_at}` : 'User is permanently banned.' });
+      }
+    }
+
     // Add user info to request with current role and approval status
     req.user = {
       ...decoded,
