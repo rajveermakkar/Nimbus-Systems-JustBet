@@ -92,6 +92,9 @@ function AdminDashboard() {
     setToast({ show: false, message: '', type: 'info' });
   };
 
+  // --- LOGOUT TRANSITION ---
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   // --- API HELPERS ---
   const api = axios.create({
     baseURL: import.meta.env.VITE_BACKEND_URL + "/api",
@@ -712,14 +715,14 @@ function AdminDashboard() {
   const handleLogout = async () => {
     try {
       await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/logout`, {}, { withCredentials: true });
-      showToast("Logged out successfully!", "success");
-    } catch (e) {
-      showToast("Logged out successfully!", "success");
-    }
+    } catch (e) {}
     localStorage.removeItem("justbetToken");
     localStorage.removeItem("justbetUser");
     setUser(null);
-    navigate("/login");
+    sessionStorage.setItem("showLogoutSuccess", "true");
+    setTimeout(() => {
+      navigate("/login");
+    }, 500);
   };
 
   // --- MODAL FOR APPROVING AUCTION ---
@@ -777,7 +780,7 @@ function AdminDashboard() {
           onClose={handleToastClose}
         />
       )}
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] flex items-center justify-center py-6 px-2">
+    <div className={`min-h-screen w-full bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] flex items-center justify-center py-6 px-2 transition-opacity duration-300 ${isLoggingOut ? 'opacity-0' : 'opacity-100'}`}>
       <div className="w-full max-w-7xl flex overflow-hidden rounded-2xl" style={{height: mainHeight ? mainHeight : 'auto'}}>
         {/* Sidebar */}
         <aside className="w-64 bg-[#181c2f]/80 backdrop-blur-md border-r border-white/10 flex flex-col py-8 px-6 text-white rounded-l-2xl" style={{height: mainHeight ? mainHeight : 'auto'}}>

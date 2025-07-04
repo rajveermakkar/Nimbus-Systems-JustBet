@@ -47,6 +47,15 @@ function Login({ showToast }) {
     }
   }, [location.state, showToast]);
 
+  // Show logout success toast if user just logged out
+  useEffect(() => {
+    const showLogoutSuccess = sessionStorage.getItem("showLogoutSuccess");
+    if (showLogoutSuccess) {
+      sessionStorage.removeItem("showLogoutSuccess");
+      showToast && showToast("Logged out successfully!", "success");
+    }
+  }, [showToast]);
+
   // Redirect if already logged in
   useEffect(() => {
     if (user && user.token && !hasRedirected.current) {
