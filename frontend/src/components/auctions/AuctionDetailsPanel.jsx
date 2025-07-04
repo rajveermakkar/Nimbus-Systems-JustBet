@@ -1,6 +1,7 @@
 import React from 'react';
+import LoadingSpinner from '../LoadingSpinner';
 
-function AuctionDetailsPanel({ auction, onViewSeller, onBack, onUserClick }) {
+function AuctionDetailsPanel({ auction, onViewSeller, onBack, onUserClick, winnerLoading }) {
   if (!auction) return null;
   // Winner info
   const winner = auction.winner;
@@ -49,7 +50,9 @@ function AuctionDetailsPanel({ auction, onViewSeller, onBack, onUserClick }) {
             </div>
             {/* Winner Details */}
             <hr className="border-white/10 my-2" />
-            {winner ? (
+            {winnerLoading ? (
+              <LoadingSpinner />
+            ) : winner ? (
               <div className="bg-green-900/30 rounded-lg p-4 mt-2">
                 <div className="font-semibold text-green-300 mb-1">Winner:</div>
                 <div className="text-white">

@@ -6,14 +6,7 @@ import { ConfirmModal } from "../src/components/SessionExpiryModal";
 import Toast from "../src/components/Toast";
 import UserDetailsPanel from '../src/components/UserDetailsPanel';
 import AuctionDetailsPanel from '../src/components/auctions/AuctionDetailsPanel';
-
-function LoadingSpinner() {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-    </div>
-  );
-}
+import LoadingSpinner from '../src/components/LoadingSpinner';
 
 function AdminDashboard() {
   const { user, setUser } = useContext(UserContext);
@@ -504,14 +497,15 @@ function AdminDashboard() {
 
   // Add at the top of AdminDashboard (after other useState):
   const [auctionWinner, setAuctionWinner] = useState(null);
+  const [winnerLoading, setWinnerLoading] = useState(false);
 
   // Fetch winner info when viewing auction details
   useEffect(() => {
-    // Only run when viewing auction details
     if (section === 'manage-auctions' && type && auctionId) {
       const auctionList = type === 'live' ? allLiveAuctions : allSettledAuctions;
       const auction = auctionList.find(a => String(a.id) === String(auctionId));
       if (auction && !auction.winner && (auction.status === 'closed' || auction.status === 'approved')) {
+        setWinnerLoading(true);
         const url = type === 'live'
           ? `${import.meta.env.VITE_BACKEND_URL}/api/auctions/live/${auction.id}/result`
           : `${import.meta.env.VITE_BACKEND_URL}/api/auctions/settled/${auction.id}/result`;
@@ -524,14 +518,18 @@ function AdminDashboard() {
               setAuctionWinner(null);
             }
           })
-          .catch(() => setAuctionWinner(null));
+          .catch(() => setAuctionWinner(null))
+          .finally(() => setWinnerLoading(false));
       } else if (auction && auction.winner) {
         setAuctionWinner(auction.winner);
+        setWinnerLoading(false);
       } else {
         setAuctionWinner(null);
+        setWinnerLoading(false);
       }
     } else {
       setAuctionWinner(null);
+      setWinnerLoading(false);
     }
   }, [section, type, auctionId, allLiveAuctions, allSettledAuctions]);
 
@@ -565,6 +563,7 @@ function AdminDashboard() {
             onBack={closeDetails}
             onViewSeller={openUserDetails}
             onUserClick={openUserDetails}
+            winnerLoading={winnerLoading}
           />
         );
       }
@@ -747,7 +746,7 @@ function AdminDashboard() {
                       <td className="p-2 align-middle text-center">{auction.seller?.first_name} {auction.seller?.last_name}</td>
                       <td className="p-2">{new Date(auction.start_time).toLocaleString()}</td>
                       <td className="p-2">{new Date(auction.end_time).toLocaleString()}</td>
-                      <td className="p-2 flex gap-2">
+                      <td className="p-2">
                         {(auction.status === 'pending' || auction.auction_status === 'pending') ? (
                           <div className="flex gap-2 justify-center">
                             <button onClick={() => openAuctionDetails(auction)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
@@ -755,9 +754,7 @@ function AdminDashboard() {
                             <button disabled={actionLoading} onClick={() => openRejectModal(auction.type, auction.id)} className="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded text-xs">Reject</button>
                           </div>
                         ) : (
-                          <div className="flex justify-center">
-                            <button onClick={() => openAuctionDetails(auction)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
-                          </div>
+                          <button onClick={() => openAuctionDetails(auction)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
                         )}
                       </td>
                     </tr>
