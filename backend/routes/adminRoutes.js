@@ -32,6 +32,7 @@ router.patch('/auctions/settled/:id/reject', adminController.rejectSettledAuctio
 // Get stats (total users and listings)
 router.get('/stats', adminController.getStats);
 
+<<<<<<< HEAD
 // Ban/unban user (Admin Only)
 router.post('/users/:userId/ban', adminController.banUser);
 router.post('/users/:userId/unban', adminController.unbanUser);
@@ -39,5 +40,34 @@ router.get('/users/:userId/ban-history', adminController.getUserBanHistory);
 
 // Ban statistics endpoint for admin dashboard
 router.get('/ban-stats', adminController.banStats);
+=======
+// Get all users (admin only)
+router.get('/users', adminController.getAllUsers);
+
+// Get all settled auctions (admin only)
+router.get('/auctions/settled/all', adminController.getAllSettledAuctions);
+// Get all live auctions (admin only)
+router.get('/auctions/live/all', adminController.getAllLiveAuctions);
+
+// Database health monitoring endpoint
+router.get('/db-health', async (req, res) => {
+  try {
+    const dbMonitor = require('../utils/dbMonitor');
+    const metrics = await dbMonitor.getPerformanceMetrics();
+    
+    res.json({
+      success: true,
+      data: metrics
+    });
+  } catch (error) {
+    console.error('Database health check error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check database health',
+      details: error.message
+    });
+  }
+});
+>>>>>>> ac7dbc3292c3f05d2a0f02afa3a59395e27310aa
 
 module.exports = router; 
