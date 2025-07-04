@@ -96,6 +96,12 @@ function AdminDashboard() {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [approveTarget, setApproveTarget] = useState(null); // {type, id}
 
+  // --- MODAL FOR APPROVING/REJECTING SELLERS ---
+  const [showSellerApproveModal, setShowSellerApproveModal] = useState(false);
+  const [showSellerRejectModal, setShowSellerRejectModal] = useState(false);
+  const [sellerTarget, setSellerTarget] = useState(null); // {id, name}
+  const [sellerRejectionReason, setSellerRejectionReason] = useState("");
+
   // --- TOAST NOTIFICATIONS ---
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
 
@@ -495,6 +501,37 @@ function AdminDashboard() {
     closeApproveModal();
   };
 
+  // --- MODAL FOR APPROVING/REJECTING SELLERS ---
+  const openSellerApproveModal = (seller) => {
+    setSellerTarget({ id: seller.id, name: `${seller.first_name} ${seller.last_name}` });
+    setShowSellerApproveModal(true);
+  };
+  const closeSellerApproveModal = () => {
+    setShowSellerApproveModal(false);
+    setSellerTarget(null);
+  };
+  const handleSellerApproveConfirm = async () => {
+    if (!sellerTarget) return;
+    await handleSellerApproval(sellerTarget.id, true);
+    closeSellerApproveModal();
+  };
+
+  const openSellerRejectModal = (seller) => {
+    setSellerTarget({ id: seller.id, name: `${seller.first_name} ${seller.last_name}` });
+    setSellerRejectionReason("");
+    setShowSellerRejectModal(true);
+  };
+  const closeSellerRejectModal = () => {
+    setShowSellerRejectModal(false);
+    setSellerTarget(null);
+    setSellerRejectionReason("");
+  };
+  const handleSellerRejectConfirm = async () => {
+    if (!sellerTarget || !sellerRejectionReason.trim()) return;
+    await handleSellerApproval(sellerTarget.id, false);
+    closeSellerRejectModal();
+  };
+
   // Add at the top of AdminDashboard (after other useState):
   const [auctionWinner, setAuctionWinner] = useState(null);
   const [winnerLoading, setWinnerLoading] = useState(false);
@@ -694,8 +731,10 @@ function AdminDashboard() {
                       <td className="p-2">{seller.email}</td>
                       <td className="p-2">{seller.business_name}</td>
                       <td className="p-2 align-middle text-center">
-                        <div className="flex justify-center">
+                        <div className="flex gap-2 justify-center">
                           <button onClick={() => openUserDetails(seller)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                          <button disabled={actionLoading} onClick={() => openSellerApproveModal(seller)} className="bg-green-700 hover:bg-green-800 text-white px-3 py-1 rounded text-xs">Approve</button>
+                          <button disabled={actionLoading} onClick={() => openSellerRejectModal(seller)} className="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded text-xs">Reject</button>
                         </div>
                       </td>
                     </tr>
@@ -924,6 +963,82 @@ function AdminDashboard() {
           {renderSection()}
         </main>
       </div>
+
+      {/* Approve Auction Modal */}
+      {showApproveModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#23235b] rounded-xl p-6 max-w-md w-full mx-4 border border-white/10">
+            <h3 className="text-xl font-bold mb-4 text-white">Approve Auction</h3>
+            <p className="text-gray-300 mb-6">Are you sure you want to approve this auction?</p>
+            <div className="flex gap-3">
+              <button onClick={closeApproveModal} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded">Cancel</button>
+              <button onClick={handleApproveConfirm} disabled={actionLoading} className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white py-2 rounded">Approve</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve Seller Modal */}
+      {showSellerApproveModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#23235b] rounded-xl p-6 max-w-md w-full mx-4 border border-white/10">
+            <h3 className="text-xl font-bold mb-4 text-white">Approve Seller</h3>
+            <p className="text-gray-300 mb-6">Are you sure you want to approve <span className="font-semibold text-white">{sellerTarget?.name}</span> as a seller?</p>
+            <div className="flex gap-3">
+              <button onClick={closeSellerApproveModal} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded">Cancel</button>
+              <button onClick={handleSellerApproveConfirm} disabled={actionLoading} className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white py-2 rounded">Approve</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Seller Modal */}
+      {showSellerRejectModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#23235b] rounded-xl p-6 max-w-md w-full mx-4 border border-white/10">
+            <h3 className="text-xl font-bold mb-4 text-white">Reject Seller</h3>
+            <p className="text-gray-300 mb-4">Are you sure you want to reject <span className="font-semibold text-white">{sellerTarget?.name}</span> as a seller?</p>
+            <div className="mb-4">
+              <label className="block text-gray-300 text-sm mb-2">Reason for rejection:</label>
+              <textarea
+                value={sellerRejectionReason}
+                onChange={(e) => setSellerRejectionReason(e.target.value)}
+                className="w-full bg-[#181c2f] border border-white/10 rounded px-3 py-2 text-white placeholder-gray-400 resize-none"
+                rows="3"
+                placeholder="Enter reason for rejection..."
+              />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={closeSellerRejectModal} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded">Cancel</button>
+              <button onClick={handleSellerRejectConfirm} disabled={actionLoading || !sellerRejectionReason.trim()} className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white py-2 rounded">Reject</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#23235b] rounded-xl p-6 max-w-md w-full mx-4 border border-white/10">
+            <h3 className="text-xl font-bold mb-4 text-white">Reject Auction</h3>
+            <p className="text-gray-300 mb-6">Are you sure you want to reject this auction?</p>
+            <div className="mb-4">
+              <label className="block text-gray-300 text-sm mb-2">Reason for rejection:</label>
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="w-full bg-[#181c2f] border border-white/10 rounded px-3 py-2 text-white placeholder-gray-400 resize-none"
+                rows="3"
+                placeholder="Enter reason for rejection..."
+              />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={closeRejectModal} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded">Cancel</button>
+              <button onClick={handleRejectConfirm} disabled={actionLoading || !rejectionReason.trim()} className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white py-2 rounded">Reject</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
