@@ -1,213 +1,129 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { UserContext } from '../src/context/UserContext';
+import React, { useEffect, useState } from 'react';
 import Button from '../src/components/Button';
 import Toast from '../src/components/Toast';
+import { useNavigate } from 'react-router-dom';
+import apiService from '../src/services/apiService';
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const STATUS_LABELS = {
+  under_process: 'Under Process',
+  shipped: 'Shipped',
+  delivered: 'Delivered'
+};
 
 function MyWinnings() {
-  const navigate = useNavigate();
-  const { user } = useContext(UserContext);
   const [winnings, setWinnings] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchWinningsAndOrders();
+  }, []);
+
+  async function fetchWinningsAndOrders() {
+    setLoading(true);
+    try {
+      // Fetch all winnings
+      const winningsData = await apiService.get('/api/auth/winnings');
+      const winningsArr = Array.isArray(winningsData.winnings) ? winningsData.winnings : [];
+      setWinnings(winningsArr);
+      // Fetch all orders for this user
+      const ordersArr = await apiService.get('/api/orders/winner');
+      setOrders(Array.isArray(ordersArr) ? ordersArr : []);
+    } catch (err) {
+      setToast({ show: true, message: 'Failed to load winnings', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Map orders by auction_id for quick lookup
+  const ordersByAuction = {};
+  for (const order of orders) {
+    ordersByAuction[order.auction_id] = order;
+  }
 
   // Format price
   const formatPrice = (price) => {
+    if (!price && price !== 0) return '-';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
     }).format(price);
   };
 
-  // Format date
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Fetch winnings
-  const fetchWinnings = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch(`${backendUrl}/api/auth/winnings`, {
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch winnings');
-      }
-
-      const data = await response.json();
-      setWinnings(data.winnings || []);
-    } catch (err) {
-      setError('Failed to load winnings. Please try again.');
-      console.error('Error fetching winnings:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user && user.token) {
-      fetchWinnings();
-    }
-  }, [user]);
-
-  const handleToastClose = () => {
-    setToast({ show: false, message: '', type: 'info' });
-  };
-
-  const handleViewAuction = (winning) => {
-    if (winning.status === "closed" || winning.status === "ended") {
-      navigate(`/ended-auction/${winning.auction_id}`, {
-        state: { fromMyWinnings: true, auctionType: winning.auction_type || 'settled' }
-      });
-    } else {
-      navigate(`/auction/${winning.auction_type}/${winning.auction_id}`);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-sm">Loading your winnings...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <>
+    <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white py-8">
       {toast.show && (
         <Toast
           message={toast.message}
           type={toast.type}
-          onClose={handleToastClose}
           duration={3000}
+          onClose={() => setToast(t => ({ ...t, show: false }))}
         />
       )}
-      
-      <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white py-6">
-        <div className="max-w-6xl mx-auto px-4">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">🏆 My Winnings</h1>
-            <p className="text-gray-300">Auctions you've won</p>
-          </div>
-
-          {error && (
-            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-6 text-center">
-              <p className="text-red-400">{error}</p>
-              <Button 
-                onClick={fetchWinnings}
-                className="mt-2"
-              >
-                Try Again
-              </Button>
-            </div>
-          )}
-
-          {winnings.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🎯</div>
-              <h2 className="text-xl font-semibold mb-2">No Winnings Yet</h2>
-              <p className="text-gray-400 mb-6">You haven't won any auctions yet. Start bidding to win!</p>
-              <div className="flex gap-4 justify-center">
-                <Button onClick={() => navigate('/live-auctions')}>
-                  Browse Live Auctions
-                </Button>
-                <Button onClick={() => navigate('/auctions')}>
-                  Browse Settled Auctions
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {winnings.map((winning) => (
-                <div 
-                  key={`${winning.auction_type}-${winning.auction_id}`}
-                  className="bg-white/10 rounded-lg p-4 hover:bg-white/15 transition-colors"
+      <div className="w-full max-w-5xl mx-auto">
+        <h2 className="text-3xl font-bold mb-8 text-center">My Winnings</h2>
+        {loading ? (
+          <div className="text-center py-8">Loading...</div>
+        ) : winnings.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">You have not won any auctions yet.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {winnings.map(win => {
+              const order = ordersByAuction[win.auction_id];
+              let buttonLabel = 'Enter Shipping Details';
+              if (order) {
+                if (order.status === 'shipped' || order.status === 'delivered') {
+                  buttonLabel = 'View Order Status';
+                } else if (order.status === 'under_process') {
+                  buttonLabel = 'View/Update Shipping';
+                }
+              }
+              return (
+                <div
+                  key={win.auction_id}
+                  className="backdrop-blur-md bg-white/10 rounded-2xl shadow-lg p-0 flex flex-col overflow-hidden hover:scale-[1.025] transition-transform duration-200 relative"
                 >
-                  {/* Auction Image */}
-                  <div className="mb-4 h-48 bg-white/5 rounded-lg flex items-center justify-center overflow-hidden">
-                    {winning.image_url ? (
+                  {win.image_url && (
+                    <div className="relative w-full h-48">
                       <img
-                        src={winning.image_url}
-                        alt={winning.title}
-                        className="w-full h-full object-cover"
+                        src={win.image_url}
+                        alt={win.title}
+                        className="w-full h-48 object-cover object-center bg-[#23235b]"
                       />
-                    ) : (
-                      <i className="fa-solid fa-image text-gray-400 text-4xl"></i>
-                    )}
-                  </div>
-
-                  {/* Auction Info */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-lg line-clamp-2 flex-1">{winning.title}</h3>
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        winning.auction_type === 'live'
-                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                          : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      }`}>
-                        {winning.auction_type}
+                      <span
+                        className={`absolute top-2 left-2 px-2 py-1 rounded font-semibold text-xs ${win.auction_type === 'live' ? 'bg-red-900/60 text-red-200' : 'bg-blue-900/60 text-blue-200'}`}
+                        title={win.auction_type === 'live' ? 'Live Auction' : 'Settled Auction'}
+                      >
+                        {win.auction_type === 'live' ? 'Live' : 'Settled'}
                       </span>
                     </div>
-                    <div className="text-sm text-gray-300">
-                      <p>Seller: <span className="text-white">{
-                        winning.seller
-                          ? `${winning.seller.first_name} ${winning.seller.last_name}${winning.seller.business_name ? ` (${winning.seller.business_name})` : ''}`
-                          : 'Unknown'
-                      }</span></p>
-                      <p>Ended: <span className="text-white">{formatDate(winning.end_time)}</span></p>
-                    </div>
-
-                    {/* Price Info */}
-                    <div className="bg-green-900/20 border border-green-500/30 rounded p-3">
-                      <div className="text-center">
-                        <p className="text-sm text-gray-300">Your Winning Bid</p>
-                        <p className="text-xl font-bold text-green-400">{formatPrice(winning.final_bid)}</p>
-                        <p className="text-xs text-gray-400">Starting: {formatPrice(winning.starting_price)}</p>
+                  )}
+                  <div className="flex-1 flex flex-col p-6 gap-2">
+                    <div className="font-bold text-xl mb-1 truncate" title={win.title}>{win.title}</div>
+                    <div className="text-gray-300 text-sm mb-1">Seller: <span className="text-white font-semibold">{win.seller_name}</span></div>
+                    <div className="text-gray-300 text-sm mb-1">End Time: <span className="text-white">{new Date(win.end_time).toLocaleString()}</span></div>
+                    <div className="text-gray-300 text-sm mb-1">Winning Bid: <span className="text-green-400 font-bold">{formatPrice(win.final_bid)}</span></div>
+                    {order && (
+                      <div className="text-gray-300 text-xs mb-1">
+                        <span className="font-semibold text-white">Shipping:</span> {order.shipping_address}, {order.shipping_city}, {order.shipping_state}, {order.shipping_postal_code}, {order.shipping_country}
                       </div>
+                    )}
+                    <div className="text-gray-300 text-sm mb-1">Status: <span className="font-bold text-white">{order ? (STATUS_LABELS[order.status] || order.status) : 'Not Claimed'}</span></div>
+                    <div className="flex justify-center mt-4">
+                      <Button className="w-fit" onClick={() => navigate(`/winning/${win.auction_id}`, { state: { auctionType: win.auction_type } })}>{buttonLabel}</Button>
                     </div>
-
-                    {/* Action Button */}
-                    <Button
-                      onClick={() => handleViewAuction(winning)}
-                      className="w-full"
-                    >
-                      View Auction Details
-                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Back Button */}
-          <div className="text-center mt-8">
-            <Button onClick={() => navigate('/dashboard')}>
-              Back to Dashboard
-            </Button>
+              );
+            })}
           </div>
-        </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 

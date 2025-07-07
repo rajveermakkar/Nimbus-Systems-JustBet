@@ -18,9 +18,9 @@ const pool = new Pool({
   allowExitOnIdle: true, // Allow the pool to exit when idle
 });
 
-// Helper to log pool stats
-function logPoolStats(context = '') {
-  console.log(`[POOL STATS${context ? ' - ' + context : ''}] total: ${pool.totalCount}, idle: ${pool.idleCount}, waiting: ${pool.waitingCount}`);
+// Helper to log database changes
+function logDbChange(message) {
+  console.log(`[DB CHANGE] ${message}`);
 }
 
 // Add error handling to prevent crashes
@@ -42,7 +42,6 @@ const queryWithRetry = async (text, params, maxRetries = 3) => {
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      logPoolStats('queryWithRetry');
       return await pool.query(text, params);
     } catch (error) {
       lastError = error;
@@ -77,7 +76,6 @@ module.exports.queryWithRetry = queryWithRetry;
 // Add connection health check
 const testConnection = async () => {
   try {
-    logPoolStats('testConnection');
     const result = await queryWithRetry('SELECT 1 as test');
     console.log('Database connection test successful');
     return true;
@@ -106,6 +104,7 @@ const updateUsersTable = async () => {
     `);
 
     if (isVerifiedCheck.rows.length === 0) {
+      logDbChange('Adding verification columns to users table');
       await pool.query(`
         ALTER TABLE users 
         ADD COLUMN is_verified BOOLEAN NOT NULL DEFAULT false,
@@ -122,6 +121,7 @@ const updateUsersTable = async () => {
     `);
 
     if (resetTokenCheck.rows.length === 0) {
+      logDbChange('Adding reset token columns to users table');
       await pool.query(`
         ALTER TABLE users 
         ADD COLUMN reset_token UUID,
@@ -137,6 +137,7 @@ const updateUsersTable = async () => {
     `);
 
     if (businessColumnsCheck.rows.length === 0) {
+      logDbChange('Adding business columns to users table');
       await pool.query(`
         ALTER TABLE users 
         ADD COLUMN business_name VARCHAR(255),
@@ -193,6 +194,7 @@ const initDatabase = async () => {
     `);
 
     if (!tableCheck.rows[0].exists) {
+      logDbChange('Creating users table');
       // Create users table if it doesn't exist
       await pool.query(`
         CREATE TABLE users (
@@ -256,6 +258,7 @@ const initDatabase = async () => {
     `);
 
     if (!settledAuctionsTableCheck.rows[0].exists) {
+      logDbChange('Creating settled_auctions table');
       await pool.query(`
         CREATE TABLE settled_auctions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -340,6 +343,7 @@ const initDatabase = async () => {
     `);
 
     if (!liveAuctionsTableCheck.rows[0].exists) {
+      logDbChange('Creating live_auctions table');
       await pool.query(`
         CREATE TABLE live_auctions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -582,6 +586,180 @@ const initDatabase = async () => {
       }
     }
     
+    // Check if orders table exists
+    const ordersTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'orders'
+      );
+    `);
+    if (!ordersTableCheck.rows[0].exists) {
+      logDbChange('Creating orders table');
+      await pool.query(`
+        CREATE TABLE orders (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          auction_id UUID NOT NULL,
+          winner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          seller_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          shipping_address TEXT,
+          shipping_city VARCHAR(100),
+          shipping_state VARCHAR(100),
+          shipping_postal_code VARCHAR(20),
+          shipping_country VARCHAR(100),
+          status VARCHAR(20) NOT NULL DEFAULT 'under_process',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(auction_id)
+        );
+      `);
+      
+      // Create function to validate auction_id exists in either settled_auctions or live_auctions
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION validate_auction_id()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          -- Check if auction_id exists in settled_auctions
+          IF EXISTS (SELECT 1 FROM settled_auctions WHERE id = NEW.auction_id) THEN
+            RETURN NEW;
+          END IF;
+          
+          -- Check if auction_id exists in live_auctions
+          IF EXISTS (SELECT 1 FROM live_auctions WHERE id = NEW.auction_id) THEN
+            RETURN NEW;
+          END IF;
+          
+          -- If not found in either table, raise error
+          RAISE EXCEPTION 'Auction with id % does not exist in either settled_auctions or live_auctions', NEW.auction_id;
+        END;
+        $$ language 'plpgsql';
+      `);
+      
+      // Create trigger to validate auction_id before insert/update
+      await pool.query(`
+        DROP TRIGGER IF EXISTS validate_auction_id_trigger ON orders;
+        CREATE TRIGGER validate_auction_id_trigger
+          BEFORE INSERT OR UPDATE ON orders
+          FOR EACH ROW
+          EXECUTE FUNCTION validate_auction_id();
+      `);
+      
+      // Create function and trigger for updated_at
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_orders_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = CURRENT_TIMESTAMP;
+          RETURN NEW;
+        END;
+        $$ language 'plpgsql';
+      `);
+      await pool.query(`
+        DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
+        CREATE TRIGGER update_orders_updated_at
+          BEFORE UPDATE ON orders
+          FOR EACH ROW
+          EXECUTE FUNCTION update_orders_updated_at_column();
+      `);
+      console.log('Created orders table');
+    } else {
+      // Ensure all columns and constraints exist
+      const columns = [
+        { name: 'shipping_address', type: 'TEXT' },
+        { name: 'shipping_city', type: 'VARCHAR(100)' },
+        { name: 'shipping_state', type: 'VARCHAR(100)' },
+        { name: 'shipping_postal_code', type: 'VARCHAR(20)' },
+        { name: 'shipping_country', type: 'VARCHAR(100)' },
+        { name: 'status', type: "VARCHAR(20) DEFAULT 'under_process'" }
+      ];
+      for (const col of columns) {
+        const colCheck = await pool.query(`
+          SELECT column_name FROM information_schema.columns WHERE table_name = 'orders' AND column_name = $1
+        `, [col.name]);
+        if (colCheck.rows.length === 0) {
+          await pool.query(`ALTER TABLE orders ADD COLUMN ${col.name} ${col.type}`);
+          console.log(`Added column ${col.name} to orders table`);
+        }
+      }
+      // Ensure UNIQUE constraint on auction_id
+      const uniqueCheck = await pool.query(`
+        SELECT COUNT(*) FROM information_schema.table_constraints
+        WHERE table_name = 'orders' AND constraint_type = 'UNIQUE';
+      `);
+      if (parseInt(uniqueCheck.rows[0].count) === 0) {
+        try {
+          await pool.query(`ALTER TABLE orders ADD CONSTRAINT orders_auction_id_key UNIQUE (auction_id);`);
+          console.log('Added UNIQUE constraint to orders.auction_id');
+        } catch (err) {
+          if (!err.message.includes('already exists')) {
+            console.error('Error adding UNIQUE constraint to orders.auction_id:', err);
+            throw err;
+          }
+        }
+      }
+      // Ensure updated_at trigger exists
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_orders_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = CURRENT_TIMESTAMP;
+          RETURN NEW;
+        END;
+        $$ language 'plpgsql';
+      `);
+      await pool.query(`
+        DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
+        CREATE TRIGGER update_orders_updated_at
+          BEFORE UPDATE ON orders
+          FOR EACH ROW
+          EXECUTE FUNCTION update_orders_updated_at_column();
+      `);
+      console.log('Checked/updated orders table');
+      
+      // Update existing orders table to remove foreign key constraint and add validation trigger
+      try {
+        logDbChange('Updating orders table to support both auction types');
+        // Drop the foreign key constraint if it exists
+        await pool.query(`
+          ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_auction_id_fkey;
+        `);
+        
+        // Create or replace the validation function
+        await pool.query(`
+          CREATE OR REPLACE FUNCTION validate_auction_id()
+          RETURNS TRIGGER AS $$
+          BEGIN
+            -- Check if auction_id exists in settled_auctions
+            IF EXISTS (SELECT 1 FROM settled_auctions WHERE id = NEW.auction_id) THEN
+              RETURN NEW;
+            END IF;
+            
+            -- Check if auction_id exists in live_auctions
+            IF EXISTS (SELECT 1 FROM live_auctions WHERE id = NEW.auction_id) THEN
+              RETURN NEW;
+            END IF;
+            
+            -- If not found in either table, raise error
+            RAISE EXCEPTION 'Auction with id % does not exist in either settled_auctions or live_auctions', NEW.auction_id;
+          END;
+          $$ language 'plpgsql';
+        `);
+        
+        // Create or replace the validation trigger
+        await pool.query(`
+          DROP TRIGGER IF EXISTS validate_auction_id_trigger ON orders;
+          CREATE TRIGGER validate_auction_id_trigger
+            BEFORE INSERT OR UPDATE ON orders
+            FOR EACH ROW
+            EXECUTE FUNCTION validate_auction_id();
+        `);
+        
+        logDbChange('Orders table updated successfully to support both auction types');
+        console.log('Updated orders table to support both auction types');
+      } catch (err) {
+        console.error('Error updating orders table constraints:', err);
+      }
+    }
+    
     console.log('Database initialization complete!');
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -636,5 +814,5 @@ module.exports = {
   initDatabase,
   testConnection,
   queryWithRetry,
-  logPoolStats
+  logDbChange
 };

@@ -34,6 +34,7 @@ import EditListing from '../pages/EditListing';
 import CompletedAuctionDetails from '../pages/CompletedAuctionDetails';
 import NotFound from '../pages/NotFound';
 import UserProfile from '../pages/UserProfile';
+import WinningPage from '../pages/WinningPage';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -297,6 +298,11 @@ function AppRoutes() {
         <Route path="/profile" element={
           <ProtectedRoute>
             <UserProfile />
+          </ProtectedRoute>
+        } />
+        <Route path="/winning/:auctionId" element={
+          <ProtectedRoute>
+            <WinningPage />
           </ProtectedRoute>
         } />
         <Route path="*" element={<NotFound />} />

@@ -3,6 +3,7 @@ import Toast from '../src/components/Toast';
 import ConfirmModal from '../src/components/ConfirmModal';
 import Button from '../src/components/Button';
 import { useNavigate } from 'react-router-dom';
+import apiService from '../src/services/apiService';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -61,11 +62,7 @@ function UserProfile() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${BACKEND_URL}/api/user/profile`, {
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error('Failed to load profile');
-      const data = await res.json();
+      const data = await apiService.get('/api/user/profile');
       setProfile(data);
       setForm({ ...data });
     } catch (err) {
@@ -138,17 +135,7 @@ function UserProfile() {
     }
     setSaving(true);
     try {
-      const token = localStorage.getItem('justbetToken');
-      const res = await fetch(`${BACKEND_URL}/api/user/profile`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(form)
-      });
-      if (!res.ok) throw new Error('Failed to update profile');
-      const data = await res.json();
+      const data = await apiService.patch('/api/user/profile', form);
       setProfile(data);
       setForm({ ...data });
       setToast({ show: true, message: 'Profile updated successfully!', type: 'success' });
