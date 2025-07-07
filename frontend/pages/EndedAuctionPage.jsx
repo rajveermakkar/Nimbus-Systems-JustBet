@@ -20,6 +20,7 @@ function EndedAuctionPage() {
   const [winnerAnnouncement, setWinnerAnnouncement] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
   const [winnerChecked, setWinnerChecked] = useState(false);
+  const auctionType = location.state?.auctionType || 'settled'; // fallback
 
   // Debug state changes
   useEffect(() => {
@@ -44,10 +45,11 @@ function EndedAuctionPage() {
 
   // Check for auction winner when page loads
   useEffect(() => {
-    // Don't show winner announcement if user is coming from "My Winnings"
+    // Don't show winner announcement if user is coming from "My Winnings" or "My Bids"
     const fromMyWinnings = location.state?.fromMyWinnings;
+    const fromMyBids = location.state?.fromMyBids;
     
-    if (auction && !winnerAnnouncement && !winnerChecked && !fromMyWinnings) {
+    if (auction && !winnerAnnouncement && !winnerChecked && !fromMyWinnings && !fromMyBids) {
       console.log('EndedAuctionPage: Checking for winner announcement, auction:', auction.id);
       setWinnerChecked(true); // Mark as checked to prevent re-running
       
@@ -120,8 +122,8 @@ function EndedAuctionPage() {
       return () => {
         clearInterval(interval);
       };
-    } else if (fromMyWinnings) {
-      console.log('EndedAuctionPage: User came from My Winnings, skipping winner announcement');
+    } else if (fromMyWinnings || fromMyBids) {
+      console.log('EndedAuctionPage: User came from My Winnings or My Bids, skipping winner announcement');
       setWinnerChecked(true); // Mark as checked to prevent re-running
     }
   }, [auction?.id, auction?.type, winnerAnnouncement, winnerChecked, user?.token, location.state]);
@@ -130,57 +132,15 @@ function EndedAuctionPage() {
     async function fetchAuction() {
       setLoading(true);
       setError(null);
-      // Check if we have auction data from navigation state (redirect)
-      if (location.state?.auctionData) {
-        console.log('EndedAuctionPage: Using auction data from navigation state:', location.state.auctionData);
-        const auctionData = location.state.auctionData;
-        setAuction(auctionData);
-        setLoading(false);
-        // Fetch bid history
-        try {
-          // Determine auction type - use from data or fallback to 'settled' for ended auctions
-          const auctionType = auctionData.type || 'settled';
-          console.log('EndedAuctionPage: Determined auction type:', auctionType);
-          
-          if (auctionType === 'settled') {
-            console.log('EndedAuctionPage: Fetching settled auction bids for:', id);
-            const bidData = await auctionService.getSettledBids(id);
-            console.log('EndedAuctionPage: Settled auction bid response:', bidData);
-            // Backend returns bids array directly, not wrapped in object
-            setBids(Array.isArray(bidData) ? bidData : []);
-          } else {
-            console.log('EndedAuctionPage: Fetching live auction bids for:', id);
-            const bidData = await auctionService.getLiveAuctionBids(id);
-            console.log('EndedAuctionPage: Live auction bid response:', bidData);
-            setBids(bidData || []);
-          }
-        } catch (error) {
-          console.error('EndedAuctionPage: Error fetching bids:', error);
-          setBids([]);
-        }
-        return;
-      }
-      // Check if there's an error from redirect
-      if (location.state?.error) {
-        console.log('EndedAuctionPage: Error from redirect:', location.state.error);
-        setError(location.state.error);
-        setLoading(false);
-        return;
-      }
+      console.log('[Frontend] Fetching auction with ID:', id, 'and type:', auctionType);
       try {
-        console.log('EndedAuctionPage: Fetching auction with ID:', id);
-        // Try both live and settled auction fetch
         let data = null;
-        let type = 'live';
-        try {
+        if (auctionType === 'live') {
           data = await auctionService.getLiveAuction(id);
-          type = 'live';
-        } catch {
-          try {
-            const settled = await auctionService.getSettledAuction(id);
-            data = settled.auction || settled;
-            type = 'settled';
-          } catch {}
+          console.log('[Frontend] Live auction fetch response:', data);
+        } else {
+          data = await auctionService.getSettledAuction(id);
+          console.log('[Frontend] Settled auction fetch response:', data);
         }
         if (!data) {
           setError('This auction does not exist or is not ended.');
@@ -192,28 +152,27 @@ function EndedAuctionPage() {
           setError('This auction is not ended.');
           setAuction(null);
         } else {
-          setAuction({ ...data, type });
+          setAuction({ ...data, type: auctionType });
           // Fetch bid history
           try {
-            if (type === 'settled') {
-              console.log('EndedAuctionPage: Fetching settled auction bids (main function) for:', id);
+            if (auctionType === 'settled') {
+              console.log('[Frontend] Fetching settled auction bids for:', id);
               const bidData = await auctionService.getSettledBids(id);
-              console.log('EndedAuctionPage: Settled auction bid response (main function):', bidData);
-              // Backend returns bids array directly, not wrapped in object
+              console.log('[Frontend] Settled auction bid response:', bidData);
               setBids(Array.isArray(bidData) ? bidData : []);
             } else {
-              console.log('EndedAuctionPage: Fetching live auction bids (main function) for:', id);
+              console.log('[Frontend] Fetching live auction bids for:', id);
               const bidData = await auctionService.getLiveAuctionBids(id);
-              console.log('EndedAuctionPage: Live auction bid response (main function):', bidData);
+              console.log('[Frontend] Live auction bid response:', bidData);
               setBids(bidData || []);
             }
           } catch (error) {
-            console.error('EndedAuctionPage: Error fetching bids (main function):', error);
+            console.error('[Frontend] Error fetching bids:', error);
             setBids([]);
           }
         }
       } catch (err) {
-        console.error('EndedAuctionPage: Error fetching auction:', err);
+        console.error('[Frontend] Error fetching auction:', err);
         setError('Failed to load auction. Please try again.');
         setAuction(null);
       } finally {
@@ -221,7 +180,7 @@ function EndedAuctionPage() {
       }
     }
     fetchAuction();
-  }, [id, location.state]);
+  }, [id, auctionType, location.state]);
 
   if (loading) {
     return (
@@ -275,7 +234,7 @@ function EndedAuctionPage() {
       )}
 
       {/* Winner Announcement Modal */}
-      {winnerAnnouncement && (
+      {winnerAnnouncement && !location.state?.fromMyWinnings && !location.state?.fromMyBids && (
         <WinnerDeclaration
           winnerAnnouncement={winnerAnnouncement}
           onClose={() => setWinnerAnnouncement(null)}

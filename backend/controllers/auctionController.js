@@ -6,6 +6,7 @@ const Bid = require('../models/Bid');
 const { getAuctionCountdown, getAuctionType } = require('../utils/auctionUtils');
 const LiveAuction = require('../models/LiveAuction');
 const settledAuctionCron = require('../services/settledAuctionCron');
+const { auctionCache } = require('../services/redisService');
 
 // function for a seller create a new auction listing
 async function createAuction(req, res) {
@@ -108,6 +109,9 @@ async function approveAuction(req, res) {
     // Schedule the auction for processing when it ends
     settledAuctionCron.scheduleAuctionProcessing(id, auction.end_time);
     console.log(`Scheduled approved auction ${id} to end at ${new Date(auction.end_time).toLocaleString()}`);
+    
+    // Invalidate any existing cache for this auction
+    await auctionCache.del(`auction:closed:${id}:full`);
     
     res.json({ auction });
   } catch (error) {
@@ -218,6 +222,9 @@ async function updateAuction(req, res) {
     const message = (auction.status === 'approved' || auction.status === 'rejected')
       ? 'Auction updated and set to pending for admin approval.' 
       : 'Auction updated.';
+    
+    // Invalidate cache for this auction
+    await auctionCache.del(`auction:closed:${id}:full`);
       
     res.json({ auction: updated, message });
   } catch (error) {
@@ -320,6 +327,10 @@ async function placeBid(req, res) {
       bid,
       auction: updatedAuction
     });
+    
+    // Invalidate user bid history cache for the bidder
+    await auctionCache.del(`user:bidhistory:${user.id}`);
+    console.log('🗑️ Invalidated bid history cache for user:', user.id);
 
   } catch (error) {
     console.error('Error placing bid:', error);
@@ -345,7 +356,7 @@ async function getBids(req, res) {
     }
 
     // Get bids with bidder details
-    const bids = await Bid.findByAuctionIdWithBidders(id);
+    const bids = await Bid.getWithBidder(id);
     res.json({ bids });
 
   } catch (error) {
@@ -365,6 +376,15 @@ async function getAuctionWithBids(req, res) {
       return res.status(400).json({ error: 'Invalid auction ID format.' });
     }
 
+    // Check cache first for closed auctions
+    const cacheKey = `auction:closed:${id}:full`;
+    const cached = await auctionCache.get(cacheKey);
+    if (cached) {
+      console.log(`[REDIS] Closed auction ${id} - CACHE HIT`);
+      return res.json(cached);
+    }
+    console.log(`[DB] Closed auction ${id} - CACHE MISS, fetching from DB`);
+
     // Get auction with seller details
     const auction = await SettledAuction.findByIdWithSeller(id);
     if (!auction) {
@@ -375,9 +395,39 @@ async function getAuctionWithBids(req, res) {
     if (auction.status !== 'approved' && auction.status !== 'closed') {
       return res.status(403).json({ error: 'This auction is not available.' });
     }
-    // Get recent bids with bidder details (last 10)
-    const bids = await Bid.findByAuctionIdWithBidders(id);
+
+    // Get ALL bids with bidder details (expensive query)
+    const bids = await Bid.getWithBidder(id);
     const recentBids = bids.slice(0, 10);
+
+    // Get winner information for closed auctions
+    let winner = null;
+    if (auction.status === 'closed') {
+      try {
+        const resultQuery = `
+          SELECT sar.*, u.first_name, u.last_name, u.email
+          FROM settled_auction_results sar
+          LEFT JOIN users u ON sar.winner_id = u.id
+          WHERE sar.auction_id = $1
+        `;
+        const result = await pool.query(resultQuery, [id]);
+        if (result.rows.length > 0) {
+          const auctionResult = result.rows[0];
+          if (auctionResult.winner_id) {
+            winner = {
+              id: auctionResult.winner_id,
+              user_name: `${auctionResult.first_name} ${auctionResult.last_name}`,
+              email: auctionResult.email,
+              amount: auctionResult.winning_amount,
+              time: auctionResult.created_at
+            };
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching winner info:', error);
+      }
+    }
+
     // Ensure current_highest_bidder_id is present (fallback to highest bid user if missing)
     let auctionWithWinner = { ...auction };
     if (!auctionWithWinner.current_highest_bidder_id && bids.length > 0) {
@@ -385,11 +435,21 @@ async function getAuctionWithBids(req, res) {
       const highestBid = bids.reduce((max, bid) => bid.amount > max.amount ? bid : max, bids[0]);
       auctionWithWinner.current_highest_bidder_id = highestBid.user_id;
     }
-    res.json({
+
+    const response = {
       auction: auctionWithWinner,
       bids: recentBids,
-      totalBids: bids.length
-    });
+      totalBids: bids.length,
+      winner: winner
+    };
+
+    // Cache closed auctions for 5 minutes
+    if (auction.status === 'closed') {
+      await auctionCache.set(cacheKey, response, 300);
+      console.log('💾 Cached closed auction:', id);
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Error fetching auction with bids:', error);
     res.status(500).json({ error: 'Server error' });

@@ -71,7 +71,13 @@ function MyBidHistory() {
   };
 
   const handleViewAuction = (bid) => {
-    navigate(`/auction/${bid.auction_type}/${bid.auction_id}`);
+    if (bid.status === 'closed' || bid.status === 'ended') {
+      navigate(`/ended-auction/${bid.auction_id}`, {
+        state: { auctionType: bid.auction_type || 'settled', fromMyBids: true }
+      });
+    } else {
+      navigate(`/auction/${bid.auction_type}/${bid.auction_id}`);
+    }
   };
 
   if (loading) {

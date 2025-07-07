@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
 const RefreshToken = require('../models/RefreshToken');
 const crypto = require('crypto');
+const { auctionCache } = require('../services/redisService');
 
 const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const validatePassword = (password) => password.length >= 8;
@@ -345,8 +346,18 @@ const userController = {
     try {
       const userId = req.user.id;
       const { type } = req.query;
+      
+      // Check cache first
+      const cacheKey = `user:winnings:${userId}`;
+      const cached = await auctionCache.get(cacheKey);
+      if (cached) {
+        console.log('✅ Cache hit for user winnings:', userId);
+        return res.json(cached);
+      }
+
       const { pool } = require('../db/init');
       let winnings = [];
+      
       if (!type || type === 'all' || type === 'live') {
         const liveQuery = `
           SELECT lar.*, la.title, la.description, la.image_url, la.starting_price, la.end_time, la.status, u.first_name, u.last_name, 'live' as auction_type
@@ -362,6 +373,7 @@ const userController = {
         }));
         winnings = winnings.concat(liveRows);
       }
+      
       if (!type || type === 'all' || type === 'settled') {
         const settledQuery = `
           SELECT sar.*, sa.title, sa.description, sa.image_url, sa.starting_price, sa.end_time, sa.status, u.first_name, u.last_name, 'settled' as auction_type
@@ -377,8 +389,16 @@ const userController = {
         }));
         winnings = winnings.concat(settledRows);
       }
+      
       winnings.sort((a, b) => new Date(b.end_time) - new Date(a.end_time));
-      res.json({ winnings });
+      
+      const response = { winnings };
+      
+      // Cache for 10 minutes
+      await auctionCache.set(cacheKey, response, 600);
+      console.log('💾 Cached user winnings:', userId);
+      
+      res.json(response);
     } catch (error) {
       console.error('Get winnings error:', error);
       res.status(500).json({ error: 'Something went wrong' });
@@ -388,7 +408,17 @@ const userController = {
   async getBidHistory(req, res) {
     try {
       const userId = req.user.id;
+      
+      // Check cache first
+      const cacheKey = `user:bidhistory:${userId}`;
+      const cached = await auctionCache.get(cacheKey);
+      if (cached) {
+        console.log('✅ Cache hit for user bid history:', userId);
+        return res.json(cached);
+      }
+
       const { pool } = require('../db/init');
+      
       // Get live auction bids
       const liveBidsQuery = `
         SELECT 
@@ -413,6 +443,7 @@ const userController = {
         WHERE lb.user_id = $1
         ORDER BY lb.created_at DESC
       `;
+      
       // Get settled auction bids
       const settledBidsQuery = `
         SELECT 
@@ -437,15 +468,24 @@ const userController = {
         WHERE b.user_id = $1
         ORDER BY b.created_at DESC
       `;
+      
       const [liveBids, settledBids] = await Promise.all([
         pool.query(liveBidsQuery, [userId]),
         pool.query(settledBidsQuery, [userId])
       ]);
+      
       const bidHistory = [
         ...liveBids.rows.map(row => ({ ...row, seller_name: `${row.first_name} ${row.last_name}` })),
         ...settledBids.rows.map(row => ({ ...row, seller_name: `${row.first_name} ${row.last_name}` }))
       ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      res.json({ bidHistory });
+      
+      const response = { bidHistory };
+      
+      // Cache for 10 minutes
+      await auctionCache.set(cacheKey, response, 600);
+      console.log('💾 Cached user bid history:', userId);
+      
+      res.json(response);
     } catch (error) {
       console.error('Get bid history error:', error);
       res.status(500).json({ error: 'Something went wrong' });
