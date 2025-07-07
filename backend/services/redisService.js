@@ -17,19 +17,19 @@ const redis = new Redis(redisConfig);
 
 // Handle connection events
 redis.on('connect', () => {
-  console.log('✅ Redis connected successfully');
+  console.log('*** Redis connected successfully ***');
 });
 
 redis.on('error', (error) => {
-  console.error('❌ Redis connection error:', error.message);
+  console.error('X Redis connection error:', error.message);
 });
 
 redis.on('ready', () => {
-  console.log('🚀 Redis is ready to accept commands');
+  console.log('--Redis is ready to accept commands--');
 });
 
 redis.on('close', () => {
-  console.log('🔌 Redis connection closed');
+  console.log('X Redis connection closed X');
 });
 
 // Helper functions for auction caching
