@@ -2,11 +2,11 @@ import React, { useContext, useState, useRef, useEffect } from "react";
 import { UserContext } from "../src/context/UserContext";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import axios from "axios";
-import { ConfirmModal } from "../src/components/SessionExpiryModal";
 import Toast from "../src/components/Toast";
 import UserDetailsPanel from '../src/components/UserDetailsPanel';
 import AuctionDetailsPanel from '../src/components/auctions/AuctionDetailsPanel';
 import LoadingSpinner from '../src/components/LoadingSpinner';
+import ConfirmModal from '../src/components/ConfirmModal';
 
 function AdminDashboard() {
   const { user, setUser } = useContext(UserContext);
@@ -535,14 +535,16 @@ function AdminDashboard() {
   // Add at the top of AdminDashboard (after other useState):
   const [auctionWinner, setAuctionWinner] = useState(null);
   const [winnerLoading, setWinnerLoading] = useState(false);
+  const [winnerChecked, setWinnerChecked] = useState(false);
 
-  // Fetch winner info when viewing auction details
+  // Update the winner loading effect to set winnerChecked
   useEffect(() => {
     if (section === 'manage-auctions' && type && auctionId) {
       const auctionList = type === 'live' ? allLiveAuctions : allSettledAuctions;
       const auction = auctionList.find(a => String(a.id) === String(auctionId));
       if (auction && !auction.winner && (auction.status === 'closed' || auction.status === 'approved')) {
         setWinnerLoading(true);
+        setWinnerChecked(false);
         const url = type === 'live'
           ? `${import.meta.env.VITE_BACKEND_URL}/api/auctions/live/${auction.id}/result`
           : `${import.meta.env.VITE_BACKEND_URL}/api/auctions/settled/${auction.id}/result`;
@@ -556,17 +558,20 @@ function AdminDashboard() {
             }
           })
           .catch(() => setAuctionWinner(null))
-          .finally(() => setWinnerLoading(false));
+          .finally(() => { setWinnerLoading(false); setWinnerChecked(true); });
       } else if (auction && auction.winner) {
         setAuctionWinner(auction.winner);
         setWinnerLoading(false);
+        setWinnerChecked(true);
       } else {
         setAuctionWinner(null);
         setWinnerLoading(false);
+        setWinnerChecked(true);
       }
     } else {
       setAuctionWinner(null);
       setWinnerLoading(false);
+      setWinnerChecked(false);
     }
   }, [section, type, auctionId, allLiveAuctions, allSettledAuctions]);
 
@@ -601,6 +606,7 @@ function AdminDashboard() {
             onViewSeller={openUserDetails}
             onUserClick={openUserDetails}
             winnerLoading={winnerLoading}
+            winnerChecked={winnerChecked}
           />
         );
       }
@@ -701,7 +707,7 @@ function AdminDashboard() {
                       <td className="p-2 align-middle text-center">{user.role}</td>
                       <td className="p-2 align-middle text-center">
                         <div className="flex justify-center">
-                          <button onClick={() => openUserDetails(user)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                          <button onClick={() => openUserDetails(user)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
                         </div>
                       </td>
                     </tr>
@@ -719,7 +725,7 @@ function AdminDashboard() {
                 <thead>
                   <tr>
                     <th className="w-1/4 text-left px-4 py-2 font-bold text-base">Name</th>
-                    <th className="w-1/3 text-center px-4 py-2 font-bold text-base">Email</th>
+                    <th className="w-1/3 text-left px-4 py-2 font-bold text-base">Email</th>
                     <th className="w-1/6 text-center px-4 py-2 font-bold text-base">Business</th>
                     <th className="w-32 text-center px-4 py-2 font-bold text-base">Actions</th>
                   </tr>
@@ -727,14 +733,14 @@ function AdminDashboard() {
                 <tbody className="h-full min-h-0 text-left text-sm">
                   {pendingSellers.length === 0 ? <tr><td colSpan={4} className="text-center text-gray-400 p-4">No pending sellers</td></tr> : pendingSellers.map(seller => (
                     <tr key={seller.id} className="border-b border-white/10">
-                      <td className="p-2"><a href="#" onClick={e => { e.preventDefault(); openUserDetails(seller); }}>{seller.first_name} {seller.last_name}</a></td>
-                      <td className="p-2">{seller.email}</td>
-                      <td className="p-2">{seller.business_name}</td>
+                      <td className="p-2 text-left"><a href="#" onClick={e => { e.preventDefault(); openUserDetails(seller); }}>{seller.first_name} {seller.last_name}</a></td>
+                      <td className="p-2 text-left">{seller.email}</td>
+                      <td className="p-2 text-center">{seller.business_name}</td>
                       <td className="p-2 align-middle text-center">
                         <div className="flex gap-2 justify-center">
-                          <button onClick={() => openUserDetails(seller)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
-                          <button disabled={actionLoading} onClick={() => openSellerApproveModal(seller)} className="bg-green-700 hover:bg-green-800 text-white px-3 py-1 rounded text-xs">Approve</button>
-                          <button disabled={actionLoading} onClick={() => openSellerRejectModal(seller)} className="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded text-xs">Reject</button>
+                          <button onClick={() => openUserDetails(seller)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
+                          <button disabled={actionLoading} onClick={() => openSellerApproveModal(seller)} className="bg-[#38b000] text-white hover:bg-[#2d8a00] px-3 py-1 rounded text-xs">Approve</button>
+                          <button disabled={actionLoading} onClick={() => openSellerRejectModal(seller)} className="bg-[#db2955] hover:bg-[#b71c3a] text-white px-3 py-1 rounded text-xs">Reject</button>
                         </div>
                       </td>
                     </tr>
@@ -788,12 +794,12 @@ function AdminDashboard() {
                       <td className="p-2">
                         {(auction.status === 'pending' || auction.auction_status === 'pending') ? (
                           <div className="flex gap-2 justify-center">
-                            <button onClick={() => openAuctionDetails(auction)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
-                            <button disabled={actionLoading} onClick={() => openApproveModal(auction.type, auction.id)} className="bg-green-700 hover:bg-green-800 text-white px-3 py-1 rounded text-xs">Approve</button>
-                            <button disabled={actionLoading} onClick={() => openRejectModal(auction.type, auction.id)} className="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded text-xs">Reject</button>
+                            <button onClick={() => openAuctionDetails(auction)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
+                            <button disabled={actionLoading} onClick={() => openApproveModal(auction.type, auction.id)} className="bg-[#38b000] text-white hover:bg-[#2d8a00] px-3 py-1 rounded text-xs">Approve</button>
+                            <button disabled={actionLoading} onClick={() => openRejectModal(auction.type, auction.id)} className="bg-[#db2955] hover:bg-[#b71c3a] text-white px-3 py-1 rounded text-xs">Reject</button>
                           </div>
                         ) : (
-                          <button onClick={() => openAuctionDetails(auction)} className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs">View</button>
+                          <button onClick={() => openAuctionDetails(auction)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
                         )}
                       </td>
                     </tr>
@@ -821,7 +827,7 @@ function AdminDashboard() {
             ) : dbHealthData ? (
               <div className="space-y-6 pb-6">
                 {/* Connection Status */}
-                <div className="bg-[#23235b]/80 rounded-xl p-6 border border-white/10">
+                <div className="rounded-xl p-6 border border-white/10">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <i className="fa-solid fa-plug"></i>
                     Connection Status
@@ -849,7 +855,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* Connection Pool Stats */}
-                <div className="bg-[#23235b]/80 rounded-xl p-6 border border-white/10">
+                <div className="rounded-xl p-6 border border-white/10">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <i className="fa-solid fa-database"></i>
                     Connection Pool Statistics
@@ -875,7 +881,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* Recommendations */}
-                <div className="bg-[#23235b]/80 rounded-xl p-6 border border-white/10">
+                <div className="rounded-xl p-6 border border-white/10">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <i className="fa-solid fa-lightbulb"></i>
                     Recommendations
@@ -966,78 +972,90 @@ function AdminDashboard() {
 
       {/* Approve Auction Modal */}
       {showApproveModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#23235b] rounded-xl p-6 max-w-md w-full mx-4 border border-white/10">
-            <h3 className="text-xl font-bold mb-4 text-white">Approve Auction</h3>
-            <p className="text-gray-300 mb-6">Are you sure you want to approve this auction?</p>
-            <div className="flex gap-3">
-              <button onClick={closeApproveModal} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded">Cancel</button>
-              <button onClick={handleApproveConfirm} disabled={actionLoading} className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white py-2 rounded">Approve</button>
-            </div>
-          </div>
-        </div>
+        <ConfirmModal
+          open={showApproveModal}
+          title="Approve Auction"
+          message="Are you sure you want to approve this auction?"
+          onCancel={closeApproveModal}
+          onConfirm={handleApproveConfirm}
+          loading={actionLoading}
+          confirmText="Approve"
+          cancelText="Cancel"
+          confirmColor="green"
+          cancelColor="bg-gray-600 hover:bg-gray-700"
+        />
       )}
 
       {/* Approve Seller Modal */}
       {showSellerApproveModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#23235b] rounded-xl p-6 max-w-md w-full mx-4 border border-white/10">
-            <h3 className="text-xl font-bold mb-4 text-white">Approve Seller</h3>
-            <p className="text-gray-300 mb-6">Are you sure you want to approve <span className="font-semibold text-white">{sellerTarget?.name}</span> as a seller?</p>
-            <div className="flex gap-3">
-              <button onClick={closeSellerApproveModal} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded">Cancel</button>
-              <button onClick={handleSellerApproveConfirm} disabled={actionLoading} className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white py-2 rounded">Approve</button>
-            </div>
-          </div>
-        </div>
+        <ConfirmModal
+          open={showSellerApproveModal}
+          title="Approve Seller"
+          message={`Are you sure you want to approve ${sellerTarget?.name} as a seller?`}
+          onCancel={closeSellerApproveModal}
+          onConfirm={handleSellerApproveConfirm}
+          loading={actionLoading}
+          confirmText="Approve"
+          cancelText="Cancel"
+          confirmColor="green"
+          cancelColor="bg-gray-600 hover:bg-gray-700"
+        />
       )}
 
       {/* Reject Seller Modal */}
       {showSellerRejectModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#23235b] rounded-xl p-6 max-w-md w-full mx-4 border border-white/10">
-            <h3 className="text-xl font-bold mb-4 text-white">Reject Seller</h3>
-            <p className="text-gray-300 mb-4">Are you sure you want to reject <span className="font-semibold text-white">{sellerTarget?.name}</span> as a seller?</p>
-            <div className="mb-4">
+        <ConfirmModal
+          open={showSellerRejectModal}
+          title="Reject Seller"
+          message={
+            <div>
+              <div className="mb-4">Are you sure you want to reject <span className="font-semibold text-white">{sellerTarget?.name}</span> as a seller?</div>
               <label className="block text-gray-300 text-sm mb-2">Reason for rejection:</label>
               <textarea
                 value={sellerRejectionReason}
-                onChange={(e) => setSellerRejectionReason(e.target.value)}
-                className="w-full bg-[#181c2f] border border-white/10 rounded px-3 py-2 text-white placeholder-gray-400 resize-none"
+                onChange={e => setSellerRejectionReason(e.target.value)}
+                className="w-full bg-[#181c2f] border border-white/10 rounded px-3 py-2 text-white placeholder-gray-400 resize-none mb-2"
                 rows="3"
                 placeholder="Enter reason for rejection..."
               />
             </div>
-            <div className="flex gap-3">
-              <button onClick={closeSellerRejectModal} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded">Cancel</button>
-              <button onClick={handleSellerRejectConfirm} disabled={actionLoading || !sellerRejectionReason.trim()} className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white py-2 rounded">Reject</button>
-            </div>
-          </div>
-        </div>
+          }
+          onCancel={closeSellerRejectModal}
+          onConfirm={handleSellerRejectConfirm}
+          loading={actionLoading}
+          confirmDisabled={!sellerRejectionReason.trim() || actionLoading}
+          confirmText="Reject"
+          cancelText="Cancel"
+          confirmColor="red"
+        />
       )}
 
-      {/* Reject Modal */}
+      {/* Reject Auction Modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#23235b] rounded-xl p-6 max-w-md w-full mx-4 border border-white/10">
-            <h3 className="text-xl font-bold mb-4 text-white">Reject Auction</h3>
-            <p className="text-gray-300 mb-6">Are you sure you want to reject this auction?</p>
-            <div className="mb-4">
+        <ConfirmModal
+          open={showRejectModal}
+          title="Reject Auction"
+          message={
+            <div>
+              <div className="mb-4">Are you sure you want to reject this auction?</div>
               <label className="block text-gray-300 text-sm mb-2">Reason for rejection:</label>
               <textarea
                 value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                className="w-full bg-[#181c2f] border border-white/10 rounded px-3 py-2 text-white placeholder-gray-400 resize-none"
+                onChange={e => setRejectionReason(e.target.value)}
+                className="w-full bg-[#181c2f] border border-white/10 rounded px-3 py-2 text-white placeholder-gray-400 resize-none mb-2"
                 rows="3"
                 placeholder="Enter reason for rejection..."
               />
             </div>
-            <div className="flex gap-3">
-              <button onClick={closeRejectModal} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded">Cancel</button>
-              <button onClick={handleRejectConfirm} disabled={actionLoading || !rejectionReason.trim()} className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white py-2 rounded">Reject</button>
-            </div>
-          </div>
-        </div>
+          }
+          onCancel={closeRejectModal}
+          onConfirm={handleRejectConfirm}
+          loading={actionLoading}
+          confirmDisabled={!rejectionReason.trim() || actionLoading}
+          confirmText="Reject"
+          cancelText="Cancel"
+          confirmColor="red"
+        />
       )}
     </div>
   );

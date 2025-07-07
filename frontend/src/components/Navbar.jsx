@@ -51,7 +51,7 @@ function Navbar() {
           {user && (
             <>
               <Link
-                to="/dashboard"
+                to={user.role === "admin" ? "/admin/dashboard" : "/dashboard"}
                 className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
               >
                 <i className="fa-solid fa-tachometer-alt"></i>

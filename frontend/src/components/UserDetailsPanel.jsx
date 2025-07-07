@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ConfirmModal from './ConfirmModal';
+import Select from 'react-select';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -9,6 +11,12 @@ const api = axios.create({
   withCredentials: true
 });
 
+const roleOptions = [
+  { value: 'buyer', label: 'Buyer' },
+  { value: 'seller', label: 'Seller' },
+  { value: 'admin', label: 'Admin' }
+];
+
 function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClick }) {
   console.log('[UserDetailsPanel] user:', user);
   const [toast, setToast] = useState(null);
@@ -16,6 +24,9 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
   const [auctions, setAuctions] = useState([]);
   const [auctionsLoading, setAuctionsLoading] = useState(false);
   const [auctionsError, setAuctionsError] = useState(null);
+  const [pendingRole, setPendingRole] = useState(user.role);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(false);
 
   useEffect(() => {
     if (user && user.id && user.role === 'seller') {
@@ -43,10 +54,28 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
     setTimeout(() => setToast(null), 2000);
   };
   const handleRoleChange = (e) => {
-    setRole(e.target.value);
-    setToast(`Role changed to ${e.target.value} (UI only)`);
-    setTimeout(() => setToast(null), 2000);
-    // TODO: Integrate API call to update role
+    setPendingRole(e.target.value);
+  };
+  const handleApplyRole = () => {
+    if (pendingRole !== role) {
+      setShowConfirmModal(true);
+    }
+  };
+  const confirmRoleChange = async () => {
+    setRoleLoading(true);
+    try {
+      const token = localStorage.getItem('justbetToken');
+      const res = await api.patch(`/admin/users/${user.id}/role`, { role: pendingRole }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setRole(pendingRole);
+      setShowConfirmModal(false);
+      setToast(`Role changed to ${pendingRole}`);
+    } catch (err) {
+      setToast('Failed to change role');
+    } finally {
+      setRoleLoading(false);
+    }
   };
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || '')}+${encodeURIComponent(user.last_name || '')}&background=2a2a72&color=fff`;
 
@@ -56,6 +85,59 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
     acc[a.type] = (acc[a.type] || 0) + 1;
     return acc;
   }, {});
+
+  const customStyles = {
+    control: (provided) => ({
+      ...provided,
+      minHeight: '32px',
+      fontSize: '0.95rem',
+      padding: '0 4px',
+      color: '#fff',
+      backgroundColor: '#23235b',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: '#fff',
+    }),
+    valueContainer: (provided) => ({
+      ...provided,
+      padding: '0 6px',
+    }),
+    input: (provided) => ({
+      ...provided,
+      margin: 0,
+      padding: 0,
+      color: '#fff',
+    }),
+    indicatorsContainer: (provided) => ({
+      ...provided,
+      height: '32px',
+    }),
+    menu: (provided) => ({
+      ...provided,
+      marginTop: 2,
+      borderRadius: 6,
+      minWidth: '100%',
+      backgroundColor: '#23235b',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      padding: '6px 12px',
+      fontSize: '0.95rem',
+      color: '#fff',
+      backgroundColor: state.isSelected
+        ? '#34346b'
+        : state.isFocused
+        ? '#373a60'
+        : '#23235b',
+    }),
+  };
+
+  const theme = {
+    colors: {
+      neutral0: '#23235b',
+    },
+  };
 
   return (
     <div className="relative w-full h-full flex flex-col p-8">
@@ -73,15 +155,35 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
         </div>
         <div className="max-w-2xl mx-auto flex flex-col gap-2 text-left">
           <label className="font-semibold text-white mb-1">Change Role</label>
-          <select
-            className="w-48 px-3 py-2 rounded border border-white/10 bg-[#23235b] text-white mb-4"
-            value={role}
-            onChange={handleRoleChange}
-          >
-            <option value="buyer">Buyer</option>
-            <option value="seller">Seller</option>
-            <option value="admin">Admin</option>
-          </select>
+          <div className="flex items-center mb-4">
+            <div className="w-48">
+              <Select
+                options={roleOptions}
+                value={roleOptions.find(opt => opt.value === pendingRole)}
+                onChange={opt => handleRoleChange({ target: { value: opt.value } })}
+                isDisabled={roleLoading}
+                isSearchable={false}
+                styles={customStyles}
+                classNamePrefix="react-select"
+                menuPlacement="auto"
+                theme={theme => ({
+                  ...theme,
+                  colors: {
+                    ...theme.colors,
+                    neutral0: '#23235b',
+                  },
+                })}
+              />
+            </div>
+            <button
+              className="ml-2 px-3 py-2 rounded bg-blue-700 text-white font-semibold text-xs disabled:opacity-50"
+              onClick={handleApplyRole}
+              disabled={pendingRole === role || roleLoading}
+              type="button"
+            >
+              Apply
+            </button>
+          </div>
           <div className="flex gap-2 mt-2">
             {user.role === 'seller' ? (
               user.is_approved ? (
@@ -236,6 +338,19 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
           </div>
         )}
         {toast && <div className="mt-4 text-center text-yellow-300 font-semibold">{toast}</div>}
+        {/* Confirmation Modal */}
+        {showConfirmModal && (
+          <ConfirmModal
+            open={showConfirmModal}
+            title="Confirm Role Change"
+            message={`Are you sure you want to change this user's role to '${pendingRole}'?`}
+            onCancel={() => setShowConfirmModal(false)}
+            onConfirm={confirmRoleChange}
+            loading={roleLoading}
+            confirmText="Confirm"
+            cancelText="Cancel"
+          />
+        )}
       </div>
     </div>
   );
