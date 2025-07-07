@@ -9,6 +9,7 @@ const sellerRoutes = require('./routes/sellerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const liveAuctionRoutes = require('./routes/liveAuctionRoutes');
 const auctionsRoutes = require('./routes/auctionsRoutes');
+const userProfileRouter = require('./routes/userProfile');
 const http = require('http');
 const { Server } = require('socket.io');
 const LiveAuctionModel = require('./models/LiveAuction');
@@ -39,6 +40,7 @@ app.use('/api/seller', sellerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/live-auction', liveAuctionRoutes);
 app.use('/api/auctions', auctionsRoutes);
+app.use('/api/user', userProfileRouter);
 
 app.get('/', (req, res) => {
   res.send('Welcome to JustBet!');

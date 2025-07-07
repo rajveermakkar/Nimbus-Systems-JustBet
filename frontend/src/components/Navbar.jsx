@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Button from "./Button";
 import { UserContext } from "../context/UserContext";
@@ -9,6 +9,8 @@ function Navbar() {
   const { user, setUser } = useContext(UserContext);
   const navigate = useNavigate();
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -17,6 +19,23 @@ function Navbar() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownOpen]);
 
   async function handleLogout() {
     try {
@@ -73,17 +92,39 @@ function Navbar() {
                   Seller Dashboard
                 </Link>
               )}
-              <span className="text-xs text-white/80 font-medium px-2">
-                Welcome, {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : "User"}
-                {user.role ? ` (${user.role})` : ""}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold transition"
-              >
-                <i className="fa-solid fa-sign-out-alt"></i>
-                Logout
-              </button>
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  className="flex items-center gap-2 text-white font-semibold text-xs px-2 py-1 rounded-lg hover:bg-[#2a2a72]/80 focus:outline-none transition-colors"
+                  onClick={() => setDropdownOpen((open) => !open)}
+                  aria-haspopup="true"
+                  aria-expanded={dropdownOpen}
+                >
+                  <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.firstName || 'A')}+${encodeURIComponent(user.lastName || 'D')}&background=2a2a72&color=fff`} alt="avatar" className="w-7 h-7 rounded-full border-2 border-white/30" />
+                  <span>{user.firstName} {user.lastName}</span>
+                </button>
+                {dropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-[#23235b]/95 rounded-xl shadow-lg py-2 z-50 border border-white/10 flex flex-col min-w-[220px]">
+                    {/* User Info */}
+                    <div className="px-4 pt-4 pb-2">
+                      <div className="font-bold text-white text-base">{user.firstName} {user.lastName}</div>
+                      <div className="text-xs text-gray-300 mb-1">{user.email}</div>
+                    </div>
+                    {/* Menu Items */}
+                    <button
+                      className="flex items-center gap-2 w-full text-left px-4 py-3 text-white hover:bg-[#34346b]/80 text-sm transition"
+                      onClick={() => { window.location.href = '/profile'; setDropdownOpen(false); }}
+                    >
+                      <i className="fa-regular fa-user text-base"></i> My Profile
+                    </button>
+                    <button
+                      className="flex items-center gap-2 w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/60 text-sm font-semibold transition"
+                      onClick={() => { handleLogout(); setDropdownOpen(false); }}
+                    >
+                      <i className="fa-solid fa-sign-out-alt text-base"></i> Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
           {!user && (

@@ -35,8 +35,13 @@ export function UserProvider({ children }) {
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
+  // If user object only has first_name/last_name, map to firstName/lastName for context consumers
+  const firstName = user?.first_name || user?.first_name;
+  const lastName = user?.last_name || user?.last_name;
+  const avatar_url = user?.avatar_url || user?.avatar_url;
+
   return (
-    <UserContext.Provider value={{ user, setUser }}>
+    <UserContext.Provider value={{ user, setUser, firstName, lastName, avatar_url }}>
       {children}
     </UserContext.Provider>
   );

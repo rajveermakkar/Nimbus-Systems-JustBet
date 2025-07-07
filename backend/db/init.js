@@ -521,6 +521,67 @@ const initDatabase = async () => {
     // Add rejection fields to auction tables if they don't exist
     await updateAuctionTablesWithRejectionFields();
     
+    // Check if user_profiles table exists
+    const userProfilesTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'user_profiles'
+      );
+    `);
+    if (!userProfilesTableCheck.rows[0].exists) {
+      await pool.query(`
+        CREATE TABLE user_profiles (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          avatar_url TEXT,
+          phone VARCHAR(20),
+          address TEXT,
+          city VARCHAR(100),
+          state VARCHAR(100),
+          country VARCHAR(100),
+          postal_code VARCHAR(20),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id)
+        );
+      `);
+      // Create function to update updated_at timestamp for user_profiles
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_user_profiles_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = CURRENT_TIMESTAMP;
+          RETURN NEW;
+        END;
+        $$ language 'plpgsql';
+      `);
+      await pool.query(`
+        DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
+        CREATE TRIGGER update_user_profiles_updated_at
+          BEFORE UPDATE ON user_profiles
+          FOR EACH ROW
+          EXECUTE FUNCTION update_user_profiles_updated_at_column();
+      `);
+      console.log('Created user_profiles table');
+    } else {
+      // Ensure user_id is unique in user_profiles
+      const uniqueCheck = await pool.query(`
+        SELECT COUNT(*) FROM information_schema.table_constraints
+        WHERE table_name = 'user_profiles' AND constraint_type = 'UNIQUE';
+      `);
+      if (parseInt(uniqueCheck.rows[0].count) === 0) {
+        try {
+          await pool.query(`ALTER TABLE user_profiles ADD CONSTRAINT user_profiles_user_id_key UNIQUE (user_id);`);
+          console.log('Added UNIQUE constraint to user_profiles.user_id');
+        } catch (err) {
+          if (!err.message.includes('already exists')) {
+            console.error('Error adding UNIQUE constraint to user_profiles.user_id:', err);
+            throw err;
+          }
+        }
+      }
+    }
+    
     console.log('Database initialization complete!');
   } catch (error) {
     console.error('Error initializing database:', error);
