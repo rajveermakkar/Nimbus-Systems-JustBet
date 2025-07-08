@@ -6,6 +6,10 @@ import { format } from 'date-fns';
 import Button from '../src/components/Button';
 import { AnimatePresence, motion } from 'framer-motion';
 import { UserContext } from '../src/context/UserContext';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import ConfirmModal from '../src/components/ConfirmModal';
+import AddCardForm from '../src/components/auctions/AddCardForm';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -812,14 +816,13 @@ function WithdrawStepper({ open, onClose, onSuccess, onAddCard }) {
             ) : cardInfo ? (
               <span>Card: {cardInfo.brand?.toUpperCase()} •••• {cardInfo.last4}</span>
             ) : (
-              <>
-                <span>No deposit card found.</span><br />
-                <Button variant="primary" size="small" style={{ marginTop: 10, fontSize: 15, padding: '7px 18px', borderRadius: 8 }} onClick={() => { onClose(); onAddCard && onAddCard(); }}>+ Add Card</Button>
-              </>
+              <span style={{ color: '#ff6b6b', fontWeight: 500 }}>
+                No eligible deposit card found. You must make a deposit with a card before you can withdraw to it.
+              </span>
             )}
           </div>
           {withdrawError && <div style={{ color: 'red', marginBottom: 8 }}>{withdrawError}</div>}
-          <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={handleWithdraw} disabled={loading}>
+          <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={handleWithdraw} disabled={loading || !cardInfo}>
             {loading ? 'Processing...' : 'Confirm & Withdraw'}
           </Button>
           <Button variant="secondary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 10, marginBottom: 0 }} onClick={onClose}>
@@ -861,6 +864,10 @@ function Wallet() {
   const [addCardError, setAddCardError] = useState('');
   // Track if AddFundsStepper is open and payment is processing, to avoid parent state updates
   const [depositProcessing, setDepositProcessing] = useState(false);
+  // Add state for confirm modal
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [removeCardId, setRemoveCardId] = useState(null);
+  const [removeCardLast4, setRemoveCardLast4] = useState('');
 
   // Lock background scroll when any modal is open
   useEffect(() => {
@@ -910,8 +917,9 @@ function Wallet() {
     const d = new Date(tx.created_at);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
-  const totalSpent = thisMonthTxs.filter(tx => tx.amount < 0).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+  const totalSpent = 0; // TODO: Replace with actual spent calculation when bidding/purchase is implemented
   const totalAdded = thisMonthTxs.filter(tx => tx.amount > 0).reduce((sum, tx) => sum + tx.amount, 0);
+  const totalWithdrawn = thisMonthTxs.filter(tx => tx.type === 'withdrawal' && tx.amount < 0).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
 
   // Only fetchWallet after AddFundsStepper closes, not during payment
   function handleAddFundsModalClose() {
@@ -972,7 +980,6 @@ function Wallet() {
   }
 
   async function handleRemoveCard(id) {
-    if (!window.confirm('Remove this card?')) return;
     await walletService.removePaymentMethod(id);
     fetchPaymentMethods();
   }
@@ -1042,8 +1049,12 @@ function Wallet() {
               <div style={{ fontSize: 17, color: '#fff', fontWeight: 500, marginBottom: 16, textAlign: 'center' }}>This Month</div>
               <div style={{ fontSize: 16, marginBottom: 12 }}>
                 <div style={{ marginBottom: 10 }}>
+                  <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Withdrawn:</span>
+                  <span style={{ color: '#ff6b6b', fontWeight: 700, marginLeft: 10 }}>${Number(totalWithdrawn || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div style={{ marginBottom: 10 }}>
                   <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Spent:</span>
-                  <span style={{ color: '#ff6b6b', fontWeight: 700, marginLeft: 10 }}>${Number(totalSpent || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span style={{ color: '#ffd166', fontWeight: 700, marginLeft: 10 }}>${Number(totalSpent || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Added:</span>
@@ -1063,12 +1074,60 @@ function Wallet() {
                 <div>No cards saved.</div>
               ) : (
                 paymentMethods.map(pm => (
-                  <div key={pm.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(32,41,74,0.7)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
-                    <div>
-                      <span style={{ fontWeight: 500 }}>{pm.card.brand.toUpperCase()} •••• {pm.card.last4}</span>
-                      <span style={{ marginLeft: 8, color: '#aaa', fontSize: 13 }}>Exp: {pm.card.exp_month}/{pm.card.exp_year}</span>
+                  <div key={pm.id} style={{
+                    borderRadius: 18,
+                    padding: 2,
+                    background: 'linear-gradient(90deg, #3b82f6 0%, #a78bfa 50%, #6366f1 100%)',
+                    marginBottom: 14,
+                    minWidth: 180,
+                    maxWidth: 260,
+                    margin: '0 auto',
+                  }}>
+                    <div style={{
+                      background: '#252663', // solid dark blue background
+                      borderRadius: 16,
+                      boxShadow: '0 2px 8px 0 rgba(31,38,135,0.08)',
+                      padding: '10px 14px 8px 14px',
+                      color: '#fff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      position: 'relative',
+                      fontSize: 15,
+                      fontWeight: 600,
+                      backdropFilter: 'blur(2px)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                        <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: 1 }}>{pm.card.brand?.toUpperCase() || 'CARD'}&nbsp;••••&nbsp;{pm.card.last4}</span>
+                        <button
+                          style={{
+                            marginLeft: 'auto',
+                            background: 'none',
+                            border: 'none',
+                            color: '#ff6b6b',
+                            borderRadius: '50%',
+                            padding: 6,
+                            fontSize: 18,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'background 0.18s',
+                          }}
+                          aria-label="Remove card"
+                          onClick={() => {
+                            setRemoveCardId(pm.id);
+                            setRemoveCardLast4(pm.card.last4);
+                            setShowRemoveConfirm(true);
+                          }}
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#b3b3c9', marginTop: 4, fontWeight: 500 }}>
+                        EXP: {pm.card.exp_month}/{pm.card.exp_year}
+                      </div>
                     </div>
-                    <button onClick={() => handleRemoveCard(pm.id)} style={smallSecondaryButtonStyle}>Remove</button>
                   </div>
                 ))
               )}
@@ -1126,6 +1185,21 @@ function Wallet() {
         onClose={() => setShowWithdraw(false)}
         onSuccess={fetchWallet}
         onAddCard={() => setShowAddCard(true)}
+      />
+
+      {/* ConfirmModal for removing card */}
+      <ConfirmModal
+        open={showRemoveConfirm}
+        title="Remove Payment Method?"
+        message={`Are you sure you want to remove card •••• ${removeCardLast4}?`}
+        onConfirm={async () => {
+          setShowRemoveConfirm(false);
+          if (removeCardId) await handleRemoveCard(removeCardId);
+        }}
+        onCancel={() => setShowRemoveConfirm(false)}
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmColor="red"
       />
     </div>
   );
