@@ -31,6 +31,9 @@ class WalletService {
   async getMostRecentDepositCard() {
     return apiService.get('/api/wallet/deposit-card');
   }
+  async getMonthlySummary() {
+    return apiService.get('/api/wallet/monthly-summary');
+  }
 }
 
 export const walletService = new WalletService();

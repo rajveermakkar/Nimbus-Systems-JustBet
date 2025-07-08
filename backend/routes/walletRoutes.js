@@ -23,4 +23,7 @@ router.delete('/payment-methods/:id', authenticateToken, walletController.remove
 // New route for GET /api/wallet/deposit-card
 router.get('/deposit-card', authenticateToken, walletController.getMostRecentDepositCard);
 
+// Add monthly summary endpoint
+router.get('/monthly-summary', authenticateToken, walletController.getMonthlySummary);
+
 module.exports = router; 
