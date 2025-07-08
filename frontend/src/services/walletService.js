@@ -10,8 +10,10 @@ class WalletService {
   async createWallet() {
     return apiService.post('/api/wallet/create', {});
   }
-  async createDepositIntent(amount, saveCard) {
-    return apiService.post('/api/wallet/deposit/intent', { amount, saveCard });
+  async createDepositIntent(amount, saveCard, paymentMethodId) {
+    const body = { amount, saveCard };
+    if (paymentMethodId) body.paymentMethodId = paymentMethodId;
+    return apiService.post('/api/wallet/deposit/intent', body);
   }
   async createWithdrawal(amount) {
     return apiService.post('/api/wallet/withdraw', { amount });
