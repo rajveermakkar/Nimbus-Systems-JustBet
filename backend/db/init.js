@@ -147,6 +147,20 @@ const updateUsersTable = async () => {
         ADD COLUMN is_approved BOOLEAN DEFAULT false
       `);
     }
+
+    // Check for Stripe customer ID column
+    const stripeCustomerIdCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'stripe_customer_id'
+    `);
+    if (stripeCustomerIdCheck.rows.length === 0) {
+      logDbChange('Adding stripe_customer_id column to users table');
+      await pool.query(`
+        ALTER TABLE users 
+        ADD COLUMN stripe_customer_id VARCHAR(255)
+      `);
+    }
   } catch (error) {
     console.error('Error updating users table:', error);
     throw error;

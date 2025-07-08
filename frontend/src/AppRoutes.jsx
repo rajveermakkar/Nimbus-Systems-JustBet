@@ -35,6 +35,7 @@ import CompletedAuctionDetails from '../pages/CompletedAuctionDetails';
 import NotFound from '../pages/NotFound';
 import UserProfile from '../pages/UserProfile';
 import WinningPage from '../pages/WinningPage';
+import Wallet from '../pages/Wallet.jsx';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -305,6 +306,7 @@ function AppRoutes() {
             <WinningPage />
           </ProtectedRoute>
         } />
+        <Route path="/wallet" element={<Wallet />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

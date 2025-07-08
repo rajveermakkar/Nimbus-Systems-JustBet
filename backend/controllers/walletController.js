@@ -312,11 +312,57 @@ async function createWallet(req, res) {
   }
 }
 
+// List saved card payment methods for the logged-in user
+async function listPaymentMethods(req, res) {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user.stripe_customer_id) {
+      return res.json({ paymentMethods: [] });
+    }
+    const methods = await stripeService.listPaymentMethods(user.stripe_customer_id);
+    res.json({ paymentMethods: methods });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list payment methods' });
+  }
+}
+
+// Create a SetupIntent for adding a card
+async function createSetupIntent(req, res) {
+  try {
+    let user = await User.findById(req.user.id);
+    let customerId = user.stripe_customer_id;
+    if (!customerId) {
+      // Create Stripe customer for existing user if needed
+      const customer = await stripeService.createCustomer(user.email);
+      await User.setStripeCustomerId(user.id, customer.id);
+      customerId = customer.id;
+    }
+    const setupIntent = await stripeService.createSetupIntent(customerId);
+    res.json({ clientSecret: setupIntent.client_secret });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create setup intent' });
+  }
+}
+
+// Remove a card
+async function removePaymentMethod(req, res) {
+  try {
+    const { id } = req.params;
+    await stripeService.detachPaymentMethod(id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove payment method' });
+  }
+}
+
 module.exports = {
   getBalance,
   getTransactions,
   createDepositIntent,
   createWithdrawalIntent,
   handleStripeWebhook,
-  createWallet
+  createWallet,
+  listPaymentMethods,
+  createSetupIntent,
+  removePaymentMethod
 }; 

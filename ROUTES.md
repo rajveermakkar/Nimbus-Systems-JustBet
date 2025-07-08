@@ -95,6 +95,9 @@
 - **POST /api/wallet/create** — Create a wallet for the logged-in user (if not exists). Returns: `{ wallet }`
 - **POST /api/wallet/deposit/intent** — Create a Stripe payment intent for wallet deposit. Body: `{ amount }`. Returns: `{ clientSecret }`
 - **POST /api/wallet/withdraw** — Create a withdrawal request (refund to original card). Body: `{ amount }`. Returns: `{ message, refundId, amount, userRole }`
+- **GET /api/wallet/payment-methods** — List all saved card payment methods for the logged-in user. Returns: `{ paymentMethods: [...] }`
+- **POST /api/wallet/payment-methods/setup-intent** — Create a Stripe SetupIntent for adding a new card. Returns: `{ clientSecret }`
+- **DELETE /api/wallet/payment-methods/:id** — Remove a saved card payment method by its Stripe ID. Returns: `{ success: true }`
 
 **Notes:**
 - All wallet endpoints except `/webhook` require authentication (JWT in Authorization header or cookie).

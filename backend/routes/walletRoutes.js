@@ -15,4 +15,9 @@ router.post('/withdraw', authenticateToken, walletController.createWithdrawalInt
 // Stripe webhook (no auth required)
 router.post('/webhook', walletController.handleStripeWebhook);
 
+// Payment method management
+router.get('/payment-methods', authenticateToken, walletController.listPaymentMethods);
+router.post('/payment-methods/setup-intent', authenticateToken, walletController.createSetupIntent);
+router.delete('/payment-methods/:id', authenticateToken, walletController.removePaymentMethod);
+
 module.exports = router; 

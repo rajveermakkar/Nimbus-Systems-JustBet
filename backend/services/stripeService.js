@@ -14,6 +14,46 @@ async function createPaymentIntent(userId, amount, currency = 'cad') {
   return paymentIntent;
 }
 
+// Create a Stripe customer
+async function createCustomer(email) {
+  const customer = await stripe.customers.create({ email });
+  return customer;
+}
+
+// Get or create a Stripe customer for a user
+async function getOrCreateCustomer(user) {
+  if (user.stripe_customer_id) {
+    return user.stripe_customer_id;
+  }
+  const customer = await createCustomer(user.email);
+  // You must update the user in your DB after this call!
+  return customer.id;
+}
+
+// Create a SetupIntent for adding a card
+async function createSetupIntent(customerId) {
+  return await stripe.setupIntents.create({ customer: customerId });
+}
+
+// List saved card payment methods for a customer
+async function listPaymentMethods(customerId) {
+  const paymentMethods = await stripe.paymentMethods.list({
+    customer: customerId,
+    type: 'card',
+  });
+  return paymentMethods.data;
+}
+
+// Detach (remove) a payment method
+async function detachPaymentMethod(paymentMethodId) {
+  return await stripe.paymentMethods.detach(paymentMethodId);
+}
+
 module.exports = {
-  createPaymentIntent
+  createPaymentIntent,
+  createCustomer,
+  getOrCreateCustomer,
+  createSetupIntent,
+  listPaymentMethods,
+  detachPaymentMethod
 }; 
