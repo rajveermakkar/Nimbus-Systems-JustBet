@@ -7,7 +7,7 @@ import Button from '../src/components/Button';
 import { AnimatePresence, motion } from 'framer-motion';
 import { UserContext } from '../src/context/UserContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faTrash, faArrowDown, faArrowUp, faCreditCard, faTrophy, faUndo, faUniversity, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import ConfirmModal from '../src/components/ConfirmModal';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -1118,6 +1118,45 @@ function WithdrawStepper({ open, onClose, onSuccess, onAddCard }) {
   ) : null;
 }
 
+// Helper: get icon and color for transaction type
+function getTxIconAndColor(tx) {
+  if (tx.type === 'deposit') {
+    return { icon: faArrowDown, color: '#6fffbe', bg: 'rgba(111,255,190,0.12)' };
+  } else if (tx.type === 'withdrawal') {
+    return { icon: faArrowUp, color: '#ff6b6b', bg: 'rgba(255,107,107,0.12)' };
+  } else if (tx.description?.toLowerCase().includes('payment')) {
+    return { icon: faCreditCard, color: '#ffd166', bg: 'rgba(255,209,102,0.12)' };
+  } else if (tx.description?.toLowerCase().includes('auction win')) {
+    return { icon: faTrophy, color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' };
+  } else if (tx.description?.toLowerCase().includes('refund')) {
+    return { icon: faUndo, color: '#38bdf8', bg: 'rgba(56,189,248,0.12)' };
+  } else if (tx.description?.toLowerCase().includes('bank')) {
+    return { icon: faUniversity, color: '#6366f1', bg: 'rgba(99,102,241,0.12)' };
+  }
+  return { icon: faQuestionCircle, color: '#b3b3c9', bg: 'rgba(179,179,201,0.10)' };
+}
+
+// Helper: get status badge color
+function getStatusColor(status) {
+  if (status === 'succeeded' || status === 'completed') return '#22c55e';
+  if (status === 'pending') return '#ffd166';
+  return '#ff6b6b';
+}
+
+// Helper: format balance
+function formatBalance(val) {
+  return `$${Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Compute running balance for each transaction (descending order)
+function computeRunningBalances(transactions, startingBalance) {
+  let bal = startingBalance;
+  return transactions.map(tx => {
+    bal = bal - (tx.amount || 0); // Subtract because list is usually newest first
+    return { ...tx, runningBalance: bal };
+  });
+}
+
 function Wallet() {
   const { user } = useContext(UserContext);
   const [balance, setBalance] = useState(null);
@@ -1146,6 +1185,10 @@ function Wallet() {
   const [removeCardId, setRemoveCardId] = useState(null);
   const [removeCardLast4, setRemoveCardLast4] = useState('');
   const [createWalletHover, setCreateWalletHover] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
 
   // Lock background scroll when any modal is open
   useEffect(() => {
@@ -1164,14 +1207,17 @@ function Wallet() {
     fetchPaymentMethods();
   }, []);
 
-  async function fetchWallet() {
+  async function fetchWallet(page = currentPage) {
     setLoading(true);
     setError('');
+    setLoadingTransactions(true);
     try {
       const bal = await walletService.getBalance();
       setBalance(bal.balance);
-      const txs = await walletService.getTransactions();
-      setTransactions(txs.transactions);
+      const txResp = await walletService.getTransactions(page, pageSize);
+      setTransactions(txResp.transactions);
+      setTotalCount(txResp.totalCount || 0);
+      setCurrentPage(txResp.page || 1);
     } catch (err) {
       // If error message indicates no wallet, show friendly message
       if ((err?.response?.status === 404) || (err?.message && err.message.toLowerCase().includes('wallet not found'))) {
@@ -1181,6 +1227,7 @@ function Wallet() {
       }
     }
     setLoading(false);
+    setLoadingTransactions(false);
   }
 
   async function fetchPaymentMethods() {
@@ -1270,6 +1317,22 @@ function Wallet() {
   async function handleRemoveCard(id) {
     await walletService.removePaymentMethod(id);
     fetchPaymentMethods();
+  }
+
+  // After fetching transactions and balance:
+  const txsWithBalance = computeRunningBalances([...transactions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)), balance);
+
+  // Pagination controls
+  const totalPages = Math.ceil(totalCount / pageSize);
+  function handleNextPage() {
+    if (currentPage < totalPages) {
+      fetchWallet(currentPage + 1);
+    }
+  }
+  function handlePrevPage() {
+    if (currentPage > 1) {
+      fetchWallet(currentPage - 1);
+    }
   }
 
   return (
@@ -1473,29 +1536,69 @@ function Wallet() {
           <div style={{ flex: 2 }}>
             <div style={{ ...cardStyle, minHeight: 400 }}>
               <div style={{ fontWeight: 600, fontSize: 20, marginBottom: 16 }}>Transaction History</div>
-              {transactions.length === 0 ? (
+              {txsWithBalance.length === 0 ? (
                 <div>No transactions yet.</div>
               ) : (
                 <div>
-                  {transactions.map(tx => (
-                    <div key={tx.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #2d3657', padding: '12px 0' }}>
-                      <div>
-                        <div style={{ fontWeight: 500 }}>
-                          {tx.type === 'deposit' ? 'Wallet top-up' : tx.type === 'withdrawal' ? 'Withdrawal' : tx.description}
+                  {txsWithBalance.map((tx, idx) => {
+                    const { icon, color, bg } = getTxIconAndColor(tx);
+                    const isPositive = Number(tx.amount) > 0;
+                    return (
+                      <div key={tx.id} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: 'rgba(35,43,74,0.32)',
+                        borderRadius: 16,
+                        padding: '16px 20px',
+                        marginBottom: 14,
+                        boxShadow: '0 2px 8px 0 rgba(31,38,135,0.08)',
+                        border: '1.5px solid rgba(255,255,255,0.06)',
+                        gap: 18,
+                      }}>
+                        {/* Icon */}
+                        <div style={{
+                          background: bg,
+                          borderRadius: '50%',
+                          width: 44,
+                          height: 44,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 22,
+                          color,
+                          flexShrink: 0,
+                        }}>
+                          <FontAwesomeIcon icon={icon} />
                         </div>
-                        <div style={{ fontSize: 13, color: '#aaa' }}>{format(new Date(tx.created_at), 'MMM d, yyyy h:mm a')}</div>
-                        <div style={{ fontSize: 12, color: '#888' }}>Ref: {tx.reference_id || tx.id}</div>
+                        {/* Main info */}
+                        <div style={{ flex: 1, marginLeft: 12 }}>
+                          <div style={{ fontWeight: 600, fontSize: 17, color: '#fff', marginBottom: 2 }}>
+                            {tx.type === 'withdrawal' ? 'Wallet Withdrawal' : tx.type === 'deposit' ? 'Wallet Deposit' : tx.description}
+                          </div>
+                          <div style={{ fontSize: 13, color: '#b3b3c9', fontWeight: 500 }}>
+                            {format(new Date(tx.created_at), 'MMM d, yyyy h:mm a')}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+                            Ref: {tx.reference_id || tx.id}
+                          </div>
+                        </div>
+                        {/* Amount */}
+                        <div style={{ textAlign: 'right', minWidth: 110 }}>
+                          <div style={{ fontWeight: 700, fontSize: 18, color: isPositive ? '#6fffbe' : '#ff6b6b' }}>
+                            {isPositive ? '+' : ''}{formatBalance(tx.amount)}
+                          </div>
+                          <div style={{ fontSize: 13, color: getStatusColor(tx.status), fontWeight: 600, marginTop: 2, textTransform: 'capitalize' }}>
+                            {tx.status}
+                          </div>
+                          {/* Running balance (optional, can comment out if not needed) */}
+                          <div style={{ fontSize: 12, color: '#b3b3c9', marginTop: 2 }}>
+                            Balance: {formatBalance(tx.runningBalance)}
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 600, color: tx.amount > 0 ? '#6fffbe' : '#ff6b6b', fontSize: 18 }}>
-                          {tx.amount > 0 ? '+' : ''}${Number(tx.amount || 0).toFixed(2)}
-                        </div>
-                        <div style={{ fontSize: 13, color: tx.status === 'succeeded' ? '#6fffbe' : tx.status === 'pending' ? '#ffd166' : '#ff6b6b' }}>
-                          {tx.status}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1536,6 +1639,21 @@ function Wallet() {
         cancelText="Cancel"
         confirmColor="red"
       />
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 18, gap: 16 }}>
+          <Button variant="secondary" size="sm" onClick={handlePrevPage} disabled={currentPage === 1 || loadingTransactions}>
+            Previous
+          </Button>
+          <span style={{ color: '#b3b3c9', fontWeight: 500, fontSize: 16 }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button variant="secondary" size="sm" onClick={handleNextPage} disabled={currentPage === totalPages || loadingTransactions}>
+            Next
+          </Button>
+        </div>
+      )}
+      {loadingTransactions && <div style={{ textAlign: 'center', color: '#6fffbe', marginTop: 12 }}>Loading transactions...</div>}
     </div>
   );
 }

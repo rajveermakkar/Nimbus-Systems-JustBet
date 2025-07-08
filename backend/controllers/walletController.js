@@ -85,12 +85,18 @@ async function getBalance(req, res) {
   }
 }
 
-// Get wallet transaction history for logged-in user
+// Get wallet transaction history for logged-in user (paginated)
 async function getTransactions(req, res) {
   try {
     const userId = req.user.id;
-    const transactions = await Transaction.getTransactionsByUserId(userId);
-    res.json({ transactions });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.max(1, Math.min(50, parseInt(req.query.limit, 10) || 10)); // max 50 per page
+    const offset = (page - 1) * limit;
+    const [transactions, totalCount] = await Promise.all([
+      Transaction.getTransactionsByUserIdPaginated(userId, limit, offset),
+      Transaction.getTransactionCountByUserId(userId)
+    ]);
+    res.json({ transactions, totalCount, page, limit });
   } catch (err) {
     res.status(500).json({ error: 'Failed to get transactions' });
   }
@@ -140,104 +146,62 @@ async function createDepositIntent(req, res) {
   }
 }
 
-// Create a withdrawal request
+// Create a withdrawal request (demo mode: no Stripe refund, just update wallet and log)
 async function createWithdrawalIntent(req, res) {
   try {
-    // Check direct access
     if (process.env.ALLOW_DIRECT_API_ACCESS !== 'true') {
       return res.status(403).json({ error: 'Direct API access not allowed' });
     }
-    
     const userId = req.user.id;
     const { amount } = req.body;
-    
-    // Validate amount
     if (!amount || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
     }
-    
-    // Get user role
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    // Check wallet exists
     const wallet = await Wallet.getWalletByUserId(userId);
     if (!wallet) {
       return res.status(404).json({ error: 'Wallet not found' });
     }
-    
-    // Check wallet balance
     if (wallet.balance < amount) {
       return res.status(400).json({ error: 'Insufficient wallet balance' });
     }
-    
-    let availableAmount = 0;
-    
-    if (user.role === 'seller') {
-      // Sellers can withdraw their earnings
-      availableAmount = await getSellerEarnings(userId);
-      if (amount > availableAmount) {
-        return res.status(400).json({ 
-          error: 'Insufficient earnings', 
-          available: availableAmount 
-        });
-      }
-    } else {
-      // Buyers can only withdraw unspent deposits
-      availableAmount = await getBuyerUnspentDeposits(userId);
-      if (amount > availableAmount) {
-        return res.status(400).json({ 
-          error: 'Insufficient unspent deposits', 
-          available: availableAmount 
-        });
-      }
-    }
-    
-    // Find the most recent deposit transaction for this user
+    // Find the most recent deposit card (for demo log)
+    let cardInfo = null;
     const transactions = await Transaction.getTransactionsByUserId(userId);
-    const depositTransaction = transactions.find(t => t.type === 'deposit' && t.status === 'succeeded');
-    
-    if (!depositTransaction || !depositTransaction.reference_id) {
-      return res.status(400).json({ error: 'No previous deposit found for withdrawal' });
+    const depositTransaction = transactions.find(t => t.type === 'deposit' && t.status === 'succeeded' && t.reference_id);
+    if (depositTransaction && depositTransaction.reference_id) {
+      try {
+        const paymentIntent = await stripe.paymentIntents.retrieve(depositTransaction.reference_id);
+        if (paymentIntent && paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data[0]) {
+          const charge = paymentIntent.charges.data[0];
+          if (charge.payment_method_details && charge.payment_method_details.card) {
+            cardInfo = {
+              brand: charge.payment_method_details.card.brand,
+              last4: charge.payment_method_details.card.last4
+            };
+          }
+        }
+      } catch (err) {}
     }
-    
-    // Verify the original payment was real
-    try {
-      const originalPayment = await stripe.paymentIntents.retrieve(depositTransaction.reference_id);
-      if (originalPayment.status !== 'succeeded' || originalPayment.amount_received === 0) {
-        return res.status(400).json({ error: 'No real payment found for withdrawal' });
-      }
-    } catch (err) {
-      return res.status(400).json({ error: 'Invalid payment for withdrawal' });
+    // Fallback: if no card found, just log generic
+    if (cardInfo) {
+      console.log(`Amount withdrawn to ${cardInfo.brand.toUpperCase()} ••••${cardInfo.last4}: $${amount}`);
+    } else {
+      console.log(`Amount withdrawn to saved card: $${amount}`);
     }
-    
-    // Create refund to original payment
-    const refund = await stripe.refunds.create({
-      payment_intent: depositTransaction.reference_id,
-      amount: Math.round(amount * 100), // Convert to cents
-      reason: 'requested_by_customer'
-    });
-    
     // Debit wallet
     await Wallet.updateBalance(userId, -amount);
-    
     // Record withdrawal transaction
     await Transaction.createTransaction({
       walletId: wallet.id,
       type: 'withdrawal',
       amount: -amount,
-      description: user.role === 'seller' ? 'Seller earnings withdrawal' : 'Buyer deposit withdrawal',
-      referenceId: refund.id,
+      description: 'Wallet withdrawal',
+      referenceId: null,
       status: 'succeeded'
     });
-    
-    res.json({ 
-      message: 'Withdrawal processed successfully',
-      refundId: refund.id,
-      amount: amount,
-      userRole: user.role
+    res.json({
+      message: 'Withdrawal processed successfully (demo mode)',
+      amount: amount
     });
   } catch (err) {
     console.error('Withdrawal error:', err);
