@@ -84,6 +84,65 @@
 
 ---
 
+## Wallet & Payments Endpoints
+
+### Public (Stripe Webhook)
+- **POST /api/wallet/webhook** — Stripe webhook endpoint for payment confirmation. (No auth, Stripe only)
+
+### Authenticated User Endpoints (require JWT)
+- **GET /api/wallet/balance** — Get the logged-in user's wallet balance. Returns: `{ balance, currency }`
+- **GET /api/wallet/transactions** — Get the logged-in user's wallet transaction history. Returns: `{ transactions: [...] }`
+- **POST /api/wallet/create** — Create a wallet for the logged-in user (if not exists). Returns: `{ wallet }`
+- **POST /api/wallet/deposit** — Create a Stripe payment intent for wallet deposit. Body: `{ amount }`. Returns: `{ clientSecret }`
+
+**Notes:**
+- All wallet endpoints except `/webhook` require authentication (JWT in Authorization header or cookie).
+- Wallets are created automatically for new users (if implemented in registration), or via `/api/wallet/create` for existing users.
+- Deposits are processed in CAD. Use the returned `clientSecret` with Stripe.js on the frontend to complete payment.
+- The webhook endpoint is for Stripe to call after payment; do not call it manually.
+
+---
+
+## Order Endpoints
+
+### Authenticated User Endpoints (require JWT)
+
+- **POST /api/orders** — Submit shipping details for a won auction.
+  - Body:
+    ```json
+    {
+      "auction_id": "...",
+      "auction_type": "live" | "settled",
+      "shipping_address": "...",
+      "shipping_city": "...",
+      "shipping_state": "...",
+      "shipping_postal_code": "...",
+      "shipping_country": "..."
+    }
+    ```
+  - Returns: The created or updated order object.
+
+- **GET /api/orders/winner** — Get all orders for the logged-in user as a winner.
+  - Returns: Array of order objects.
+
+- **GET /api/orders/seller** — Get all orders for the logged-in user as a seller.
+  - Returns: Array of order objects (with auction and winner info).
+
+- **PATCH /api/orders/:orderId/status** — Seller updates shipping status for an order.
+  - Body:
+    ```json
+    { "status": "under_process" | "shipped" | "delivered" }
+    ```
+  - Only the seller for the order can update the status.
+  - Returns: The updated order object.
+
+**Notes:**
+- All order endpoints require authentication (JWT in Authorization header or cookie).
+- Only the winner of an auction can submit shipping details for that auction.
+- Only the seller can update the shipping status of their orders.
+
+---
+
 ## Notes
 - All POST/PATCH endpoints that require authentication must include a valid JWT token in the `Authorization: Bearer <token>` header.
 - For image upload endpoints, use `multipart/form-data` with a file field named `image`.

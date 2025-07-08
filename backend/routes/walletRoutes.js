@@ -18,4 +18,7 @@ router.get('/transactions', walletController.getTransactions);
 // Create a Stripe payment intent for deposit
 router.post('/deposit', walletController.createDepositIntent);
 
+// Create a wallet for the logged-in user
+router.post('/create', walletController.createWallet);
+
 module.exports = router; 

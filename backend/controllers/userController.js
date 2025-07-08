@@ -6,9 +6,11 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/e
 const RefreshToken = require('../models/RefreshToken');
 const crypto = require('crypto');
 const { auctionCache } = require('../services/redisService');
+const Wallet = require('../models/Wallet');
 
 const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const validatePassword = (password) => password.length >= 8;
+const validateName = (name) => /^[A-Za-z\s'-]+$/.test(name);
 
 const errorResponse = (res, status, message) => res.status(status).json({ error: message });
 
@@ -36,6 +38,14 @@ const userController = {
         return errorResponse(res, 400, 'All fields (firstName, lastName, email, password) are required');
       }
 
+      if (!validateName(firstName)) {
+        return errorResponse(res, 400, 'First name can only contain letters, spaces, hyphens, and apostrophes');
+      }
+
+      if (!validateName(lastName)) {
+        return errorResponse(res, 400, 'Last name can only contain letters, spaces, hyphens, and apostrophes');
+      }
+
       if (!validateEmail(email)) {
         return errorResponse(res, 400, 'Invalid email format');
       }
@@ -52,6 +62,14 @@ const userController = {
 
       // Create user
       const user = await User.create({ firstName, lastName, email, password });
+
+      // Create wallet for user
+      try {
+        await Wallet.createWallet(user.id);
+      } catch (walletErr) {
+        console.error('Wallet creation error:', walletErr);
+        // Continue registration even if wallet creation fails
+      }
 
       // Generate verification token
       const verificationToken = uuidv4();
