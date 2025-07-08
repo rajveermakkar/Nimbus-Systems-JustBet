@@ -18,6 +18,8 @@ const liveAuctionState = require('./services/liveAuctionState');
 const LiveAuctionBid = require('./models/LiveAuctionBid');
 const LiveAuctionResult = require('./models/LiveAuctionResult');
 const ordersRouter = require('./routes/orders');
+const walletRoutes = require('./routes/walletRoutes');
+const bodyParser = require('body-parser');
 
 // Start settled auction cron job
 if (process.env.NODE_ENV !== 'test') {
@@ -32,6 +34,7 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true 
 }));
+app.use(bodyParser.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -43,6 +46,7 @@ app.use('/api/live-auction', liveAuctionRoutes);
 app.use('/api/auctions', auctionsRoutes);
 app.use('/api/user', userProfileRouter);
 app.use('/api/orders', ordersRouter);
+app.use('/api/wallet', walletRoutes);
 
 app.get('/', (req, res) => {
   res.send('Welcome to JustBet!');

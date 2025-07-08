@@ -760,6 +760,70 @@ const initDatabase = async () => {
       }
     }
     
+    // Check if wallets table exists
+    const walletsTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'wallets'
+      );
+    `);
+    if (!walletsTableCheck.rows[0].exists) {
+      logDbChange('Creating wallets table');
+      await pool.query(`
+        CREATE TABLE wallets (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+          balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+          currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+          status VARCHAR(20) NOT NULL DEFAULT 'active',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      // Trigger for updated_at
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_wallets_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = CURRENT_TIMESTAMP;
+          RETURN NEW;
+        END;
+        $$ language 'plpgsql';
+      `);
+      await pool.query(`
+        DROP TRIGGER IF EXISTS update_wallets_updated_at ON wallets;
+        CREATE TRIGGER update_wallets_updated_at
+          BEFORE UPDATE ON wallets
+          FOR EACH ROW
+          EXECUTE FUNCTION update_wallets_updated_at_column();
+      `);
+      console.log('Created wallets table');
+    }
+
+    // Check if wallet_transactions table exists
+    const walletTxTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'wallet_transactions'
+      );
+    `);
+    if (!walletTxTableCheck.rows[0].exists) {
+      logDbChange('Creating wallet_transactions table');
+      await pool.query(`
+        CREATE TABLE wallet_transactions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          wallet_id UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+          type VARCHAR(20) NOT NULL, -- deposit, withdraw, bid, refund, etc.
+          amount NUMERIC(12,2) NOT NULL,
+          description TEXT,
+          reference_id UUID,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      console.log('Created wallet_transactions table');
+    }
+    
     console.log('Database initialization complete!');
   } catch (error) {
     console.error('Error initializing database:', error);
