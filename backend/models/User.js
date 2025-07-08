@@ -164,6 +164,15 @@ const User = {
   async getAll() {
     const result = await queryWithRetry('SELECT * FROM users ORDER BY created_at DESC');
     return result.rows;
+  },
+
+  // Set Stripe customer ID
+  async setStripeCustomerId(userId, customerId) {
+    const query = `
+      UPDATE users SET stripe_customer_id = $1 WHERE id = $2 RETURNING *
+    `;
+    const result = await queryWithRetry(query, [customerId, userId]);
+    return result.rows[0];
   }
 };
 
