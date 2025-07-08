@@ -164,8 +164,48 @@ const sendPasswordResetEmail = async (email, token) => {
   }
 };
 
+// Send deposit notification
+const sendDepositNotification = async (email, amount, currency = 'CAD') => {
+  const mailOptions = {
+    from: `"JustBet" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: 'Deposit Successful - JustBet Wallet',
+    html: `<div style="font-family: Arial, sans-serif; padding: 20px;">
+      <h2>Deposit Successful</h2>
+      <p>Your deposit of <b>${amount} ${currency}</b> was successful and has been added to your JustBet wallet.</p>
+      <p>Thank you for using JustBet!</p>
+    </div>`
+  };
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error('Error sending deposit notification:', error);
+  }
+};
+
+// Send withdrawal notification
+const sendWithdrawalNotification = async (email, amount, currency = 'CAD') => {
+  const mailOptions = {
+    from: `"JustBet" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: 'Withdrawal Successful - JustBet Wallet',
+    html: `<div style="font-family: Arial, sans-serif; padding: 20px;">
+      <h2>Withdrawal Successful</h2>
+      <p>Your withdrawal of <b>${amount} ${currency}</b> was processed successfully from your JustBet wallet.</p>
+      <p>If you did not request this, please contact support immediately.</p>
+    </div>`
+  };
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error('Error sending withdrawal notification:', error);
+  }
+};
+
 module.exports = {
   verifyEmailService,
   sendVerificationEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendDepositNotification,
+  sendWithdrawalNotification
 }; 

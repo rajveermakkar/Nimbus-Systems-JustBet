@@ -9,6 +9,7 @@ import { UserContext } from '../src/context/UserContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash, faArrowDown, faArrowUp, faCreditCard, faTrophy, faUndo, faUniversity, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import ConfirmModal from '../src/components/ConfirmModal';
+import LoadingSpinner from '../src/components/LoadingSpinner';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -1165,21 +1166,12 @@ function Wallet() {
   const [error, setError] = useState('');
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
-  const [depositAmount, setDepositAmount] = useState('');
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [depositLoading, setDepositLoading] = useState(false);
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
-  const [depositError, setDepositError] = useState('');
-  const [withdrawError, setWithdrawError] = useState('');
-  const [clientSecret, setClientSecret] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
   const [successMsg, setSuccessMsg] = useState('');
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [pmLoading, setPmLoading] = useState(false);
   const [showAddCard, setShowAddCard] = useState(false);
-  const [addCardClientSecret, setAddCardClientSecret] = useState(null);
-  const [addCardError, setAddCardError] = useState('');
-  // Track if AddFundsStepper is open and payment is processing, to avoid parent state updates
-  const [depositProcessing, setDepositProcessing] = useState(false);
   // Add state for confirm modal
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [removeCardId, setRemoveCardId] = useState(null);
@@ -1282,40 +1274,9 @@ function Wallet() {
   // Only fetchWallet after AddFundsStepper closes, not during payment
   function handleAddFundsModalClose() {
     setShowDeposit(false);
-    setTimeout(() => {
-      fetchWallet();
-    }, 400); // Wait for modal animation to finish
-  }
-
-  // Deposit modal logic
-  async function handleDeposit() {
-    setDepositLoading(true);
-    setDepositError('');
-    setSuccessMsg('');
-    try {
-      const resp = await walletService.createDepositIntent(Number(depositAmount));
-      setClientSecret(resp.clientSecret);
-    } catch (err) {
-      setDepositError(err.message || 'Failed to create deposit');
-    }
-    setDepositLoading(false);
-  }
-
-  // Withdraw modal logic
-  async function handleWithdraw() {
-    setWithdrawLoading(true);
-    setWithdrawError('');
-    setSuccessMsg('');
-    try {
-      await walletService.createWithdrawal(Number(withdrawAmount));
-      setSuccessMsg('Withdrawal request submitted.');
-      setWithdrawAmount('');
-      setShowWithdraw(false);
-      fetchWallet();
-    } catch (err) {
-      setWithdrawError(err.message || 'Failed to withdraw');
-    }
-    setWithdrawLoading(false);
+    setShowDeposit(false);
+  setIsUpdating(true);
+  fetchWallet().finally(() => setIsUpdating(false)); // Wait for modal animation to finish
   }
 
   // Add card modal logic
@@ -1431,6 +1392,7 @@ function Wallet() {
               <div style={{ fontSize: 18, color: '#fff', fontWeight: 500, marginBottom: 6 }}>Available Balance</div>
               <div style={{ fontSize: 36, fontWeight: 700, color: '#6fffbe', letterSpacing: 1, marginBottom: 18, textShadow: '0 2px 8px #6fffbe, 0 1px 2px #fff' }}>
                 ${Number(balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {isUpdating && <LoadingSpinner message={null} />}
               </div>
               <Button
                 variant="primary"
@@ -1676,8 +1638,7 @@ function Wallet() {
           </Button>
         </div>
       )}
-      {loadingTransactions && <div style={{ textAlign: 'center', color: '#6fffbe', marginTop: 12 }}>Loading transactions...</div>}
-    </div>
+      {loadingTransactions && <LoadingSpinner message="Loading transactions..." />}    </div>
   );
 }
 

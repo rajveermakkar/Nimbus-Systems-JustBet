@@ -2,9 +2,11 @@ const Wallet = require('../models/Wallet');
 const Transaction = require('../models/Transaction');
 const stripeService = require('../services/stripeService');
 const User = require('../models/User');
+const StripeConnectedCustomer = require('../models/StripeConnectedCustomer');
 const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-
+const emailService = require('../services/emailService');
+const { queryWithRetry } = require('../db/init');
 
 
 // Get seller earnings (total sales minus withdrawals)
@@ -106,39 +108,42 @@ async function getTransactions(req, res) {
 async function createDepositIntent(req, res) {
   try {
     console.log('createDepositIntent req.body:', req.body);
-    // Check direct access
     if (process.env.ALLOW_DIRECT_API_ACCESS !== 'true') {
       return res.status(403).json({ error: 'Direct API access not allowed' });
     }
-    
     const userId = req.user.id;
     const { amount, saveCard, paymentMethodId } = req.body;
-    
-    // Validate amount
     if (!amount || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
     }
-    
-    // Check daily deposit limit (if needed)
-    const DAILY_DEPOSIT_LIMIT = 2000; // $2000 CAD per day
+    const DAILY_DEPOSIT_LIMIT = 2000;
     const todayDeposits = await getTodayDeposits(userId);
     if (todayDeposits + amount > DAILY_DEPOSIT_LIMIT) {
       return res.status(400).json({ error: 'Daily deposit limit exceeded' });
     }
-    
     let customerId = null;
     let user = await User.findById(userId);
-    if (saveCard || paymentMethodId) {
-      // Fetch user and ensure they have a Stripe customer ID
+    const connectedAccountId = user.stripe_account_id || null;
+    if (connectedAccountId) {
+      // For Connect: get or create customer on connected account
+      let connectedCustomer = await StripeConnectedCustomer.findByUserAndAccount(userId, connectedAccountId);
+      if (!connectedCustomer) {
+        const customer = await stripe.customers.create(
+          { email: user.email },
+          { stripeAccount: connectedAccountId }
+        );
+        connectedCustomer = await StripeConnectedCustomer.create(userId, connectedAccountId, customer.id);
+      }
+      customerId = connectedCustomer.customer_id;
+    } else if (saveCard || paymentMethodId) {
       customerId = user.stripe_customer_id;
       if (!customerId) {
-        // Create Stripe customer if needed
         const customer = await stripeService.createCustomer(user.email);
         await User.setStripeCustomerId(user.id, customer.id);
         customerId = customer.id;
       }
     }
-    const paymentIntent = await stripeService.createPaymentIntent(userId, amount, 'cad', saveCard, customerId, paymentMethodId);
+    const paymentIntent = await stripeService.createPaymentIntent(userId, amount, 'cad', saveCard, customerId, paymentMethodId, connectedAccountId);
     res.json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {
     console.error('Failed to create payment intent:', err);
@@ -199,6 +204,15 @@ async function createWithdrawalIntent(req, res) {
       referenceId: null,
       status: 'succeeded'
     });
+    // Send withdrawal email notification
+    const user = await User.findById(userId);
+    if (user && user.email) {
+      try {
+        await emailService.sendWithdrawalNotification(user.email, amount, wallet.currency || 'CAD');
+      } catch (emailErr) {
+        console.error('Failed to send withdrawal email:', emailErr);
+      }
+    }
     res.json({
       message: 'Withdrawal processed successfully (demo mode)',
       amount: amount
@@ -259,13 +273,22 @@ async function handleStripeWebhook(req, res) {
       await Transaction.createTransaction({
         walletId: wallet.id,
         type: 'deposit',
-        amount,
-        description: 'Stripe deposit',
+        amount: amount,
+        description: 'Wallet deposit',
         referenceId: paymentIntent.id,
         status: 'succeeded'
       });
       
-      return res.json({ received: true });
+      // Send deposit email notification
+      const user = await User.findById(userId);
+      if (user && user.email) {
+        try {
+          await emailService.sendDepositNotification(user.email, amount, wallet.currency || 'CAD');
+        } catch (emailErr) {
+          console.error('Failed to send deposit email:', emailErr);
+        }
+      }
+      return res.status(200).send('Deposit processed');
     } catch (err) {
       console.error('Webhook processing error:', err);
       return res.status(500).send('Failed to process deposit');
@@ -413,6 +436,74 @@ async function getMonthlySummary(req, res) {
   }
 }
 
+// --- STRIPE CONNECT CONTROLLER LOGIC ---
+
+// 1. Start onboarding: create account if needed, return onboarding link
+async function startOnboarding(req, res) {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.role !== 'seller') return res.status(403).json({ error: 'Only sellers can onboard for payouts' });
+    let accountId = user.stripe_account_id;
+    if (!accountId) {
+      // Create new connected account
+      const account = await stripeService.createConnectedAccount(user.email);
+      accountId = account.id;
+      // Save to user
+      await queryWithRetry('UPDATE users SET stripe_account_id = $1 WHERE id = $2', [accountId, userId]);
+    }
+    // Generate onboarding link
+    const frontendBase = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : 'http://localhost:3000';
+    const refreshUrl = `${frontendBase}/wallet`;
+    const returnUrl = `${frontendBase}/wallet`;
+    const url = await stripeService.generateOnboardingLink(accountId, refreshUrl, returnUrl);
+    res.json({ url });
+  } catch (err) {
+    console.error('Stripe Connect onboarding error:', err);
+    res.status(500).json({ error: 'Failed to start onboarding' });
+  }
+}
+
+// 2. Get onboarding/KYC status
+async function getOnboardingStatus(req, res) {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    if (!user || !user.stripe_account_id) return res.status(404).json({ error: 'No connected account' });
+    const status = await stripeService.getAccountStatus(user.stripe_account_id);
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get onboarding status' });
+  }
+}
+
+// 3. Create payout to connected account
+async function createPayout(req, res) {
+  try {
+    const userId = req.user.id;
+    const { amount } = req.body;
+    if (!amount || isNaN(amount) || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+    const user = await User.findById(userId);
+    if (!user || !user.stripe_account_id) return res.status(404).json({ error: 'No connected account' });
+    // Check KYC status
+    const status = await stripeService.getAccountStatus(user.stripe_account_id);
+    if (!status.charges_enabled || !status.payouts_enabled) {
+      return res.status(400).json({ error: 'Account not fully onboarded for payouts' });
+    }
+    // Check wallet balance (seller earnings)
+    const earnings = await getSellerEarnings(userId);
+    if (earnings < amount) return res.status(400).json({ error: 'Insufficient earnings for payout' });
+    // Initiate payout
+    await stripeService.createPayout(user.stripe_account_id, amount, 'cad');
+    // Log payout (optional: create a transaction record)
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Stripe Connect payout error:', err);
+    res.status(500).json({ error: 'Failed to create payout' });
+  }
+}
+
 module.exports = {
   getBalance,
   getTransactions,
@@ -424,5 +515,8 @@ module.exports = {
   createSetupIntent,
   removePaymentMethod,
   getMostRecentDepositCard,
-  getMonthlySummary
+  getMonthlySummary,
+  startOnboarding,
+  getOnboardingStatus,
+  createPayout
 }; 

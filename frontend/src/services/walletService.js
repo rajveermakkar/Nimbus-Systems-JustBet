@@ -34,6 +34,16 @@ class WalletService {
   async getMonthlySummary() {
     return apiService.get('/api/wallet/monthly-summary');
   }
+  // Stripe Connect onboarding/status/payout
+  async getStripeConnectStatus() {
+    return apiService.get('/api/wallet/stripe-connect/status');
+  }
+  async startStripeOnboarding() {
+    return apiService.post('/api/wallet/stripe-connect/onboarding', {});
+  }
+  async createStripePayout(amount) {
+    return apiService.post('/api/wallet/stripe-connect/payout', { amount });
+  }
 }
 
 export const walletService = new WalletService();

@@ -26,4 +26,9 @@ router.get('/deposit-card', authenticateToken, walletController.getMostRecentDep
 // Add monthly summary endpoint
 router.get('/monthly-summary', authenticateToken, walletController.getMonthlySummary);
 
+// Stripe Connect onboarding and payout routes
+router.post('/stripe-connect/onboarding', authenticateToken, walletController.startOnboarding);
+router.get('/stripe-connect/status', authenticateToken, walletController.getOnboardingStatus);
+router.post('/stripe-connect/payout', authenticateToken, walletController.createPayout);
+
 module.exports = router; 

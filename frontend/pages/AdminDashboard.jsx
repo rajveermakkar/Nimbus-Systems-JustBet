@@ -40,7 +40,6 @@ function AdminDashboard() {
     { key: "manage-users", label: "Manage Users", icon: "fa-users-cog" },
     { key: "manage-auctions", label: "Manage Auctions", icon: "fa-gavel" },
     { key: "approve-users", label: "Approve Users", icon: "fa-user-check" },
-
     { key: "earnings", label: "Earnings", icon: "fa-dollar-sign" },
     { key: "db-health", label: "DB Health", icon: "fa-database" },
   ];
@@ -340,7 +339,6 @@ function AdminDashboard() {
       fetchAllSettledAuctions();
       fetchAllLiveAuctions();
     }
-
     if (section === "db-health") fetchDbHealth();
   }, [section]);
 
@@ -726,7 +724,7 @@ function AdminDashboard() {
                   <tr>
                     <th className="w-1/4 text-left px-4 py-2 font-bold text-base">Name</th>
                     <th className="w-1/3 text-left px-4 py-2 font-bold text-base">Email</th>
-                    <th className="w-1/6 text-center px-4 py-2 font-bold text-base">Business</th>
+                    <th className="w-1/6 text-left px-4 py-2 font-bold text-base">Business</th>
                     <th className="w-32 text-center px-4 py-2 font-bold text-base">Actions</th>
                   </tr>
                 </thead>
@@ -735,8 +733,8 @@ function AdminDashboard() {
                     <tr key={seller.id} className="border-b border-white/10">
                       <td className="p-2 text-left"><a href="#" onClick={e => { e.preventDefault(); openUserDetails(seller); }}>{seller.first_name} {seller.last_name}</a></td>
                       <td className="p-2 text-left">{seller.email}</td>
-                      <td className="p-2 text-center">{seller.business_name}</td>
-                      <td className="p-2 align-middle text-center">
+                      <td className="p-2 text-left">{seller.business_name}</td>
+                      <td className="p-2 text-center">
                         <div className="flex gap-2 justify-center">
                           <button onClick={() => openUserDetails(seller)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
                           <button disabled={actionLoading} onClick={() => openSellerApproveModal(seller)} className="bg-[#38b000] text-white hover:bg-[#2d8a00] px-3 py-1 rounded text-xs">Approve</button>
@@ -954,7 +952,14 @@ function AdminDashboard() {
               {navLinks.filter(link => link.key !== "approve-auctions").map(link => (
                 <button
                   key={link.key}
-                  onClick={() => navigate('/admin/' + link.key)}
+                  onClick={() => {
+                    if (link.key === 'dashboard') navigate('/admin/dashboard');
+                    else if (link.key === 'manage-users') navigate('/admin/manage-users');
+                    else if (link.key === 'manage-auctions') navigate('/admin/manage-auctions');
+                    else if (link.key === 'approve-users') navigate('/admin/approve-users');
+                    else if (link.key === 'earnings') navigate('/admin/earnings');
+                    else if (link.key === 'db-health') navigate('/admin/db-health');
+                  }}
                   className={`flex items-center gap-3 px-4 py-2 rounded-lg text-left transition font-semibold ${section === link.key ? 'bg-blue-900/60 text-blue-300' : 'hover:bg-blue-900/40 text-gray-200'}`}
                 >
                   <i className={`fa-solid ${link.icon}`}></i> {link.label}
