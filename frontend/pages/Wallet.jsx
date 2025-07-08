@@ -9,7 +9,6 @@ import { UserContext } from '../src/context/UserContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
 import ConfirmModal from '../src/components/ConfirmModal';
-import AddCardForm from '../src/components/auctions/AddCardForm';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
