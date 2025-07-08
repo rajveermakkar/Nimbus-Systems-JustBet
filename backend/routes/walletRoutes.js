@@ -1,24 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const walletController = require('../controllers/walletController');
-const jwtauth = require('../middleware/jwtauth');
+const authenticateToken = require('../middleware/jwtauth');
 
-// Stripe webhook endpoint (no auth)
+// Wallet routes
+router.get('/balance', authenticateToken, walletController.getBalance);
+router.get('/transactions', authenticateToken, walletController.getTransactions);
+router.post('/create', authenticateToken, walletController.createWallet);
+
+// Deposit and withdrawal routes
+router.post('/deposit/intent', authenticateToken, walletController.createDepositIntent);
+router.post('/withdraw', authenticateToken, walletController.createWithdrawalIntent);
+
+// Stripe webhook (no auth required)
 router.post('/webhook', walletController.handleStripeWebhook);
-
-// All wallet routes require authentication
-router.use(jwtauth);
-
-// Get wallet balance
-router.get('/balance', walletController.getBalance);
-
-// Get wallet transaction history
-router.get('/transactions', walletController.getTransactions);
-
-// Create a Stripe payment intent for deposit
-router.post('/deposit', walletController.createDepositIntent);
-
-// Create a wallet for the logged-in user
-router.post('/create', walletController.createWallet);
 
 module.exports = router; 

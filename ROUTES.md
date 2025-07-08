@@ -93,13 +93,21 @@
 - **GET /api/wallet/balance** — Get the logged-in user's wallet balance. Returns: `{ balance, currency }`
 - **GET /api/wallet/transactions** — Get the logged-in user's wallet transaction history. Returns: `{ transactions: [...] }`
 - **POST /api/wallet/create** — Create a wallet for the logged-in user (if not exists). Returns: `{ wallet }`
-- **POST /api/wallet/deposit** — Create a Stripe payment intent for wallet deposit. Body: `{ amount }`. Returns: `{ clientSecret }`
+- **POST /api/wallet/deposit/intent** — Create a Stripe payment intent for wallet deposit. Body: `{ amount }`. Returns: `{ clientSecret }`
+- **POST /api/wallet/withdraw** — Create a withdrawal request (refund to original card). Body: `{ amount }`. Returns: `{ message, refundId, amount, userRole }`
 
 **Notes:**
 - All wallet endpoints except `/webhook` require authentication (JWT in Authorization header or cookie).
-- Wallets are created automatically for new users (if implemented in registration), or via `/api/wallet/create` for existing users.
+- Wallets are created automatically for new users during registration.
 - Deposits are processed in CAD. Use the returned `clientSecret` with Stripe.js on the frontend to complete payment.
 - The webhook endpoint is for Stripe to call after payment; do not call it manually.
+- **Security**: Direct API access to deposit/withdrawal endpoints is controlled by `ALLOW_DIRECT_API_ACCESS` environment variable.
+- **Withdrawals**: 
+  - Sellers can withdraw their earnings (total sales minus previous withdrawals)
+  - Buyers can only withdraw unspent deposits (deposits minus spent on auctions)
+  - Withdrawals are processed as refunds to the original payment method
+- **Daily Limits**: Deposits are limited to $1000 CAD per day per user
+- **Validation**: All payments are verified to be real (not test payments) before processing
 
 ---
 
