@@ -30,8 +30,34 @@ async function getTransactionsByUserId(userId) {
   return result.rows;
 }
 
+// Get paginated transactions for a user (by joining wallets)
+async function getTransactionsByUserIdPaginated(userId, limit, offset) {
+  const query = `
+    SELECT wt.* FROM wallet_transactions wt
+    JOIN wallets w ON wt.wallet_id = w.id
+    WHERE w.user_id = $1
+    ORDER BY wt.created_at DESC
+    LIMIT $2 OFFSET $3
+  `;
+  const result = await queryWithRetry(query, [userId, limit, offset]);
+  return result.rows;
+}
+
+// Get total transaction count for a user
+async function getTransactionCountByUserId(userId) {
+  const query = `
+    SELECT COUNT(*) FROM wallet_transactions wt
+    JOIN wallets w ON wt.wallet_id = w.id
+    WHERE w.user_id = $1
+  `;
+  const result = await queryWithRetry(query, [userId]);
+  return parseInt(result.rows[0].count, 10);
+}
+
 module.exports = {
   createTransaction,
   getTransactionsByWalletId,
-  getTransactionsByUserId
+  getTransactionsByUserId,
+  getTransactionsByUserIdPaginated,
+  getTransactionCountByUserId
 }; 

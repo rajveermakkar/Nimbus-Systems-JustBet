@@ -4,8 +4,8 @@ class WalletService {
   async getBalance() {
     return apiService.get('/api/wallet/balance');
   }
-  async getTransactions() {
-    return apiService.get('/api/wallet/transactions');
+  async getTransactions(page = 1, limit = 10) {
+    return apiService.get(`/api/wallet/transactions?page=${page}&limit=${limit}`);
   }
   async createWallet() {
     return apiService.post('/api/wallet/create', {});
