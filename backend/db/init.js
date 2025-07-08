@@ -830,12 +830,23 @@ const initDatabase = async () => {
           type VARCHAR(20) NOT NULL, -- deposit, withdraw, bid, refund, etc.
           amount NUMERIC(12,2) NOT NULL,
           description TEXT,
-          reference_id UUID,
+          reference_id TEXT, -- changed from UUID to TEXT for Stripe compatibility
           status VARCHAR(20) NOT NULL DEFAULT 'pending',
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
       console.log('Created wallet_transactions table');
+    } else {
+      // Always check and update reference_id column to TEXT if needed
+      const refIdTypeCheck = await pool.query(`
+        SELECT data_type FROM information_schema.columns 
+        WHERE table_name = 'wallet_transactions' AND column_name = 'reference_id'
+      `);
+      if (refIdTypeCheck.rows.length > 0 && refIdTypeCheck.rows[0].data_type !== 'text') {
+        logDbChange('Altering wallet_transactions.reference_id to TEXT');
+        await pool.query(`ALTER TABLE wallet_transactions ALTER COLUMN reference_id TYPE TEXT`);
+        console.log('Altered wallet_transactions.reference_id to TEXT');
+      }
     }
     
     console.log('Database initialization complete!');

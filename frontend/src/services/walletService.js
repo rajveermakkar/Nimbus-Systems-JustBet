@@ -10,8 +10,8 @@ class WalletService {
   async createWallet() {
     return apiService.post('/api/wallet/create', {});
   }
-  async createDepositIntent(amount) {
-    return apiService.post('/api/wallet/deposit/intent', { amount });
+  async createDepositIntent(amount, saveCard) {
+    return apiService.post('/api/wallet/deposit/intent', { amount, saveCard });
   }
   async createWithdrawal(amount) {
     return apiService.post('/api/wallet/withdraw', { amount });
@@ -25,6 +25,9 @@ class WalletService {
   }
   async removePaymentMethod(id) {
     return apiService.delete(`/api/wallet/payment-methods/${id}`);
+  }
+  async getMostRecentDepositCard() {
+    return apiService.get('/api/wallet/deposit-card');
   }
 }
 
