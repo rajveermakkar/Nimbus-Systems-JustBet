@@ -20,4 +20,7 @@ router.get('/payment-methods', authenticateToken, walletController.listPaymentMe
 router.post('/payment-methods/setup-intent', authenticateToken, walletController.createSetupIntent);
 router.delete('/payment-methods/:id', authenticateToken, walletController.removePaymentMethod);
 
+// New route for GET /api/wallet/deposit-card
+router.get('/deposit-card', authenticateToken, walletController.getMostRecentDepositCard);
+
 module.exports = router; 

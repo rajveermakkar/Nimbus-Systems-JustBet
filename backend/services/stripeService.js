@@ -2,15 +2,22 @@ const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Create a payment intent for a deposit
-async function createPaymentIntent(userId, amount, currency = 'cad') {
+async function createPaymentIntent(userId, amount, currency = 'cad', saveCard = false, customerId = null) {
   // Optionally, you can add metadata like userId
-  const paymentIntent = await stripe.paymentIntents.create({
+  const paymentIntentData = {
     amount: Math.round(amount * 100), // Stripe expects amount in cents
     currency,
     metadata: { userId },
     description: 'Wallet deposit',
     payment_method_types: ['card']
-  });
+  };
+  if (saveCard) {
+    paymentIntentData.setup_future_usage = 'off_session';
+  }
+  if (customerId) {
+    paymentIntentData.customer = customerId;
+  }
+  const paymentIntent = await stripe.paymentIntents.create(paymentIntentData);
   return paymentIntent;
 }
 

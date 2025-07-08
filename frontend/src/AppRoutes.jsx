@@ -306,7 +306,11 @@ function AppRoutes() {
             <WinningPage />
           </ProtectedRoute>
         } />
-        <Route path="/wallet" element={<Wallet />} />
+        <Route path="/wallet" element={
+          <ProtectedRoute>
+            <Wallet />
+          </ProtectedRoute>
+        } />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

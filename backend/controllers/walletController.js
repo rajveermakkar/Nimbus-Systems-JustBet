@@ -105,7 +105,7 @@ async function createDepositIntent(req, res) {
     }
     
     const userId = req.user.id;
-    const { amount } = req.body;
+    const { amount, saveCard } = req.body;
     
     // Validate amount
     if (!amount || isNaN(amount) || amount <= 0) {
@@ -119,7 +119,19 @@ async function createDepositIntent(req, res) {
       return res.status(400).json({ error: 'Daily deposit limit exceeded' });
     }
     
-    const paymentIntent = await stripeService.createPaymentIntent(userId, amount, 'cad');
+    let customerId = null;
+    if (saveCard) {
+      // Fetch user and ensure they have a Stripe customer ID
+      let user = await User.findById(userId);
+      customerId = user.stripe_customer_id;
+      if (!customerId) {
+        // Create Stripe customer if needed
+        const customer = await stripeService.createCustomer(user.email);
+        await User.setStripeCustomerId(user.id, customer.id);
+        customerId = customer.id;
+      }
+    }
+    const paymentIntent = await stripeService.createPaymentIntent(userId, amount, 'cad', saveCard, customerId);
     res.json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create payment intent' });
@@ -252,7 +264,7 @@ async function handleStripeWebhook(req, res) {
   const sig = req.headers['stripe-signature'];
   let event;
   try {
-    event = stripe.webhooks.constructEvent(req.rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
@@ -355,6 +367,46 @@ async function removePaymentMethod(req, res) {
   }
 }
 
+// Get card info for most recent deposit
+async function getMostRecentDepositCard(req, res) {
+  try {
+    const userId = req.user.id;
+    const transactions = await Transaction.getTransactionsByUserId(userId);
+    const depositTransaction = transactions.find(t => t.type === 'deposit' && t.status === 'succeeded' && t.reference_id);
+    let card = null;
+    if (depositTransaction && depositTransaction.reference_id) {
+      // Fetch PaymentIntent from Stripe
+      const paymentIntent = await stripe.paymentIntents.retrieve(depositTransaction.reference_id);
+      if (paymentIntent && paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data[0]) {
+        const charge = paymentIntent.charges.data[0];
+        if (charge.payment_method_details && charge.payment_method_details.card) {
+          card = {
+            brand: charge.payment_method_details.card.brand,
+            last4: charge.payment_method_details.card.last4
+          };
+        }
+      }
+    }
+    // Fallback: if no card found, try to get saved payment methods
+    if (!card) {
+      const user = await User.findById(userId);
+      if (user && user.stripe_customer_id) {
+        const methods = await stripeService.listPaymentMethods(user.stripe_customer_id);
+        if (methods && methods.length > 0) {
+          card = {
+            brand: methods[0].card.brand,
+            last4: methods[0].card.last4
+          };
+        }
+      }
+    }
+    return res.json({ card });
+  } catch (err) {
+    console.error('Error fetching most recent deposit card:', err);
+    return res.status(500).json({ error: 'Failed to fetch card info' });
+  }
+}
+
 module.exports = {
   getBalance,
   getTransactions,
@@ -364,5 +416,6 @@ module.exports = {
   createWallet,
   listPaymentMethods,
   createSetupIntent,
-  removePaymentMethod
+  removePaymentMethod,
+  getMostRecentDepositCard
 }; 

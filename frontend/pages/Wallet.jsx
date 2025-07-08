@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { walletService } from '../src/services/walletService';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { format } from 'date-fns';
 import Button from '../src/components/Button';
 import { AnimatePresence, motion } from 'framer-motion';
+import { UserContext } from '../src/context/UserContext';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -115,61 +116,6 @@ const modalBackBtnStyle = {
   lineHeight: 1,
   fontWeight: 700,
 };
-
-function AddCardForm({ clientSecret, onSuccess, onError, onClose, depositAmount, onBack, amountMessage, context }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    if (!stripe || !elements) {
-      setError('Stripe not loaded');
-      setLoading(false);
-      return;
-    }
-    const { error: stripeError } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {},
-      redirect: 'if_required',
-    });
-    if (stripeError) {
-      setError(stripeError.message);
-      setLoading(false);
-      return;
-    }
-    onSuccess();
-    setLoading(false);
-  };
-
-  // Context-aware message
-  let cardMsg = '';
-  if (context === 'deposit') cardMsg = 'Enter card details to add funds';
-  else if (context === 'withdraw') cardMsg = 'Enter card details to receive funds';
-  else cardMsg = amountMessage || '';
-
-  return (
-    <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 18, position: 'relative' }}>
-      {cardMsg && (
-        <div style={{ color: '#b3b3c9', fontSize: 17, fontWeight: 500, marginBottom: 8, textAlign: 'center' }}>{cardMsg}</div>
-      )}
-      <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2, color: '#fff', textAlign: 'center' }}>Card Details</div>
-      {clientSecret && (
-        <div style={{ background: 'rgba(35,43,74,0.18)', borderRadius: 14, padding: 14, marginBottom: 2, border: '1.5px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 8px rgba(31,38,135,0.10)' }}>
-          <PaymentElement options={{ layout: 'tabs', appearance: paymentElementAppearance }} />
-        </div>
-      )}
-      {/* Reserve space for error message to prevent jump */}
-      <div style={{ minHeight: 22, color: 'red', marginTop: 2, textAlign: 'center', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'min-height 0.2s' }}>{error || ''}</div>
-      <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} type="submit" disabled={loading}>
-        {loading ? 'Processing...' : depositAmount ? `Add $${Number(depositAmount).toFixed(2)}` : 'Add Card'}
-      </Button>
-    </form>
-  );
-}
 
 // Modal overlay style
 const modalOverlayStyle = {
@@ -368,9 +314,59 @@ const stepVariants = {
   exit: { opacity: 0, x: -40, position: 'absolute', width: '100%' },
 };
 
+// SaveCardChoiceStep component for AddFundsStepper step 1
+function SaveCardChoiceStep({ onChoice, loading }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, marginTop: 24 }}>
+      <div style={{ fontWeight: 600, fontSize: 18, color: '#fff', textAlign: 'center', marginBottom: 12 }}>
+        Do you want to save this card for future use?
+      </div>
+      <div style={{ display: 'flex', gap: 32 }}>
+        <Button variant="primary" size="default" style={{ minWidth: 120, fontSize: 18, borderRadius: 10 }} type="button" onClick={() => onChoice(true)} disabled={loading}>
+          Yes
+        </Button>
+        <Button variant="secondary" size="default" style={{ minWidth: 120, fontSize: 18, borderRadius: 10 }} type="button" onClick={() => onChoice(false)} disabled={loading}>
+          No
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// PaymentElementStep component for AddFundsStepper step 2
+function PaymentElementStep({ clientSecret, onConfirm, confirmError, confirmLoading, cardInfo }) {
+  const paymentElementOptions = React.useMemo(() => ({
+    layout: 'tabs',
+    appearance: paymentElementAppearance,
+    defaultValues: { billingDetails: { email: '' } },
+    fields: { billingDetails: { email: 'never' } },
+    wallets: { link: 'never' },
+  }), []);
+  const stripe = useStripe();
+  const elements = useElements();
+  useEffect(() => {
+    console.log('[PaymentElementStep] mount', { stripeLoaded: !!stripe, elementsLoaded: !!elements, clientSecret });
+    return () => {
+      console.log('[PaymentElementStep] unmount', { stripeLoaded: !!stripe, elementsLoaded: !!elements, clientSecret });
+    };
+  }, [stripe, elements, clientSecret]);
+  return (
+    <form onSubmit={e => { e.preventDefault(); onConfirm(stripe, elements); }} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 18, position: 'relative' }}>
+      <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2, color: '#fff', textAlign: 'center' }}>Card Details</div>
+      <div style={{ background: 'rgba(35,43,74,0.18)', borderRadius: 14, padding: 14, marginBottom: 2, border: '1.5px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 8px rgba(31,38,135,0.10)' }}>
+        <PaymentElement options={paymentElementOptions} />
+      </div>
+      <div style={{ minHeight: 22, color: 'red', marginTop: 2, textAlign: 'center', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'min-height 0.2s' }}>{confirmError || ''}</div>
+      <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} type="submit" disabled={confirmLoading}>
+        {confirmLoading ? 'Processing...' : 'Confirm & Pay'}
+      </Button>
+    </form>
+  );
+}
+
 // Add Funds Stepper Modal
-function AddFundsStepper({ open, onClose, onSuccess }) {
-  const [step, setStep] = useState(0); // 0: Amount, 1: Card, 2: Confirm, 3: Success
+function AddFundsStepper({ open, onClose, onSuccess, userEmail }) {
+  const [step, setStep] = useState(0); // 0: Amount, 1: SaveCard, 2: Payment, 3: Success
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState('');
   const [clientSecret, setClientSecret] = useState(null);
@@ -380,7 +376,25 @@ function AddFundsStepper({ open, onClose, onSuccess }) {
   const [cardInfo, setCardInfo] = useState(null); // {brand, last4}
   const [confirmError, setConfirmError] = useState('');
   const [confirmLoading, setConfirmLoading] = useState(false);
-  const [saveCard, setSaveCard] = useState(false);
+  const [saveCard, setSaveCard] = useState(null); // null until user chooses Yes/No
+  const [lockModal, setLockModal] = useState(false);
+
+  // Debug logs for modal open/close, step, and clientSecret
+  useEffect(() => {
+    if (open) {
+      console.log('[AddFundsStepper] Modal opened, resetting state');
+    } else {
+      console.log('[AddFundsStepper] Modal closed');
+    }
+  }, [open]);
+  useEffect(() => {
+    console.log('[AddFundsStepper] Step changed:', step);
+  }, [step]);
+  useEffect(() => {
+    if (clientSecret) {
+      console.log('[AddFundsStepper] clientSecret set:', clientSecret);
+    }
+  }, [clientSecret]);
 
   // Reset on open/close
   useEffect(() => {
@@ -395,52 +409,65 @@ function AddFundsStepper({ open, onClose, onSuccess }) {
       setCardInfo(null);
       setConfirmError('');
       setConfirmLoading(false);
-      setSaveCard(false);
+      setSaveCard(null);
+      setLockModal(false);
     }
   }, [open]);
 
-  // Step 1: Enter Amount
-  async function handleAmountNext() {
+  // Step 0: Enter Amount
+  function handleAmountNext() {
     setAmountError('');
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       setAmountError('Enter a valid amount');
       return;
     }
+    setStep(1);
+  }
+
+  // Step 1: Save card? (Yes/No)
+  async function handleSaveCardChoice(choice) {
+    setSaveCard(choice);
     setLoading(true);
     try {
-      const resp = await walletService.createDepositIntent(Number(amount));
-      setClientSecret(resp.clientSecret);
-      setStep(1);
+      // Only set clientSecret if not already set
+      if (!clientSecret) {
+        const resp = await walletService.createDepositIntent(Number(amount), !!choice);
+        setClientSecret(resp.clientSecret);
+      }
+      setStep(2);
     } catch (err) {
-      setAmountError(err.message || 'Failed to create deposit');
+      setCardError(err.message || 'Failed to create deposit');
+      setStep(0); // go back to amount step on error
     }
     setLoading(false);
   }
 
-  // Step 2: Card Details (collect card, do not process payment yet)
-  function handleCardFormSuccess(cardMeta) {
-    setCardInfo(cardMeta); // {brand, last4}
-    setStep(2);
-  }
-
-  // Step 3: Confirm & Pay
+  // Step 2: Confirm & Pay (render PaymentElement)
   async function handleConfirmAndPay(stripe, elements) {
     setConfirmError('');
     setConfirmLoading(true);
+    setLockModal(true);
+    console.log('[AddFundsStepper] handleConfirmAndPay called', { stripeLoaded: !!stripe, elementsLoaded: !!elements, step });
     try {
       if (!stripe || !elements) throw new Error('Stripe not loaded');
       const options = {
         elements,
-        confirmParams: {},
+        confirmParams: {
+          payment_method_data: {
+            billing_details: {
+              email: userEmail || ''
+            }
+          }
+        },
         redirect: 'if_required',
       };
-      if (saveCard) {
-        options.confirmParams.setup_future_usage = 'off_session';
-      }
+      console.log('[AddFundsStepper] Calling stripe.confirmPayment', options);
       const { error, paymentIntent } = await stripe.confirmPayment(options);
+      console.log('[AddFundsStepper] stripe.confirmPayment result', { error, paymentIntent });
       if (error) {
         setConfirmError(error.message);
         setConfirmLoading(false);
+        setLockModal(false);
         return;
       }
       // Try to extract card info from paymentIntent if available
@@ -456,146 +483,43 @@ function AddFundsStepper({ open, onClose, onSuccess }) {
       setStep(3);
       setSuccessMsg('Deposit successful!');
       setTimeout(() => {
-        onSuccess && onSuccess();
-        onClose();
+        onClose(); // Only close modal, do not trigger parent state update yet
       }, 1200);
     } catch (err) {
+      console.error('[AddFundsStepper] Error in handleConfirmAndPay:', err);
       setConfirmError(err.message || 'Failed to process payment');
+      setLockModal(false);
     }
     setConfirmLoading(false);
   }
 
-  // Custom AddCardForm for deposit (step 1): collects card, but does not process payment
-  function AddCardFormForDeposit({ clientSecret, onSuccess, onError, onClose, depositAmount, onBack, amountMessage, context, saveCard, setSaveCard, setCardMeta }) {
-    const stripe = useStripe();
-    const elements = useElements();
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    // Card meta state for confirmation step
-    const [localCardMeta, setLocalCardMeta] = useState(null);
-    const paymentElementOptions = React.useMemo(() => ({
-      layout: 'tabs',
-      appearance: paymentElementAppearance,
-      defaultValues: { billingDetails: { email: '' } },
-      fields: { billingDetails: { email: 'never' } },
-      wallets: { link: 'never' },
-    }), []);
-
-    // Listen for changes in PaymentElement to try to extract card info
-    useEffect(() => {
-      if (!elements) return;
-      const paymentElement = elements.getElement('payment');
-      if (!paymentElement) return;
-      const handler = (event) => {
-        if (event.value && event.value.type === 'card' && event.value.brand && event.value.last4) {
-          setLocalCardMeta({ brand: event.value.brand, last4: event.value.last4 });
-          setCardMeta && setCardMeta({ brand: event.value.brand, last4: event.value.last4 });
-        }
-      };
-      paymentElement.on('change', handler);
-      return () => paymentElement.off('change', handler);
-    }, [elements, setCardMeta]);
-
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      setLoading(true);
-      setError('');
-      if (!stripe || !elements) {
-        setError('Stripe not loaded');
-        setLoading(false);
-        return;
-      }
-      // Just proceed to next step; card details will be confirmed on payment
-      onSuccess(localCardMeta);
-      setLoading(false);
-    };
-
-    let cardMsg = '';
-    if (context === 'deposit') cardMsg = 'Enter card details to add funds';
-    else if (context === 'withdraw') cardMsg = 'Enter card details to receive funds';
-    else cardMsg = amountMessage || '';
-
-    return (
-      <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 18, position: 'relative' }}>
-        {cardMsg && (
-          <div style={{ color: '#b3b3c9', fontSize: 17, fontWeight: 500, marginBottom: 8, textAlign: 'center' }}>{cardMsg}</div>
-        )}
-        <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2, color: '#fff', textAlign: 'center' }}>Card Details</div>
-        {clientSecret && (
-          <div style={{ background: 'rgba(35,43,74,0.18)', borderRadius: 14, padding: 14, marginBottom: 2, border: '1.5px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 8px rgba(31,38,135,0.10)' }}>
-            <PaymentElement options={paymentElementOptions} />
-          </div>
-        )}
-        {/* Save card checkbox inside the form */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0 0 0', color: '#b3b3c9', fontSize: 15 }}>
-          <input type="checkbox" checked={saveCard} onChange={e => setSaveCard(e.target.checked)} style={{ accentColor: '#6fffbe', width: 18, height: 18 }} />
-          Save card for future transactions
-        </label>
-        <div style={{ minHeight: 22, color: 'red', marginTop: 2, textAlign: 'center', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'min-height 0.2s' }}>{error || ''}</div>
-        <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} type="submit" disabled={loading}>
-          {loading ? 'Processing...' : depositAmount ? `Continue` : 'Continue'}
-        </Button>
-      </form>
-    );
-  }
-
-  // Confirm step component
-  function ConfirmDepositStep({ amount, cardInfo, onBack, onConfirm, confirmError, confirmLoading, saveCard }) {
-    const stripe = useStripe();
-    const elements = useElements();
-    return (
-      <div>
-        <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 18, fontWeight: 500 }}>
-          Confirm Deposit
-        </div>
-        <div style={{ background: 'rgba(35,43,74,0.18)', borderRadius: 10, padding: 18, marginBottom: 18, border: '1.5px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
-          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Amount: <span style={{ color: '#6fffbe' }}>${Number(amount).toFixed(2)}</span></div>
-          <div style={{ fontSize: 15, color: '#b3b3c9' }}>
-            Payment Method: {cardInfo && cardInfo.last4 ? `Card ending in ${cardInfo.last4}` : 'Card'}
-          </div>
-          {saveCard && <div style={{ fontSize: 14, color: '#6fffbe', marginTop: 6 }}>This card will be saved for future transactions.</div>}
-        </div>
-        {confirmError && <div style={{ color: 'red', marginBottom: 8 }}>{confirmError}</div>}
-        <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={() => onConfirm(stripe, elements)} disabled={confirmLoading}>
-          {confirmLoading ? 'Processing...' : 'Confirm & Pay'}
-        </Button>
-        <Button variant="secondary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 10, marginBottom: 0 }} onClick={onBack}>
-          Back
-        </Button>
-      </div>
-    );
-  }
+  // CSS display helpers for step visibility
+  const getStepDisplay = (targetStep) => (step === targetStep ? {} : { display: 'none' });
 
   return open ? (
     <div style={modalOverlayStyle}>
-      <motion.div
-        style={{ ...modalCardStyle, minWidth: 440, maxWidth: 540, minHeight: 340, padding: '54px 48px 48px 48px', position: 'relative' }}
-        transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-      >
-        {/* Top left back arrow (only if step > 0) */}
-        {step > 0 && (
-          <button type="button" aria-label="Back" style={modalBackBtnStyle} onClick={() => setStep(step - 1)}>
-            <span aria-hidden="true">&#8592;</span>
-          </button>
-        )}
-        {/* Top right close X (always) */}
-        <button type="button" aria-label="Close" style={modalCloseBtnStyle} onClick={onClose}>
-          <span aria-hidden="true">&times;</span>
-        </button>
-        <h3 style={{ fontWeight: 700, fontSize: 26, marginBottom: 18, textAlign: 'center' }}>Add Funds</h3>
-        <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 18, fontWeight: 500, minHeight: 24 }}>
-          You are adding <span style={{ color: '#6fffbe', fontWeight: 700 }}>${amount && !isNaN(Number(amount)) && Number(amount) > 0 ? Number(amount).toFixed(2) : '0.00'}</span> to your Wallet
-        </div>
-        <AnimatePresence mode="wait" initial={false}>
-          {step === 0 && (
-            <motion.div
-              key="step-0"
-              variants={stepVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-            >
+      {clientSecret ? (
+        <Elements stripe={stripePromise} options={{ clientSecret, locale: 'en-CA' }}>
+          <motion.div
+            style={{ ...modalCardStyle, minWidth: 440, maxWidth: 540, minHeight: 340, padding: '54px 48px 48px 48px', position: 'relative' }}
+            transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
+          >
+            {/* Top left back arrow (only if step > 0) */}
+            {step > 0 && (
+              <button type="button" aria-label="Back" style={modalBackBtnStyle} onClick={() => !lockModal && setStep(step - 1)} disabled={lockModal}>
+                <span aria-hidden="true">&#8592;</span>
+              </button>
+            )}
+            {/* Top right close X (always) */}
+            <button type="button" aria-label="Close" style={modalCloseBtnStyle} onClick={() => { if (!lockModal) onClose(); }} disabled={lockModal}>
+              <span aria-hidden="true">&times;</span>
+            </button>
+            <h3 style={{ fontWeight: 700, fontSize: 26, marginBottom: 18, textAlign: 'center' }}>Add Funds</h3>
+            <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 18, fontWeight: 500, minHeight: 24 }}>
+              You are adding <span style={{ color: '#6fffbe', fontWeight: 700 }}>${amount && !isNaN(Number(amount)) && Number(amount) > 0 ? Number(amount).toFixed(2) : '0.00'}</span> to your Wallet
+            </div>
+            {/* Step 0: Amount */}
+            <div style={getStepDisplay(0)}>
               <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 16, fontWeight: 400 }}>
                 How much would you like to add?
               </div>
@@ -607,276 +531,76 @@ function AddFundsStepper({ open, onClose, onSuccess }) {
               <Button variant="secondary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 10, marginBottom: 0 }} onClick={onClose}>
                 Cancel
               </Button>
-            </motion.div>
-          )}
-          {step === 1 && clientSecret && (
-            <motion.div
-              key="step-1"
-              variants={stepVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-            >
-              <Elements stripe={stripePromise} options={{ clientSecret, locale: 'en-CA' }}>
-                <AddCardFormForDeposit
-                  clientSecret={clientSecret}
-                  onSuccess={handleCardFormSuccess}
-                  onError={setCardError}
-                  onClose={onClose}
-                  depositAmount={amount}
-                  cardError={cardError}
-                  onBack={() => setStep(0)}
-                  amountMessage="Enter card details to add funds"
-                  context="deposit"
-                  saveCard={saveCard}
-                  setSaveCard={setSaveCard}
-                  setCardMeta={setCardInfo}
-                />
-              </Elements>
-            </motion.div>
-          )}
-          {step === 2 && clientSecret && (
-            <motion.div
-              key="step-2"
-              variants={stepVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-            >
-              <Elements stripe={stripePromise} options={{ clientSecret, locale: 'en-CA' }}>
-                <ConfirmDepositStep
-                  amount={amount}
-                  cardInfo={cardInfo}
-                  onBack={() => setStep(1)}
-                  onConfirm={handleConfirmAndPay}
-                  confirmError={confirmError}
-                  confirmLoading={confirmLoading}
-                  saveCard={saveCard}
-                />
-              </Elements>
-            </motion.div>
-          )}
-          {step === 3 && (
-            <motion.div
-              key="step-3"
-              variants={stepVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-            >
+            </div>
+            {/* Step 1: Save Card Choice */}
+            <div style={getStepDisplay(1)}>
+              <SaveCardChoiceStep onChoice={handleSaveCardChoice} loading={loading} />
+            </div>
+            {/* Step 2: PaymentElementStep (always mounted, only visible at step 2) */}
+            <div style={getStepDisplay(2)}>
+              <PaymentElementStep
+                clientSecret={clientSecret}
+                onConfirm={handleConfirmAndPay}
+                confirmError={confirmError}
+                confirmLoading={confirmLoading}
+                cardInfo={cardInfo}
+              />
+            </div>
+            {/* Step 3: Success */}
+            <div style={getStepDisplay(3)}>
               <div style={{ textAlign: 'center', margin: '40px 0 30px 0', color: '#6fffbe', fontSize: 22, fontWeight: 700 }}>
                 {successMsg}
               </div>
-            </motion.div>
+            </div>
+            <StepDots step={step} total={4} />
+          </motion.div>
+        </Elements>
+      ) : (
+        <motion.div
+          style={{ ...modalCardStyle, minWidth: 440, maxWidth: 540, minHeight: 340, padding: '54px 48px 48px 48px', position: 'relative' }}
+          transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
+        >
+          {/* Top left back arrow (only if step > 0) */}
+          {step > 0 && (
+            <button type="button" aria-label="Back" style={modalBackBtnStyle} onClick={() => setStep(step - 1)}>
+              <span aria-hidden="true">&#8592;</span>
+            </button>
           )}
-        </AnimatePresence>
-        <StepDots step={step} total={4} />
-      </motion.div>
-    </div>
-  ) : null;
-}
-
-// Withdraw Stepper Modal
-function WithdrawStepper({ open, onClose, onSuccess, paymentMethods, onAddCard }) {
-  const [step, setStep] = useState(0); // 0: Amount, 1: Card, 2: Confirm, 3: Success
-  const [amount, setAmount] = useState('');
-  const [amountError, setAmountError] = useState('');
-  const [selectedCard, setSelectedCard] = useState(null);
-  const [showAddCard, setShowAddCard] = useState(false);
-  const [cardError, setCardError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
-
-  useEffect(() => {
-    if (open) {
-      setStep(0);
-      setAmount('');
-      setAmountError('');
-      setSelectedCard(null);
-      setShowAddCard(false);
-      setCardError('');
-      setLoading(false);
-      setSuccessMsg('');
-    }
-  }, [open]);
-
-  // Step 1: Enter Amount
-  function handleAmountNext() {
-    setAmountError('');
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      setAmountError('Enter a valid amount');
-      return;
-    }
-    setStep(1);
-  }
-
-  // Step 2: Card selection or add
-  function handleCardNext() {
-    if (!selectedCard && !showAddCard) {
-      setCardError('Select a card or add a new one');
-      return;
-    }
-    setCardError('');
-    setStep(2);
-  }
-
-  // Step 3: Confirm
-  async function handleConfirm() {
-    setLoading(true);
-    try {
-      // Call backend to create withdrawal (pass amount and selectedCard.id)
-      await walletService.createWithdrawal(Number(amount), selectedCard?.id);
-      setStep(3);
-      setSuccessMsg('Withdrawal request submitted!');
-      setTimeout(() => {
-        onSuccess && onSuccess();
-        onClose();
-      }, 1200);
-    } catch (err) {
-      setCardError(err.message || 'Failed to withdraw');
-    }
-    setLoading(false);
-  }
-
-  return open ? (
-    <div style={modalOverlayStyle}>
-      <motion.div
-        style={{ ...modalCardStyle, minWidth: 440, maxWidth: 540, minHeight: 340, padding: '54px 48px 48px 48px', position: 'relative' }}
-        transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-      >
-        {/* Top left back arrow (only if step > 0) */}
-        {step > 0 && (
-          <button type="button" aria-label="Back" style={modalBackBtnStyle} onClick={() => setStep(step - 1)}>
-            <span aria-hidden="true">&#8592;</span>
+          {/* Top right close X (always) */}
+          <button type="button" aria-label="Close" style={modalCloseBtnStyle} onClick={onClose}>
+            <span aria-hidden="true">&times;</span>
           </button>
-        )}
-        {/* Top right close X (always) */}
-        <button type="button" aria-label="Close" style={modalCloseBtnStyle} onClick={onClose}>
-          <span aria-hidden="true">&times;</span>
-        </button>
-        <h3 style={{ fontWeight: 700, fontSize: 26, marginBottom: 18, textAlign: 'center' }}>Withdraw Funds</h3>
-        <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 18, fontWeight: 500, minHeight: 24 }}>
-          You are withdrawing <span style={{ color: '#6fffbe', fontWeight: 700 }}>${amount && !isNaN(Number(amount)) && Number(amount) > 0 ? Number(amount).toFixed(2) : '0.00'}</span> from your Wallet
-        </div>
-        <AnimatePresence mode="wait" initial={false}>
-          {step === 0 && (
-            <motion.div
-              key="step-0"
-              variants={stepVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-            >
-              <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 16, fontWeight: 400 }}>
-                How much would you like to withdraw?
-              </div>
-              <input type="number" placeholder="Amount (CAD)" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inputStyle, fontSize: 20, textAlign: 'center', marginBottom: 8 }} />
-              {amountError && <div style={{ color: 'red', marginBottom: 8 }}>{amountError}</div>}
-              <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={handleAmountNext}>
-                Continue
-              </Button>
-              <Button variant="secondary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 10, marginBottom: 0 }} onClick={onClose}>
-                Cancel
-              </Button>
-            </motion.div>
-          )}
-          {step === 1 && (
-            <motion.div
-              key="step-1"
-              variants={stepVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-            >
-              {(!paymentMethods || paymentMethods.length === 0 || showAddCard) ? (
-                <>
-                  <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 16, fontWeight: 400 }}>
-                    Enter card details to receive funds
-                  </div>
-                  <Elements stripe={stripePromise} options={{ locale: 'en-CA' }}>
-                    <AddCardForm clientSecret={null} onSuccess={() => { setShowAddCard(false); onAddCard && onAddCard(); }} onError={setCardError} onClose={() => setShowAddCard(false)} onBack={() => setStep(0)} amountMessage="Enter card details to receive funds" context="withdraw" />
-                  </Elements>
-                  <Button variant="secondary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 10, marginBottom: 0 }} onClick={() => setShowAddCard(false)}>
-                    Back
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 16, fontWeight: 400 }}>
-                    Select a card to receive funds
-                  </div>
-                  <div style={{ marginBottom: 16 }}>
-                    {paymentMethods.map(pm => (
-                      <div key={pm.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: selectedCard && selectedCard.id === pm.id ? 'rgba(79,70,229,0.18)' : 'rgba(32,41,74,0.7)', borderRadius: 8, padding: 10, marginBottom: 8, cursor: 'pointer', border: selectedCard && selectedCard.id === pm.id ? '2px solid #6fffbe' : '1.5px solid rgba(255,255,255,0.08)' }} onClick={() => setSelectedCard(pm)}>
-                        <div>
-                          <span style={{ fontWeight: 500 }}>{pm.card.brand.toUpperCase()} •••• {pm.card.last4}</span>
-                          <span style={{ marginLeft: 8, color: '#aaa', fontSize: 13 }}>Exp: {pm.card.exp_month}/{pm.card.exp_year}</span>
-                        </div>
-                        {selectedCard && selectedCard.id === pm.id && <span style={{ color: '#6fffbe', fontWeight: 700, fontSize: 15 }}>Selected</span>}
-                      </div>
-                    ))}
-                  </div>
-                  <Button variant="primary" size="sm" style={{ width: '100%', height: smallActionButtonHeight, fontSize: smallActionFontSize, borderRadius: smallActionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={() => setShowAddCard(true)}>
-                    + Add New Card
-                  </Button>
-                  {cardError && <div style={{ color: 'red', marginTop: 8 }}>{cardError}</div>}
-                  <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 14, marginBottom: 0 }} onClick={handleCardNext}>
-                    Continue
-                  </Button>
-                  <Button variant="secondary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 10, marginBottom: 0 }} onClick={() => setStep(0)}>
-                    Back
-                  </Button>
-                </>
-              )}
-            </motion.div>
-          )}
-          {step === 2 && (
-            <motion.div
-              key="step-2"
-              variants={stepVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-            >
-              <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 18, fontWeight: 500 }}>
-                Confirm Withdrawal
-              </div>
-              <div style={{ background: 'rgba(35,43,74,0.18)', borderRadius: 10, padding: 18, marginBottom: 18, border: '1.5px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
-                <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Amount: <span style={{ color: '#6fffbe' }}>${Number(amount).toFixed(2)}</span></div>
-                <div style={{ fontSize: 15, color: '#b3b3c9' }}>To Card: {selectedCard ? `${selectedCard.card.brand.toUpperCase()} •••• ${selectedCard.card.last4}` : 'N/A'}</div>
-              </div>
-              {cardError && <div style={{ color: 'red', marginBottom: 8 }}>{cardError}</div>}
-              <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={handleConfirm} disabled={loading}>
-                {loading ? 'Processing...' : 'Confirm & Withdraw'}
-              </Button>
-              <Button variant="secondary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 10, marginBottom: 0 }} onClick={() => setStep(1)}>
-                Back
-              </Button>
-            </motion.div>
-          )}
-          {step === 3 && (
-            <motion.div
-              key="step-3"
-              variants={stepVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-            >
-              <div style={{ textAlign: 'center', margin: '40px 0 30px 0', color: '#6fffbe', fontSize: 22, fontWeight: 700 }}>
-                {successMsg}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <StepDots step={step} total={4} />
-      </motion.div>
+          <h3 style={{ fontWeight: 700, fontSize: 26, marginBottom: 18, textAlign: 'center' }}>Add Funds</h3>
+          <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 18, fontWeight: 500, minHeight: 24 }}>
+            You are adding <span style={{ color: '#6fffbe', fontWeight: 700 }}>${amount && !isNaN(Number(amount)) && Number(amount) > 0 ? Number(amount).toFixed(2) : '0.00'}</span> to your Wallet
+          </div>
+          {/* Step 0: Amount */}
+          <div style={getStepDisplay(0)}>
+            <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 16, fontWeight: 400 }}>
+              How much would you like to add?
+            </div>
+            <input type="number" placeholder="Amount (CAD)" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inputStyle, fontSize: 20, textAlign: 'center', marginBottom: 8, outline: 'none', border: 'none', boxShadow: 'none' }} />
+            {/* Helper text below input */}
+            <div style={{ textAlign: 'center', color: '#b3b3c9', fontSize: 15, marginBottom: 8 }}>
+              {amount && !isNaN(Number(amount)) && Number(amount) > 0
+                ? `You are withdrawing $${Number(amount).toFixed(2)} to your card.`
+                : 'Enter the amount you want to withdraw.'}
+            </div>
+            {amountError && <div style={{ color: 'red', marginBottom: 8 }}>{amountError}</div>}
+            <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={handleAmountNext}>
+              Continue
+            </Button>
+            <Button variant="secondary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 10, marginBottom: 0 }} onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
+          {/* Step 1: Save Card Choice */}
+          <div style={getStepDisplay(1)}>
+            <SaveCardChoiceStep onChoice={handleSaveCardChoice} loading={loading} />
+          </div>
+          <StepDots step={step} total={4} />
+        </motion.div>
+      )}
     </div>
   ) : null;
 }
@@ -987,7 +711,135 @@ function AddCardStepper({ open, onClose, onSuccess }) {
   ) : null;
 }
 
+// Withdraw Stepper Modal
+function WithdrawStepper({ open, onClose, onSuccess, onAddCard }) {
+  const [step, setStep] = useState(0); // 0: Amount, 1: Confirm, 2: Success
+  const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [withdrawError, setWithdrawError] = useState('');
+  const [cardInfo, setCardInfo] = useState(null);
+  const [cardLoading, setCardLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setStep(0);
+      setAmount('');
+      setAmountError('');
+      setLoading(false);
+      setSuccessMsg('');
+      setWithdrawError('');
+      setCardInfo(null);
+      setCardLoading(true);
+      walletService.getMostRecentDepositCard()
+        .then(res => {
+          setCardInfo(res.card);
+        })
+        .catch(() => setCardInfo(null))
+        .finally(() => setCardLoading(false));
+    }
+  }, [open]);
+
+  function handleAmountNext() {
+    setAmountError('');
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      setAmountError('Enter a valid amount');
+      return;
+    }
+    setStep(1);
+  }
+
+  async function handleWithdraw() {
+    setWithdrawError('');
+    setLoading(true);
+    try {
+      await walletService.createWithdrawal(Number(amount));
+      setStep(2);
+      setSuccessMsg('Withdrawal request submitted!');
+      setTimeout(() => {
+        onClose();
+        onSuccess && onSuccess();
+      }, 1200);
+    } catch (err) {
+      setWithdrawError(err.message || 'Failed to withdraw');
+    }
+    setLoading(false);
+  }
+
+  const getStepDisplay = (targetStep) => (step === targetStep ? {} : { display: 'none' });
+
+  return open ? (
+    <div style={modalOverlayStyle}>
+      <motion.div
+        style={{ ...modalCardStyle, minWidth: 440, maxWidth: 540, minHeight: 340, padding: '54px 48px 48px 48px', position: 'relative' }}
+        transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
+      >
+        {/* Top left back arrow (only if step > 0) */}
+        {step > 0 && (
+          <button type="button" aria-label="Back" style={modalBackBtnStyle} onClick={() => setStep(step - 1)}>
+            <span aria-hidden="true">&#8592;</span>
+          </button>
+        )}
+        {/* Top right close X (always) */}
+        <button type="button" aria-label="Close" style={modalCloseBtnStyle} onClick={onClose}>
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <h3 style={{ fontWeight: 700, fontSize: 26, marginBottom: 18, textAlign: 'center' }}>Withdraw Funds</h3>
+        {/* Step 0: Amount */}
+        <div style={getStepDisplay(0)}>
+          <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 16, fontWeight: 400 }}>
+            How much would you like to withdraw?
+          </div>
+          <input type="number" placeholder="Amount (CAD)" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inputStyle, fontSize: 20, textAlign: 'center', marginBottom: 8 }} />
+          {amountError && <div style={{ color: 'red', marginBottom: 8 }}>{amountError}</div>}
+          <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={handleAmountNext}>
+            Continue
+          </Button>
+          <Button variant="secondary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 10, marginBottom: 0 }} onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+        {/* Step 1: Confirm */}
+        <div style={getStepDisplay(1)}>
+          <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 18, fontWeight: 500, minHeight: 24 }}>
+            You are withdrawing <span style={{ color: '#ff6b6b', fontWeight: 700 }}>${amount && !isNaN(Number(amount)) && Number(amount) > 0 ? Number(amount).toFixed(2) : '0.00'}</span> from your Wallet
+          </div>
+          <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 16 }}>
+            <b>Money will be withdrawn to your original payment method.</b><br />
+            {cardLoading ? (
+              <span>Loading card info...</span>
+            ) : cardInfo ? (
+              <span>Card: {cardInfo.brand?.toUpperCase()} •••• {cardInfo.last4}</span>
+            ) : (
+              <>
+                <span>No deposit card found.</span><br />
+                <Button variant="primary" size="small" style={{ marginTop: 10, fontSize: 15, padding: '7px 18px', borderRadius: 8 }} onClick={() => { onClose(); onAddCard && onAddCard(); }}>+ Add Card</Button>
+              </>
+            )}
+          </div>
+          {withdrawError && <div style={{ color: 'red', marginBottom: 8 }}>{withdrawError}</div>}
+          <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={handleWithdraw} disabled={loading}>
+            {loading ? 'Processing...' : 'Confirm & Withdraw'}
+          </Button>
+          <Button variant="secondary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 10, marginBottom: 0 }} onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+        {/* Step 2: Success */}
+        <div style={getStepDisplay(2)}>
+          <div style={{ textAlign: 'center', margin: '40px 0 30px 0', color: '#6fffbe', fontSize: 22, fontWeight: 700 }}>
+            {successMsg}
+          </div>
+        </div>
+        <StepDots step={step} total={3} />
+      </motion.div>
+    </div>
+  ) : null;
+}
+
 function Wallet() {
+  const { user } = useContext(UserContext);
   const [balance, setBalance] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1007,6 +859,8 @@ function Wallet() {
   const [showAddCard, setShowAddCard] = useState(false);
   const [addCardClientSecret, setAddCardClientSecret] = useState(null);
   const [addCardError, setAddCardError] = useState('');
+  // Track if AddFundsStepper is open and payment is processing, to avoid parent state updates
+  const [depositProcessing, setDepositProcessing] = useState(false);
 
   // Lock background scroll when any modal is open
   useEffect(() => {
@@ -1059,6 +913,14 @@ function Wallet() {
   const totalSpent = thisMonthTxs.filter(tx => tx.amount < 0).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
   const totalAdded = thisMonthTxs.filter(tx => tx.amount > 0).reduce((sum, tx) => sum + tx.amount, 0);
 
+  // Only fetchWallet after AddFundsStepper closes, not during payment
+  function handleAddFundsModalClose() {
+    setShowDeposit(false);
+    setTimeout(() => {
+      fetchWallet();
+    }, 400); // Wait for modal animation to finish
+  }
+
   // Deposit modal logic
   async function handleDeposit() {
     setDepositLoading(true);
@@ -1071,14 +933,6 @@ function Wallet() {
       setDepositError(err.message || 'Failed to create deposit');
     }
     setDepositLoading(false);
-  }
-
-  function handleDepositSuccess() {
-    setShowDeposit(false);
-    setDepositAmount('');
-    setClientSecret(null);
-    setSuccessMsg('Deposit successful!');
-    fetchWallet();
   }
 
   // Withdraw modal logic
@@ -1134,23 +988,72 @@ function Wallet() {
         <div style={{ display: 'flex', gap: 32 }}>
           {/* Left: Balance and actions */}
           <div style={{ flex: 1 }}>
-            <div style={{ ...cardStyle, color: '#6fffbe', textAlign: 'center', fontSize: 28, fontWeight: 600, marginBottom: 24 }}>
-              Available Balance<br />
-              <span style={{ fontSize: 36, color: '#6fffbe' }}>${Number(balance ?? 0).toFixed(2)}</span>
+            {/* Available Balance Card */}
+            <div style={{
+              background: 'rgba(35, 43, 74, 0.45)',
+              borderRadius: 18,
+              padding: '28px 24px 24px 24px',
+              marginBottom: 24,
+              boxShadow: '0 4px 18px 0 rgba(31,38,135,0.18)',
+              border: '1.5px solid rgba(255,255,255,0.08)',
+              minWidth: 260,
+              maxWidth: 340,
+              marginLeft: 'auto',
+              marginRight: 'auto',
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 18, color: '#fff', fontWeight: 500, marginBottom: 6 }}>Available Balance</div>
+              <div style={{ fontSize: 36, fontWeight: 700, color: '#6fffbe', letterSpacing: 1, marginBottom: 18, textShadow: '0 2px 8px #6fffbe, 0 1px 2px #fff' }}>
+                ${Number(balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <Button
+                variant="primary"
+                size="default"
+                style={{ width: '100%', height: 44, fontSize: 18, borderRadius: 10, marginBottom: 10, fontWeight: 600 }}
+                onClick={() => setShowDeposit(true)}
+              >
+                + Add Funds
+              </Button>
+              <Button
+                variant="secondary"
+                size="default"
+                style={{ width: '100%', height: 44, fontSize: 18, borderRadius: 10, fontWeight: 600, opacity: balance > 0 ? 1 : 0.6 }}
+                onClick={() => setShowWithdraw(true)}
+                disabled={balance <= 0}
+              >
+                &mdash; Withdraw
+              </Button>
             </div>
-            <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, padding: actionPadding, marginTop: 0, marginBottom: 0 }} onClick={() => setShowDeposit(true)}>
-              + Add Funds
-            </Button>
-            <div style={withdrawButtonWrapper}>
-              <button style={withdrawButtonStyle} onClick={() => setShowWithdraw(true)}>
-                Withdraw
-              </button>
-            </div>
-            <div style={{ ...cardStyle, marginTop: 24 }}>
-              <div style={{ fontWeight: 600, marginBottom: 8 }}>This Month</div>
-              <div>Total Spent: <span style={{ color: '#ff6b6b' }}>${totalSpent.toFixed(2)}</span></div>
-              <div>Total Added: <span style={{ color: '#6fffbe' }}>${totalAdded.toFixed(2)}</span></div>
-              <div>Transactions: {thisMonthTxs.length}</div>
+
+            {/* This Month Summary Card */}
+            <div
+              style={{
+                background: 'rgba(35, 43, 74, 0.32)',
+                borderRadius: 14,
+                padding: '18px 24px 14px 24px',
+                marginBottom: 18,
+                boxShadow: '0 2px 10px 0 rgba(31,38,135,0.10)',
+                border: '1.5px solid rgba(255,255,255,0.06)',
+                width: 320,
+                margin: '0 auto',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ fontSize: 17, color: '#fff', fontWeight: 500, marginBottom: 16, textAlign: 'center' }}>This Month</div>
+              <div style={{ fontSize: 16, marginBottom: 12 }}>
+                <div style={{ marginBottom: 10 }}>
+                  <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Spent:</span>
+                  <span style={{ color: '#ff6b6b', fontWeight: 700, marginLeft: 10 }}>${Number(totalSpent || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Added:</span>
+                  <span style={{ color: '#6fffbe', fontWeight: 700, marginLeft: 10 }}>${Number(totalAdded || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div>
+                  <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Transactions:</span>
+                  <span style={{ color: '#fff', fontWeight: 700, marginLeft: 10 }}>{thisMonthTxs.length}</span>
+                </div>
+              </div>
             </div>
             <div style={{ ...cardStyle, marginTop: 24 }}>
               <div style={{ fontWeight: 600, marginBottom: 8 }}>Payment Methods</div>
@@ -1193,7 +1096,7 @@ function Wallet() {
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontWeight: 600, color: tx.amount > 0 ? '#6fffbe' : '#ff6b6b', fontSize: 18 }}>
-                          {tx.amount > 0 ? '+' : ''}${tx.amount.toFixed(2)}
+                          {tx.amount > 0 ? '+' : ''}${Number(tx.amount || 0).toFixed(2)}
                         </div>
                         <div style={{ fontSize: 13, color: tx.status === 'succeeded' ? '#6fffbe' : tx.status === 'pending' ? '#ffd166' : '#ff6b6b' }}>
                           {tx.status}
@@ -1209,16 +1112,21 @@ function Wallet() {
       )}
 
       {/* Deposit Modal */}
-      <AddFundsStepper open={showDeposit} onClose={() => setShowDeposit(false)} onSuccess={fetchWallet} />
+      <AddFundsStepper open={showDeposit} onClose={handleAddFundsModalClose} onSuccess={fetchWallet} userEmail={user?.email} />
 
       {/* Add Card Modal */}
       <AddCardStepper open={showAddCard} onClose={() => setShowAddCard(false)} onSuccess={fetchPaymentMethods} />
 
-      {/* Withdraw Modal */}
-      <WithdrawStepper open={showWithdraw} onClose={() => setShowWithdraw(false)} onSuccess={fetchWallet} paymentMethods={paymentMethods} onAddCard={fetchPaymentMethods} />
-
       {/* Success Message */}
       {successMsg && <div style={{ marginTop: 24, color: '#6fffbe', fontWeight: 600 }}>{successMsg}</div>}
+
+      {/* Withdraw Stepper Modal */}
+      <WithdrawStepper
+        open={showWithdraw}
+        onClose={() => setShowWithdraw(false)}
+        onSuccess={fetchWallet}
+        onAddCard={() => setShowAddCard(true)}
+      />
     </div>
   );
 }
