@@ -99,13 +99,14 @@ async function getTransactions(req, res) {
 // Create a Stripe payment intent for deposit
 async function createDepositIntent(req, res) {
   try {
+    console.log('createDepositIntent req.body:', req.body);
     // Check direct access
     if (process.env.ALLOW_DIRECT_API_ACCESS !== 'true') {
       return res.status(403).json({ error: 'Direct API access not allowed' });
     }
     
     const userId = req.user.id;
-    const { amount, saveCard } = req.body;
+    const { amount, saveCard, paymentMethodId } = req.body;
     
     // Validate amount
     if (!amount || isNaN(amount) || amount <= 0) {
@@ -120,9 +121,9 @@ async function createDepositIntent(req, res) {
     }
     
     let customerId = null;
-    if (saveCard) {
+    let user = await User.findById(userId);
+    if (saveCard || paymentMethodId) {
       // Fetch user and ensure they have a Stripe customer ID
-      let user = await User.findById(userId);
       customerId = user.stripe_customer_id;
       if (!customerId) {
         // Create Stripe customer if needed
@@ -131,9 +132,10 @@ async function createDepositIntent(req, res) {
         customerId = customer.id;
       }
     }
-    const paymentIntent = await stripeService.createPaymentIntent(userId, amount, 'cad', saveCard, customerId);
+    const paymentIntent = await stripeService.createPaymentIntent(userId, amount, 'cad', saveCard, customerId, paymentMethodId);
     res.json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {
+    console.error('Failed to create payment intent:', err);
     res.status(500).json({ error: 'Failed to create payment intent' });
   }
 }
@@ -357,6 +359,7 @@ async function createSetupIntent(req, res) {
 }
 
 // Remove a card
+// NOTE: If all cards are removed, user cannot withdraw until they add a new card and make a deposit. Cards not used for deposit are not verified for withdrawal.
 async function removePaymentMethod(req, res) {
   try {
     const { id } = req.params;
@@ -399,6 +402,12 @@ async function getMostRecentDepositCard(req, res) {
           };
         }
       }
+    }
+    if (!card) {
+      // Improved error message for frontend
+      return res.status(400).json({ 
+        error: 'You have no card saved for withdrawal. Save a card and use it in a deposit to verify it for withdrawals. Cards not used for deposit are not verified and cannot be used for withdrawal.'
+      });
     }
     return res.json({ card });
   } catch (err) {

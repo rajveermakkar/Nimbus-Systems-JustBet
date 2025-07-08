@@ -2,7 +2,7 @@ const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Create a payment intent for a deposit
-async function createPaymentIntent(userId, amount, currency = 'cad', saveCard = false, customerId = null) {
+async function createPaymentIntent(userId, amount, currency = 'cad', saveCard = false, customerId = null, paymentMethodId = null) {
   // Optionally, you can add metadata like userId
   const paymentIntentData = {
     amount: Math.round(amount * 100), // Stripe expects amount in cents
@@ -16,6 +16,11 @@ async function createPaymentIntent(userId, amount, currency = 'cad', saveCard = 
   }
   if (customerId) {
     paymentIntentData.customer = customerId;
+  }
+  if (paymentMethodId) {
+    paymentIntentData.payment_method = paymentMethodId;
+    paymentIntentData.customer = customerId; // Always set customer if using saved card
+    paymentIntentData.confirm = false; // Will confirm on frontend
   }
   const paymentIntent = await stripe.paymentIntents.create(paymentIntentData);
   return paymentIntent;
