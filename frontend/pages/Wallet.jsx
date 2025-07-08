@@ -1186,9 +1186,10 @@ function Wallet() {
   const [removeCardLast4, setRemoveCardLast4] = useState('');
   const [createWalletHover, setCreateWalletHover] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(6);
   const [totalCount, setTotalCount] = useState(0);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [monthlySummary, setMonthlySummary] = useState({ totalAdded: 0, totalWithdrawn: 0, totalSpent: 0, transactionCount: 0 });
 
   // Lock background scroll when any modal is open
   useEffect(() => {
@@ -1205,21 +1206,28 @@ function Wallet() {
   useEffect(() => {
     fetchWallet();
     fetchPaymentMethods();
+    fetchMonthlySummary();
   }, []);
 
-  async function fetchWallet(page = currentPage) {
+  async function fetchMonthlySummary() {
+    try {
+      const summary = await walletService.getMonthlySummary();
+      setMonthlySummary(summary);
+    } catch (err) {
+      setMonthlySummary({ totalAdded: 0, totalWithdrawn: 0, totalSpent: 0, transactionCount: 0 });
+    }
+  }
+
+  // Fetch wallet balance and first page of transactions (initial load or after deposit/withdrawal)
+  async function fetchWallet() {
     setLoading(true);
     setError('');
     setLoadingTransactions(true);
     try {
       const bal = await walletService.getBalance();
       setBalance(bal.balance);
-      const txResp = await walletService.getTransactions(page, pageSize);
-      setTransactions(txResp.transactions);
-      setTotalCount(txResp.totalCount || 0);
-      setCurrentPage(txResp.page || 1);
+      await fetchTransactions(1); // Always reset to first page
     } catch (err) {
-      // If error message indicates no wallet, show friendly message
       if ((err?.response?.status === 404) || (err?.message && err.message.toLowerCase().includes('wallet not found'))) {
         setError('No wallet found. Click below to create your wallet.');
       } else {
@@ -1227,6 +1235,21 @@ function Wallet() {
       }
     }
     setLoading(false);
+    setLoadingTransactions(false);
+  }
+
+  // Fetch only transactions for a given page (for pagination)
+  async function fetchTransactions(page) {
+    setLoadingTransactions(true);
+    try {
+      const txResp = await walletService.getTransactions(page, 6);
+      setTransactions(txResp.transactions);
+      setTotalCount(txResp.totalCount || 0);
+      setCurrentPage(txResp.page || 1);
+    } catch (err) {
+      setTransactions([]);
+      setTotalCount(0);
+    }
     setLoadingTransactions(false);
   }
 
@@ -1326,12 +1349,12 @@ function Wallet() {
   const totalPages = Math.ceil(totalCount / pageSize);
   function handleNextPage() {
     if (currentPage < totalPages) {
-      fetchWallet(currentPage + 1);
+      fetchTransactions(currentPage + 1);
     }
   }
   function handlePrevPage() {
     if (currentPage > 1) {
-      fetchWallet(currentPage - 1);
+      fetchTransactions(currentPage - 1);
     }
   }
 
@@ -1446,19 +1469,19 @@ function Wallet() {
               <div style={{ fontSize: 16, marginBottom: 12 }}>
                 <div style={{ marginBottom: 10 }}>
                   <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Withdrawn:</span>
-                  <span style={{ color: '#ff6b6b', fontWeight: 700, marginLeft: 10 }}>${Number(totalWithdrawn || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span style={{ color: '#ff6b6b', fontWeight: 700, marginLeft: 10 }}>${Number(monthlySummary.totalWithdrawn || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Spent:</span>
-                  <span style={{ color: '#ffd166', fontWeight: 700, marginLeft: 10 }}>${Number(totalSpent || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span style={{ color: '#ffd166', fontWeight: 700, marginLeft: 10 }}>${Number(monthlySummary.totalSpent || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Added:</span>
-                  <span style={{ color: '#6fffbe', fontWeight: 700, marginLeft: 10 }}>${Number(totalAdded || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span style={{ color: '#6fffbe', fontWeight: 700, marginLeft: 10 }}>${Number(monthlySummary.totalAdded || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div>
                   <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Transactions:</span>
-                  <span style={{ color: '#fff', fontWeight: 700, marginLeft: 10 }}>{thisMonthTxs.length}</span>
+                  <span style={{ color: '#fff', fontWeight: 700, marginLeft: 10 }}>{monthlySummary.transactionCount}</span>
                 </div>
               </div>
             </div>

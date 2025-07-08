@@ -380,6 +380,39 @@ async function getMostRecentDepositCard(req, res) {
   }
 }
 
+// Get monthly summary for the logged-in user
+async function getMonthlySummary(req, res) {
+  try {
+    const userId = req.user.id;
+    const { pool } = require('../db/init');
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // JS months are 0-based
+    // Get all transactions for this month
+    const summaryQuery = `
+      SELECT
+        SUM(CASE WHEN wt.amount > 0 THEN wt.amount ELSE 0 END) AS total_added,
+        SUM(CASE WHEN wt.type = 'withdrawal' AND wt.amount < 0 THEN ABS(wt.amount) ELSE 0 END) AS total_withdrawn,
+        COUNT(*) AS transaction_count
+      FROM wallet_transactions wt
+      JOIN wallets w ON wt.wallet_id = w.id
+      WHERE w.user_id = $1
+        AND EXTRACT(YEAR FROM wt.created_at) = $2
+        AND EXTRACT(MONTH FROM wt.created_at) = $3
+    `;
+    const result = await pool.query(summaryQuery, [userId, year, month]);
+    const row = result.rows[0] || {};
+    res.json({
+      totalAdded: Number(row.total_added) || 0,
+      totalWithdrawn: Number(row.total_withdrawn) || 0,
+      totalSpent: 0, // Placeholder for future bidding/purchase logic
+      transactionCount: Number(row.transaction_count) || 0
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get monthly summary' });
+  }
+}
+
 module.exports = {
   getBalance,
   getTransactions,
@@ -390,5 +423,6 @@ module.exports = {
   listPaymentMethods,
   createSetupIntent,
   removePaymentMethod,
-  getMostRecentDepositCard
+  getMostRecentDepositCard,
+  getMonthlySummary
 }; 
