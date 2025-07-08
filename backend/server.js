@@ -34,9 +34,12 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true 
 }));
-app.use(bodyParser.raw({ type: 'application/json' }));
-app.use(express.json());
 app.use(cookieParser());
+
+// Stripe webhook needs raw body
+app.use('/api/wallet/webhook', bodyParser.raw({ type: 'application/json' }));
+// All other routes use JSON parser
+app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);

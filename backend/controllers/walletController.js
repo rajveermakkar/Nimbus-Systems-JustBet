@@ -83,9 +83,25 @@ async function handleStripeWebhook(req, res) {
   res.json({ received: true });
 }
 
+// Create a wallet for the logged-in user
+async function createWallet(req, res) {
+  try {
+    const userId = req.user.id;
+    let wallet = await Wallet.getWalletByUserId(userId);
+    if (wallet) {
+      return res.json({ wallet });
+    }
+    wallet = await Wallet.createWallet(userId);
+    res.status(201).json({ wallet });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create wallet' });
+  }
+}
+
 module.exports = {
   getBalance,
   getTransactions,
   createDepositIntent,
-  handleStripeWebhook
+  handleStripeWebhook,
+  createWallet
 }; 

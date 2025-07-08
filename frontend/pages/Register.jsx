@@ -47,7 +47,9 @@ function Register({ showToast }) {
   const validate = () => {
     const newErrors = {};
     if (!form.firstName) newErrors.firstName = "First name is required";
+    else if (!/^[A-Za-z\s'-]+$/.test(form.firstName)) newErrors.firstName = "First name can only contain letters, spaces, hyphens, and apostrophes";
     if (!form.lastName) newErrors.lastName = "Last name is required";
+    else if (!/^[A-Za-z\s'-]+$/.test(form.lastName)) newErrors.lastName = "Last name can only contain letters, spaces, hyphens, and apostrophes";
     if (!form.email) newErrors.email = "Email is required";
     else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email))
       newErrors.email = "Invalid email";
