@@ -37,9 +37,47 @@ async function getAllWallets() {
   return result.rows;
 }
 
+// --- Wallet Blocks Logic ---
+
+// Get total blocked amount for a user
+async function getTotalBlockedAmount(userId) {
+  const query = 'SELECT COALESCE(SUM(amount), 0) AS total FROM wallet_blocks WHERE user_id = $1';
+  const result = await queryWithRetry(query, [userId]);
+  return Number(result.rows[0].total) || 0;
+}
+
+// Create a wallet block
+async function createWalletBlock(userId, auctionId, amount) {
+  const query = `
+    INSERT INTO wallet_blocks (user_id, auction_id, amount)
+    VALUES ($1, $2, $3)
+    RETURNING *
+  `;
+  const result = await queryWithRetry(query, [userId, auctionId, amount]);
+  return result.rows[0];
+}
+
+// Remove a wallet block
+async function removeWalletBlock(userId, auctionId) {
+  const query = 'DELETE FROM wallet_blocks WHERE user_id = $1 AND auction_id = $2 RETURNING *';
+  const result = await queryWithRetry(query, [userId, auctionId]);
+  return result.rows[0];
+}
+
+// Get a wallet block by user and auction
+async function getWalletBlock(userId, auctionId) {
+  const query = 'SELECT * FROM wallet_blocks WHERE user_id = $1 AND auction_id = $2';
+  const result = await queryWithRetry(query, [userId, auctionId]);
+  return result.rows[0];
+}
+
 module.exports = {
   createWallet,
   getWalletByUserId,
   updateBalance,
-  getAllWallets
+  getAllWallets,
+  getTotalBlockedAmount,
+  createWalletBlock,
+  removeWalletBlock,
+  getWalletBlock
 }; 

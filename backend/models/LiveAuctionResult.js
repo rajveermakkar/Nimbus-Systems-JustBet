@@ -1,4 +1,9 @@
 const { pool } = require('../db/init');
+const Wallet = require('../models/Wallet');
+const User = require('../models/User');
+const Transaction = require('../models/Transaction');
+const LiveAuction = require('./LiveAuction');
+const LiveAuctionBid = require('./LiveAuctionBid');
 
 const LiveAuctionResult = {
   // Create a new auction result
@@ -48,6 +53,112 @@ const LiveAuctionResult = {
     const result = await pool.query(query);
     return result.rows;
   }
+};
+
+// Finalize a live auction (process winner, funds, etc.)
+LiveAuctionResult.finalizeAuction = async function(auctionId) {
+  // Get the auction
+  const auction = await LiveAuction.findById(auctionId);
+  if (!auction || auction.status === 'closed') return;
+  // Get all bids
+  const bids = await LiveAuctionBid.findByAuctionId(auctionId);
+  if (!bids.length) {
+    // No bids placed
+    await LiveAuction.updateAuction(auctionId, { status: 'closed', current_highest_bidder_id: null });
+    await LiveAuctionResult.create({
+      auctionId,
+      winnerId: null,
+      finalBid: null,
+      reserveMet: false,
+      status: 'no_bids'
+    });
+    return;
+  }
+  // Find highest bid
+  const highestBid = bids.reduce((max, bid) => bid.amount > max.amount ? bid : max, bids[0]);
+  // Check reserve price
+  if (auction.reserve_price && highestBid.amount < auction.reserve_price) {
+    await LiveAuction.updateAuction(auctionId, { status: 'closed', current_highest_bidder_id: null });
+    await LiveAuctionResult.create({
+      auctionId,
+      winnerId: null,
+      finalBid: highestBid.amount,
+      reserveMet: false,
+      status: 'reserve_not_met'
+    });
+    return;
+  }
+  // Set winner
+  await LiveAuction.updateAuction(auctionId, { status: 'closed', current_highest_bidder_id: highestBid.user_id });
+  await LiveAuctionResult.create({
+    auctionId,
+    winnerId: highestBid.user_id,
+    finalBid: highestBid.amount,
+    reserveMet: true,
+    status: 'won'
+  });
+  // --- WALLET BLOCK/FUND LOGIC ---
+  // 1. Release wallet blocks for all non-winning bidders
+  for (const bid of bids) {
+    if (bid.user_id !== highestBid.user_id) {
+      await Wallet.removeWalletBlock(bid.user_id, auctionId);
+    }
+  }
+  // 2. For the winner, deduct the bid amount and remove block
+  const winnerId = highestBid.user_id;
+  let winnerBlock = await Wallet.getWalletBlock(winnerId, auctionId);
+  if (!winnerBlock) {
+    // If no block exists, create one for deduction
+    await Wallet.createWalletBlock(winnerId, auctionId, highestBid.amount);
+    winnerBlock = await Wallet.getWalletBlock(winnerId, auctionId);
+  }
+  if (winnerBlock) {
+    await Wallet.removeWalletBlock(winnerId, auctionId);
+    await Wallet.updateBalance(winnerId, -highestBid.amount);
+    // Add wallet transaction for deduction
+    const winnerWallet = await Wallet.getWalletByUserId(winnerId);
+    await Transaction.createTransaction({
+      walletId: winnerWallet.id,
+      type: 'auction_payment',
+      amount: -highestBid.amount,
+      description: `Payment for winning live auction`, // No id number
+      referenceId: auctionId,
+      status: 'succeeded'
+    });
+  }
+  // 3. Distribute funds
+  // Seller gets (bid - 10% fee), admin gets 10% fee
+  const platformFee = Math.round(highestBid.amount * 0.10 * 100) / 100;
+  const sellerAmount = Math.round((highestBid.amount - platformFee) * 100) / 100;
+  const sellerId = auction.seller_id;
+  await Wallet.updateBalance(sellerId, sellerAmount);
+  // Add wallet transaction for seller
+  const sellerWallet = await Wallet.getWalletByUserId(sellerId);
+  await Transaction.createTransaction({
+    walletId: sellerWallet.id,
+    type: 'auction_income',
+    amount: sellerAmount,
+    description: `Income from live auction`, // No id number
+    referenceId: auctionId,
+    status: 'succeeded'
+    // Frontend: use trophy icon for this type
+  });
+  // Admin wallet
+  const adminUser = await User.findByEmail('admin@justbet.com');
+  if (adminUser) {
+    await Wallet.updateBalance(adminUser.id, platformFee);
+    // Add wallet transaction for admin
+    const adminWallet = await Wallet.getWalletByUserId(adminUser.id);
+    await Transaction.createTransaction({
+      walletId: adminWallet.id,
+      type: 'platform_fee',
+      amount: platformFee,
+      description: `Platform fee from live auction`,
+      referenceId: auctionId,
+      status: 'succeeded'
+    });
+  }
+  // --- END WALLET BLOCK/FUND LOGIC ---
 };
 
 module.exports = LiveAuctionResult; 

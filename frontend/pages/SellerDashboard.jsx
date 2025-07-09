@@ -490,54 +490,27 @@ function SellerDashboard() {
                 
                 {/* Wallet Overview */}
                 <div className="bg-white/5 rounded-lg p-6 border border-white/20 mb-6">
-                  <h3 className="text-lg font-semibold mb-4 text-green-400">💰 Wallet Overview</h3>
-                  {walletLoading ? (
-                    <div className="text-center py-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto"></div>
-                      <p className="text-sm mt-2">Loading wallet info...</p>
+                  <h3 className="text-lg font-semibold mb-4 text-green-400">💰 Seller Overview</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-green-400">{formatPrice(walletBalance)}</div>
+                      <div className="text-sm text-gray-300">Total Balance</div>
                     </div>
-                  ) : walletBalance !== null ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold text-green-400">{formatPrice(walletBalance)}</div>
-                        <div className="text-sm text-gray-300">Total Balance</div>
-                      </div>
-                      <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold text-blue-400">
-                          {formatPrice(walletTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + Math.abs(t.amount), 0))}
-                        </div>
-                        <div className="text-sm text-gray-300">Total Deposited</div>
-                      </div>
-                      <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold text-purple-400">
-                          {formatPrice(walletTransactions.filter(t => t.type === 'deposit' && t.description.includes('earnings')).reduce((sum, t) => sum + Math.abs(t.amount), 0))}
-                        </div>
-                        <div className="text-sm text-gray-300">Total Earned</div>
-                      </div>
+                    <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-purple-400">{formatPrice(walletTransactions.filter(t => t.type === 'auction_income').reduce((sum, t) => sum + Math.abs(t.amount), 0))}</div>
+                      <div className="text-sm text-gray-300">Total Earned</div>
                     </div>
-                  ) : (
-                    <div className="text-center py-4 text-gray-400">
-                      <i className="fa-solid fa-wallet text-2xl mb-2"></i>
-                      <p>No wallet information available</p>
+                    <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-blue-400">{analytics.overall.totalAuctions}</div>
+                      <div className="text-sm text-gray-300">Total Auctions</div>
                     </div>
-                  )}
-                </div>
-                
-                {/* Overall Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-400">{analytics.overall.totalAuctions}</div>
-                    <div className="text-sm text-gray-300">Total Auctions</div>
-                  </div>
-                  <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-green-400">{formatPrice(analytics.overall.totalRevenue)}</div>
-                    <div className="text-sm text-gray-300">Total Revenue</div>
-                  </div>
-                  <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-purple-400">{analytics.overall.totalCompleted}</div>
-                    <div className="text-sm text-gray-300">Completed Auctions</div>
+                    <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-green-400">{analytics.overall.totalCompleted}</div>
+                      <div className="text-sm text-gray-300">Completed Auctions</div>
+                    </div>
                   </div>
                 </div>
+
 
                 {/* Live vs Settled */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

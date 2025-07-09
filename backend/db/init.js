@@ -905,6 +905,27 @@ const initDatabase = async () => {
       console.log('Created stripe_connected_customers table');
     }
     
+    // Check if wallet_blocks table exists
+    const walletBlocksTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'wallet_blocks'
+      );
+    `);
+    if (!walletBlocksTableCheck.rows[0].exists) {
+      logDbChange('Creating wallet_blocks table');
+      await pool.query(`
+        CREATE TABLE wallet_blocks (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          auction_id UUID NOT NULL,
+          amount NUMERIC(12,2) NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      console.log('Created wallet_blocks table');
+    }
+
     console.log('Database initialization complete!');
   } catch (error) {
     console.error('Error initializing database:', error);

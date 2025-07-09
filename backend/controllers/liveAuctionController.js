@@ -2,6 +2,7 @@ const LiveAuction = require('../models/LiveAuction');
 const { pool } = require('../db/init');
 const multer = require('multer');
 const { uploadImageToAzure } = require('../services/azureBlobService');
+const Wallet = require('../models/Wallet');
 
 // Create a new live auction
 async function createLiveAuction(req, res) {
@@ -282,7 +283,8 @@ async function getLiveAuctionBids(req, res) {
         lb.created_at,
         u.first_name,
         u.last_name,
-        u.email
+        u.email,
+        u.id as user_id
       FROM live_auction_bids lb
       JOIN users u ON lb.user_id = u.id
       WHERE lb.auction_id = $1
@@ -301,7 +303,7 @@ async function getLiveAuctionBids(req, res) {
       last_name: bid.last_name,
       email: bid.email,
       user_name: `${bid.first_name} ${bid.last_name}`,
-      user_id: bid.email // Using email as user_id for consistency
+      user_id: bid.user_id // Use user_id, not email
     }));
     
     res.json({ bids });
@@ -368,6 +370,97 @@ async function deleteLiveAuction(req, res) {
   }
 }
 
+// Add this function for live auction bid placement (if not present, create it)
+async function placeLiveBid(req, res) {
+  try {
+    const user = req.user;
+    const { id } = req.params; // auction id
+    const { amount } = req.body;
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ error: 'Invalid auction ID format.' });
+    }
+
+    // Validate bid amount
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ error: 'Valid bid amount is required.' });
+    }
+    const bidAmount = Number(amount);
+
+    // Get auction details
+    const auction = await LiveAuction.findById(id);
+    if (!auction) {
+      return res.status(404).json({ error: 'Live auction not found.' });
+    }
+    if (auction.status !== 'approved') {
+      return res.status(400).json({ error: 'Auction is not open for bidding.' });
+    }
+    const now = new Date();
+    const endTime = new Date(auction.end_time);
+    if (now > endTime) {
+      return res.status(400).json({ error: 'Auction has ended.' });
+    }
+    const startTime = new Date(auction.start_time);
+    if (now < startTime) {
+      return res.status(400).json({ error: 'Auction has not started yet.' });
+    }
+    // Determine minimum bid amount
+    const currentBid = auction.current_highest_bid || auction.starting_price;
+    const minIncrement = auction.min_bid_increment || 1;
+    const minBidAmount = Number(currentBid) + Number(minIncrement);
+    if (bidAmount < minBidAmount) {
+      return res.status(400).json({ error: `Bid must be at least $${minBidAmount.toFixed(2)}` });
+    }
+    // --- WALLET CHECK AND SOFT-BLOCK ---
+    const wallet = await Wallet.getWalletByUserId(user.id);
+    if (!wallet) {
+      return res.status(400).json({ error: 'Wallet not found.' });
+    }
+    const totalBlocked = await Wallet.getTotalBlockedAmount(user.id);
+    const available = Number(wallet.balance) - totalBlocked;
+    if (available < bidAmount) {
+      return res.status(400).json({ error: 'Insufficient available wallet balance for this bid.' });
+    }
+    // Check if user already has a block for this auction
+    const existingBlock = await Wallet.getWalletBlock(user.id, id);
+    if (!existingBlock) {
+      await Wallet.createWalletBlock(user.id, id, bidAmount);
+    } else {
+      // Update block amount if needed (not strictly necessary for first version)
+    }
+    // --- END WALLET CHECK ---
+
+    // Remove previous highest bidder's wallet block (if any and not the current user)
+    const previousHighestBidderId = auction.current_highest_bidder_id;
+    if (previousHighestBidderId && previousHighestBidderId !== user.id) {
+      await Wallet.removeWalletBlock(previousHighestBidderId, id);
+    }
+
+    // Store the bid
+    const LiveAuctionBid = require('../models/LiveAuctionBid');
+    const bid = await LiveAuctionBid.create({
+      auctionId: id,
+      userId: user.id,
+      amount: bidAmount
+    });
+    // Update auction with new highest bid
+    await LiveAuction.updateAuction(id, {
+      current_highest_bid: bidAmount,
+      current_highest_bidder_id: user.id,
+      bid_count: (auction.bid_count || 0) + 1
+    });
+    res.json({
+      message: 'Bid placed successfully',
+      bid
+    });
+  } catch (error) {
+    console.error('Error placing live auction bid:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   createLiveAuction,
   getLiveAuctionsByStatus,
@@ -381,5 +474,6 @@ module.exports = {
   getLiveAuctionBids,
   getLiveAuctionByIdForSeller,
   getLiveAuctionsForSeller,
-  deleteLiveAuction
+  deleteLiveAuction,
+  placeLiveBid
 }; 

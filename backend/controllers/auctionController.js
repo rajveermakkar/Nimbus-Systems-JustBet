@@ -7,6 +7,7 @@ const { getAuctionCountdown, getAuctionType } = require('../utils/auctionUtils')
 const LiveAuction = require('../models/LiveAuction');
 const settledAuctionCron = require('../services/settledAuctionCron');
 const { auctionCache } = require('../services/redisService');
+const Wallet = require('../models/Wallet');
 
 // function for a seller create a new auction listing
 async function createAuction(req, res) {
@@ -305,15 +306,33 @@ async function placeBid(req, res) {
       });
     }
 
-    // Remove reserve price validation - users can bid below reserve
-    // Reserve price is only checked at auction end to determine if there's a winner
+    // --- WALLET CHECK AND SOFT-BLOCK ---
+    const wallet = await Wallet.getWalletByUserId(user.id);
+    if (!wallet) {
+      return res.status(400).json({ error: 'Wallet not found.' });
+    }
+    const totalBlocked = await Wallet.getTotalBlockedAmount(user.id);
+    const available = Number(wallet.balance) - totalBlocked;
+    if (available < bidAmount) {
+      return res.status(400).json({ error: 'Insufficient available wallet balance for this bid.' });
+    }
+    // Check if user already has a block for this auction (shouldn't happen, but just in case)
+    const existingBlock = await Wallet.getWalletBlock(user.id, id);
+    if (!existingBlock) {
+      await Wallet.createWalletBlock(user.id, id, bidAmount);
+    } else {
+      // Update block amount if needed (not strictly necessary for first version)
+    }
+    // --- END WALLET CHECK ---
 
     // Store the bid
-    const bid = await Bid.create({
-      auctionId: id,
-      userId: user.id,
-      amount: bidAmount
-    });
+    const bid = await Bid.create(id, user.id, bidAmount);
+
+    // Remove previous highest bidder's wallet block (if any and not the current user)
+    const previousHighestBidderId = auction.current_highest_bidder_id;
+    if (previousHighestBidderId && previousHighestBidderId !== user.id) {
+      await Wallet.removeWalletBlock(previousHighestBidderId, id);
+    }
 
     // Update auction with new highest bid
     const updatedAuction = await SettledAuction.updateAuction(id, {

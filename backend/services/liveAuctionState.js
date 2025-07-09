@@ -2,6 +2,7 @@
 // Stores: current highest bid, bidder, timer, last 15-20 bids, auction status
 
 const auctions = new Map(); // auctionId -> { currentBid, currentBidder, bids: [], status, timer }
+const LiveAuctionResult = require('../models/LiveAuctionResult');
 
 function initAuction(auctionId, startingPrice, reservePrice, minIncrement = 1, startTime) {
   auctions.set(auctionId, {
@@ -34,9 +35,12 @@ function addBid(auctionId, bid) {
   if (auction.bids.length > 20) auction.bids.shift();
 }
 
+// Remove manual close: closeAuction should do nothing
 function closeAuction(auctionId) {
-  if (!auctions.has(auctionId)) return;
-  auctions.get(auctionId).status = 'closed';
+  // Manual close is disabled. Auctions can only be closed by timer.
+  // This function is intentionally left blank.
+  // If needed, you can throw an error here.
+  // throw new Error('Manual close is disabled.');
 }
 
 function removeAuction(auctionId) {
@@ -52,6 +56,8 @@ function setTimer(auctionId, duration, onEnd) {
     auction.status = 'closed';
     auction.timer = null;
     auction.timerEnd = null;
+    // Settle the auction (funds, wallet blocks, etc.)
+    LiveAuctionResult.finalizeAuction(auctionId);
     if (onEnd) onEnd();
   }, duration);
 }
