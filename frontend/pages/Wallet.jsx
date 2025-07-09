@@ -346,6 +346,13 @@ function PaymentElementStep({ clientSecret, onConfirm, confirmError, confirmLoad
     fields: { billingDetails: { email: 'never' } },
     wallets: { link: 'never' },
     paymentMethodTypes: ['card'],
+    appearance: {
+      theme: 'night',
+      variables: {
+        colorText: '#fff',
+        colorLabel: '#fff',
+      }
+    }
   }), []);
   const stripe = useStripe();
   const elements = useElements();
@@ -553,6 +560,10 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
       }
       goToStep(4);
       setSuccessMsg('Deposit successful!');
+      // Refresh payment methods so new cards appear immediately
+      if (typeof window.fetchPaymentMethods === 'function') {
+        window.fetchPaymentMethods();
+      }
       setTimeout(() => {
         onClose();
       }, 1200);
@@ -585,6 +596,10 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
       }
       goToStep(4);
       setSuccessMsg('Deposit successful!');
+      // Refresh payment methods so new cards appear immediately
+      if (typeof window.fetchPaymentMethods === 'function') {
+        window.fetchPaymentMethods();
+      }
       setTimeout(() => {
         onClose();
       }, 1200);
@@ -873,6 +888,13 @@ function AddCardPaymentElement({ onSuccess, onError, onClose }) {
     fields: { billingDetails: { email: 'never' } },
     wallets: { link: 'never' },
     paymentMethodTypes: ['card'],
+    appearance: {
+      theme: 'stripe',
+      variables: {
+        colorText: '#fff',
+        colorLabel: '#fff',
+      }
+    }
   }), []);
 
   const handleSubmit = async (e) => {
@@ -1309,6 +1331,11 @@ function Wallet() {
     }
     setPmLoading(false);
   }
+  // Expose globally for AddFundsStepper
+  useEffect(() => {
+    window.fetchPaymentMethods = fetchPaymentMethods;
+    return () => { delete window.fetchPaymentMethods; };
+  }, []);
 
   // Monthly summary
   const now = new Date();

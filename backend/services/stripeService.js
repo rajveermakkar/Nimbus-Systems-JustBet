@@ -17,9 +17,11 @@ async function createPaymentIntent(userId, amount, currency = 'cad', saveCard = 
   };
   if (saveCard) {
     paymentIntentData.setup_future_usage = 'off_session';
+    console.log('[createPaymentIntent] saveCard=true, setting setup_future_usage: off_session');
   }
   if (customerId) {
     paymentIntentData.customer = customerId;
+    console.log('[createPaymentIntent] Setting customer:', customerId);
   }
   if (paymentMethodId) {
     paymentIntentData.payment_method = paymentMethodId;
@@ -31,6 +33,8 @@ async function createPaymentIntent(userId, amount, currency = 'cad', saveCard = 
   if (connectedAccountId && !paymentMethodId) {
     options.stripeAccount = connectedAccountId;
   }
+  // Debug log for final paymentIntentData
+  console.log('[createPaymentIntent] Final paymentIntentData:', paymentIntentData);
   // Only pass options if not empty
   if (Object.keys(options).length > 0) {
     return await stripe.paymentIntents.create(paymentIntentData, options);
