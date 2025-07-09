@@ -243,9 +243,16 @@ function AuctionPage() {
   useEffect(() => {
     // Wait for user to be available before connecting
     if (!isLiveAuction || !user || !user.token || !user.id || socketConnectedRef.current) {
+      console.log('[AuctionPage] Socket connection delayed - waiting for user:', { 
+        isLiveAuction, 
+        hasUser: !!user, 
+        hasToken: !!user?.token, 
+        hasUserId: !!user?.id 
+      });
       return;
     }
 
+    console.log('[AuctionPage] User fully loaded, connecting socket...');
     socketConnectedRef.current = true;
 
     const setupSocket = async () => {
@@ -257,8 +264,12 @@ function AuctionPage() {
         const joinRoom = () => {
           socketService.joinLiveAuction(id, (data) => {
             // Only process updates if user is fully loaded
-            if (!user || !user.id) {
-              console.log('[AuctionPage] Skipping socket update - user not fully loaded');
+            if (!user || !user.id || !user.token) {
+              console.log('[AuctionPage] Skipping socket update - user not fully loaded:', { 
+                hasUser: !!user, 
+                hasUserId: !!user?.id, 
+                hasToken: !!user?.token 
+              });
               return;
             }
             
@@ -317,7 +328,7 @@ function AuctionPage() {
                   current_highest_bidder_id: currentId,
                 };
               });
-            } else if (data.type === 'bid-update') {
+            } else if (data.type === 'bid_update') {
               if (data.bids && Array.isArray(data.bids)) {
                 // Sort bids properly
                 const sortedBids = data.bids.sort((a, b) => {
@@ -747,12 +758,15 @@ function AuctionPage() {
   }
 
   // Show loading while user is being loaded for live auctions
-  if (isLiveAuction && (!user || !user.id)) {
+  if (isLiveAuction && (!user || !user.id || !user.token)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4"></div>
           <p className="text-sm">Loading user session...</p>
+          <p className="text-xs text-gray-400 mt-2">
+            {!user ? 'No user data' : !user.id ? 'Missing user ID' : !user.token ? 'Missing token' : 'Loading...'}
+          </p>
         </div>
       </div>
     );
@@ -1060,32 +1074,24 @@ function AuctionPage() {
                 )}
               </div>
             )}
+            
+            {/* Live Bid Countdown - moved inline below bid form */}
+            {isLiveAuction && liveBidCountdown !== null && (
+              <div className="rounded-lg bg-white/10 shadow p-4 mt-4">
+                <div className="text-center">
+                  <div className="text-sm text-green-400 font-semibold mb-2">Live Bid Countdown</div>
+                  <div className="text-2xl font-bold text-white mb-2">{formatSeconds(liveBidCountdown)}</div>
+                  <div className="text-xs text-yellow-400">
+                    If no bids are placed before this timer ends,<br />
+                    the auction will end automatically.<br />
+                    Place bids to win!
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-      {isLiveAuction && liveBidCountdown !== null && (
-  <div style={{
-    position: 'absolute',
-    top: 80,
-    right: 24,
-    background: 'rgba(35,43,74,0.92)',
-    color: '#fff',
-    borderRadius: 12,
-    padding: '12px 24px',
-    boxShadow: '0 2px 8px #0004',
-    zIndex: 10,
-    minWidth: 180,
-    textAlign: 'center',
-    fontWeight: 600,
-    fontSize: 18
-  }}>
-    <div style={{ fontSize: 15, color: '#6fffbe', fontWeight: 700, marginBottom: 4 }}>Live Bid Countdown</div>
-    <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: 1 }}>{formatSeconds(liveBidCountdown)}</div>
-    <div style={{ fontSize: 13, color: '#ffd166', marginTop: 6 }}>
-      If no bids are placed before this timer ends,<br />the auction will end automatically.<br />Place bids to win!
-    </div>
-  </div>
-)}
     </>
   );
 }
