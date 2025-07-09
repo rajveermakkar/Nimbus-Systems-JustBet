@@ -88,6 +88,9 @@ function SellerDashboard() {
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [payoutError, setPayoutError] = useState('');
   const [payoutSuccess, setPayoutSuccess] = useState('');
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [walletTransactions, setWalletTransactions] = useState([]);
+  const [walletLoading, setWalletLoading] = useState(false);
 
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -122,6 +125,23 @@ function SellerDashboard() {
       setError(err.message || "Failed to fetch analytics");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch wallet balance and transactions
+  const fetchWalletInfo = async () => {
+    try {
+      setWalletLoading(true);
+      const [balanceData, transactionsData] = await Promise.all([
+        apiService.get('/api/wallet/balance'),
+        apiService.get('/api/wallet/transactions')
+      ]);
+      setWalletBalance(balanceData.balance);
+      setWalletTransactions(transactionsData.transactions || []);
+    } catch (err) {
+      console.error('Failed to fetch wallet info:', err);
+    } finally {
+      setWalletLoading(false);
     }
   };
 
@@ -203,20 +223,19 @@ function SellerDashboard() {
 
   // Load data based on active tab
   useEffect(() => {
-    if (user && user.isApproved) {
-      if (activeTab === 'overview') {
-        fetchAnalytics();
-      } else if (activeTab === 'results') {
-        fetchAuctionResults();
-      } else if (activeTab === 'listings') {
-        fetchListings(false); // Initial load, not polling
-      } else if (activeTab === 'orders') {
-        fetchOrders();
-      } else if (activeTab === 'settings') {
-        fetchStripeStatus();
-      }
+    if (activeTab === 'overview') {
+      fetchAnalytics();
+      fetchWalletInfo();
+    } else if (activeTab === 'results') {
+      fetchAuctionResults();
+    } else if (activeTab === 'listings') {
+      fetchListings(false); // Initial load, not polling
+    } else if (activeTab === 'orders') {
+      fetchOrders();
+    } else if (activeTab === 'settings') {
+      fetchStripeStatus();
     }
-  }, [activeTab, user]);
+  }, [activeTab]);
 
   // Simple polling for listings - just fetch data every 5 seconds
   useEffect(() => {
@@ -468,6 +487,41 @@ function SellerDashboard() {
             {activeTab === 'overview' && analytics && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold mb-4">📊 Analytics Overview</h2>
+                
+                {/* Wallet Overview */}
+                <div className="bg-white/5 rounded-lg p-6 border border-white/20 mb-6">
+                  <h3 className="text-lg font-semibold mb-4 text-green-400">💰 Wallet Overview</h3>
+                  {walletLoading ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto"></div>
+                      <p className="text-sm mt-2">Loading wallet info...</p>
+                    </div>
+                  ) : walletBalance !== null ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-green-400">{formatPrice(walletBalance)}</div>
+                        <div className="text-sm text-gray-300">Total Balance</div>
+                      </div>
+                      <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-blue-400">
+                          {formatPrice(walletTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + Math.abs(t.amount), 0))}
+                        </div>
+                        <div className="text-sm text-gray-300">Total Deposited</div>
+                      </div>
+                      <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-purple-400">
+                          {formatPrice(walletTransactions.filter(t => t.type === 'deposit' && t.description.includes('earnings')).reduce((sum, t) => sum + Math.abs(t.amount), 0))}
+                        </div>
+                        <div className="text-sm text-gray-300">Total Earned</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-400">
+                      <i className="fa-solid fa-wallet text-2xl mb-2"></i>
+                      <p>No wallet information available</p>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Overall Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

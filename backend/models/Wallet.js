@@ -3,8 +3,8 @@ const { pool, queryWithRetry } = require('../db/init');
 // Create a new wallet for a user
 async function createWallet(userId) {
   const query = `
-    INSERT INTO wallets (user_id)
-    VALUES ($1)
+    INSERT INTO wallets (user_id, currency)
+    VALUES ($1, 'CAD')
     RETURNING *
   `;
   const result = await queryWithRetry(query, [userId]);

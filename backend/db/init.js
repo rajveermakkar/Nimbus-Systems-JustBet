@@ -148,6 +148,7 @@ const updateUsersTable = async () => {
       `);
     }
 
+
     // Check for Stripe customer ID column
     const stripeCustomerIdCheck = await pool.query(`
       SELECT column_name 

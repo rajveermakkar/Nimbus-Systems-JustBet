@@ -27,11 +27,16 @@ async function createPaymentIntent(userId, amount, currency = 'cad', saveCard = 
     paymentIntentData.confirm = false; // Will confirm on frontend
   }
   const options = {};
-  if (connectedAccountId) {
+  // For saved cards, always use platform account (no connected account)
+  if (connectedAccountId && !paymentMethodId) {
     options.stripeAccount = connectedAccountId;
   }
-  const paymentIntent = await stripe.paymentIntents.create(paymentIntentData, options);
-  return paymentIntent;
+  // Only pass options if not empty
+  if (Object.keys(options).length > 0) {
+    return await stripe.paymentIntents.create(paymentIntentData, options);
+  } else {
+    return await stripe.paymentIntents.create(paymentIntentData);
+  }
 }
 
 // Create a Stripe customer
@@ -51,8 +56,16 @@ async function getOrCreateCustomer(user) {
 }
 
 // Create a SetupIntent for adding a card
-async function createSetupIntent(customerId) {
-  return await stripe.setupIntents.create({ customer: customerId });
+async function createSetupIntent(customerId, connectedAccountId = null) {
+  const setupIntentData = { customer: customerId };
+  
+  if (connectedAccountId) {
+    // For connected accounts
+    return await stripe.setupIntents.create(setupIntentData, { stripeAccount: connectedAccountId });
+  } else {
+    // For platform account
+    return await stripe.setupIntents.create(setupIntentData);
+  }
 }
 
 // List saved card payment methods for a customer
@@ -213,6 +226,14 @@ async function fulfillAllRequirementsManually(accountId) {
   }
 }
 
+// Create a refund for a PaymentIntent (for user withdrawals)
+async function createRefund(paymentIntentId, amount, currency = 'cad') {
+  return await stripe.refunds.create({
+    payment_intent: paymentIntentId,
+    amount: Math.round(amount * 100),
+  });
+}
+
 module.exports = {
   createPaymentIntent,
   createCustomer,
@@ -226,5 +247,6 @@ module.exports = {
   createPayout,
   verifyConnectedAccount,
   fulfillAllTestRequirements,
-  fulfillAllRequirementsManually
+  fulfillAllRequirementsManually,
+  createRefund,
 }; 
