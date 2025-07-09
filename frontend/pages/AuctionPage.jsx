@@ -13,7 +13,7 @@ function AuctionPage() {
   const { id, type } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useContext(UserContext);
+  const { user, loading: userLoading } = useContext(UserContext);
   
   const [auction, setAuction] = useState(null);
   const [recentBids, setRecentBids] = useState([]);
@@ -183,7 +183,14 @@ function AuctionPage() {
           const response = await fetch(`${backendUrl}/api/auctions/live/${id}/bids`);
           if (response.ok) {
             const data = await response.json();
-            setRecentBids(data.bids || []);
+            // Sort bids by amount descending (highest first) and then by time
+            const sortedBids = (data.bids || []).sort((a, b) => {
+              if (a.amount !== b.amount) {
+                return b.amount - a.amount; // Highest amount first
+              }
+              return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+            });
+            setRecentBids(sortedBids);
           }
         } catch (bidError) {
           console.error('[AuctionPage] Error fetching live bids:', bidError);
@@ -227,6 +234,7 @@ function AuctionPage() {
 
   // Single socket connection useEffect
   useEffect(() => {
+    // Wait for user to be available before connecting
     if (!isLiveAuction || !user || !user.token || socketConnectedRef.current) {
       return;
     }
@@ -252,7 +260,14 @@ function AuctionPage() {
               });
             } else if (data.type === 'auction_state') {
               if (data.existingBids && data.existingBids.length > 0) {
-                setRecentBids(data.existingBids);
+                // Sort bids properly
+                const sortedBids = data.existingBids.sort((a, b) => {
+                  if (a.amount !== b.amount) {
+                    return b.amount - a.amount; // Highest amount first
+                  }
+                  return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+                });
+                setRecentBids(sortedBids);
               }
               setAuction(prevAuction => {
                 if (!prevAuction) return data;
@@ -263,7 +278,14 @@ function AuctionPage() {
                 };
               });
               if (data.bids && Array.isArray(data.bids)) {
-                setRecentBids(data.bids);
+                // Sort bids properly
+                const sortedBids = data.bids.sort((a, b) => {
+                  if (a.amount !== b.amount) {
+                    return b.amount - a.amount; // Highest amount first
+                  }
+                  return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+                });
+                setRecentBids(sortedBids);
               }
               if (data.timerEnd) {
                 setLiveBidTimerEnd(data.timerEnd);
@@ -284,7 +306,14 @@ function AuctionPage() {
               });
             } else if (data.type === 'bid-update') {
               if (data.bids && Array.isArray(data.bids)) {
-                setRecentBids(data.bids);
+                // Sort bids properly
+                const sortedBids = data.bids.sort((a, b) => {
+                  if (a.amount !== b.amount) {
+                    return b.amount - a.amount; // Highest amount first
+                  }
+                  return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+                });
+                setRecentBids(sortedBids);
               }
               setAuction(prevAuction => {
                 if (!prevAuction) return prevAuction;
@@ -423,7 +452,14 @@ function AuctionPage() {
             const response = await fetch(`${backendUrl}/api/auctions/live/${id}/bids`);
             if (response.ok) {
               const bidsData = await response.json();
-              setRecentBids(bidsData.bids || []);
+              // Sort bids properly
+              const sortedBids = (bidsData.bids || []).sort((a, b) => {
+                if (a.amount !== b.amount) {
+                  return b.amount - a.amount; // Highest amount first
+                }
+                return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+              });
+              setRecentBids(sortedBids);
             } else {
               setRecentBids([]);
             }
@@ -686,12 +722,24 @@ function AuctionPage() {
     );
   }
 
-  if (loading) {
+  if (loading || userLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4"></div>
           <p className="text-sm">Loading auction...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading while user is being loaded for live auctions
+  if (isLiveAuction && !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-sm">Loading user session...</p>
         </div>
       </div>
     );
@@ -921,7 +969,9 @@ function AuctionPage() {
                 )}
                 {!user ? (
                   <div className="text-center py-4">
-                    <p className="text-gray-400 mb-4 text-sm">Please log in to place a bid</p>
+                    <p className="text-gray-400 mb-4 text-sm">
+                      {isLiveAuction ? 'Your session has expired. Please log in again to continue bidding.' : 'Please log in to place a bid'}
+                    </p>
                     <button 
                       onClick={() => navigate('/login')}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm transition-colors"
