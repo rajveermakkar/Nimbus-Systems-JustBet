@@ -4,6 +4,8 @@ import Button from "../src/components/Button";
 import { useNavigate, useLocation } from "react-router-dom";
 import Toast from "../src/components/Toast";
 import { getStatusBadgeClass } from '../src/utils/statusBadgeUtils';
+import ConfirmModal from "../src/components/ConfirmModal";
+import apiService from "../src/services/apiService";
 
 // Tooltip component for rejection reason
 function Tooltip({ children, text }) {
@@ -43,6 +45,13 @@ function Tooltip({ children, text }) {
   );
 }
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const ORDER_STATUSES = [
+  { value: 'under_process', label: 'Under Process' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'delivered', label: 'Delivered' }
+];
+
 function SellerDashboard() {
   const { user } = useContext(UserContext);
   const navigate = useNavigate();
@@ -56,6 +65,20 @@ function SellerDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+  const [section, setSection] = useState('dashboard');
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [orderToast, setOrderToast] = useState({ show: false, message: '', type: 'info' });
+  const [confirmModal, setConfirmModal] = useState({ 
+    open: false, 
+    orderId: null, 
+    status: null, 
+    title: '', 
+    message: '' 
+  });
+  const [orderFilter, setOrderFilter] = useState('all');
+
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
   // Format price
   const formatPrice = (price) => {
@@ -82,13 +105,7 @@ function SellerDashboard() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("justbetToken");
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const res = await fetch(`${apiUrl}/api/seller/analytics`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to fetch analytics");
+      const data = await apiService.get('/api/seller/analytics');
       setAnalytics(data.analytics);
     } catch (err) {
       setError(err.message || "Failed to fetch analytics");
@@ -101,25 +118,41 @@ function SellerDashboard() {
   const fetchAuctionResults = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("justbetToken");
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const res = await fetch(`${apiUrl}/api/seller/auction-results`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const data = await apiService.get('/api/seller/auction-results');
+      // Standardize each result object
+      const mappedResults = (data.results || []).map(result => {
+        // Standardize id and type
+        const id = result.id || result.auction_id;
+        const type = result.type || result.auction_type || (result.max_participants ? 'live' : 'settled');
+        // Standardize result_type
+        let result_type = result.result_type;
+        if (!result_type) {
+          if (result.status === 'won' || (result.status === 'closed' && result.winner_id)) {
+            result_type = 'sold';
+          } else if (result.status === 'no_bids' || (!result.winner_id && (!result.final_bid || result.final_bid === 0))) {
+            result_type = 'no_bids';
+          } else if (result.status === 'reserve_not_met') {
+            result_type = 'reserve_not_met';
+          } else {
+            result_type = result.status;
+          }
+        }
+        // Standardize winner_name
+        let winner_name = result.winner_name;
+        if (!winner_name && result.winner_first_name && result.winner_last_name) {
+          winner_name = `${result.winner_first_name} ${result.winner_last_name}`;
+        }
+        // Standardize final_bid
+        const final_bid = result.final_bid || result.current_highest_bid || result.starting_price || 0;
+        return {
+          ...result,
+          id,
+          type,
+          result_type,
+          winner_name,
+          final_bid,
+        };
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to fetch auction results");
-      // Map backend status to frontend result_type
-      const mappedResults = (data.results || []).map(result => ({
-        ...result,
-        result_type:
-          (result.status === 'won' || (result.status === 'closed' && result.winner_id))
-            ? 'sold'
-            : result.status === 'no_bids'
-            ? 'no_bids'
-            : result.status === 'reserve_not_met'
-            ? 'reserve_not_met'
-            : result.status
-      }));
       setAuctionResults(mappedResults);
     } catch (err) {
       setError(err.message || "Failed to fetch auction results");
@@ -135,22 +168,9 @@ function SellerDashboard() {
         setLoading(true);
       }
       
-      const token = localStorage.getItem("justbetToken");
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      
       // Fetch both live and settled auctions
-      const liveRes = await fetch(`${apiUrl}/api/seller/auctions/live`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const settledRes = await fetch(`${apiUrl}/api/seller/auctions/settled`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      const liveData = await liveRes.json();
-      const settledData = await settledRes.json();
-      
-      if (!liveRes.ok) throw new Error(liveData.message || "Failed to fetch live listings");
-      if (!settledRes.ok) throw new Error(settledData.message || "Failed to fetch settled listings");
+      const liveData = await apiService.get('/api/seller/auctions/live');
+      const settledData = await apiService.get('/api/seller/auctions/settled');
       
       // Combine the listings
       const liveListings = liveData.auctions || [];
@@ -179,11 +199,11 @@ function SellerDashboard() {
         fetchAuctionResults();
       } else if (activeTab === 'listings') {
         fetchListings(false); // Initial load, not polling
+      } else if (activeTab === 'orders') {
+        fetchOrders();
       }
     }
   }, [activeTab, user]);
-
-
 
   // Simple polling for listings - just fetch data every 5 seconds
   useEffect(() => {
@@ -202,13 +222,75 @@ function SellerDashboard() {
     return () => clearInterval(interval);
   }, [user, activeTab]);
 
+  useEffect(() => {
+    if (section === 'orders') fetchOrders();
+  }, [section]);
+
+  async function fetchOrders() {
+    setOrdersLoading(true);
+    try {
+      const data = await apiService.get('/api/orders/seller');
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setOrderToast({ show: true, message: err.message || 'Failed to load orders', type: 'error' });
+    } finally {
+      setOrdersLoading(false);
+    }
+  }
+
+  function showStatusConfirmation(orderId, status) {
+    const statusLabels = {
+      'under_process': 'Under Process',
+      'shipped': 'Shipped', 
+      'delivered': 'Delivered'
+    };
+    
+    setConfirmModal({
+      open: true,
+      orderId,
+      status,
+      title: `Mark Order as ${statusLabels[status]}?`,
+      message: `Are you sure you want to mark this order as ${statusLabels[status].toLowerCase()}?`
+    });
+  }
+
+  async function updateOrderStatus(orderId, status) {
+    try {
+      await apiService.patch(`/api/orders/${orderId}/status`, { status });
+      setOrderToast({ show: true, message: 'Order status updated', type: 'success' });
+      fetchOrders();
+    } catch (err) {
+      console.error('Error updating order status:', err);
+      setOrderToast({ show: true, message: err.message || 'Failed to update status', type: 'error' });
+    }
+  }
+
+  function handleConfirmStatusUpdate() {
+    if (confirmModal.orderId && confirmModal.status) {
+      updateOrderStatus(confirmModal.orderId, confirmModal.status);
+    }
+    setConfirmModal({ open: false, orderId: null, status: null, title: '', message: '' });
+  }
+
+  function handleCancelStatusUpdate() {
+    setConfirmModal({ open: false, orderId: null, status: null, title: '', message: '' });
+  }
+
+  // Filter orders based on selected filter
+  const filteredOrders = useMemo(() => {
+    if (orderFilter === 'all') return orders;
+    return orders.filter(order => order.status === orderFilter);
+  }, [orders, orderFilter]);
+
   const handleToastClose = () => {
     setToast({ show: false, message: '', type: 'info' });
   };
 
   const handleViewAuction = (result) => {
-    const auctionType = result.type || result.auction_type || 'settled';
-    const auctionId = result.auction_id;
+    // Use auction_id if present, otherwise fallback to id
+    const auctionType = result.type;
+    const auctionId = result.auction_id || result.id;
     const path = `/seller/completed-auction/${auctionType}/${auctionId}`;
     navigate(path);
   };
@@ -247,6 +329,17 @@ function SellerDashboard() {
         />
       )}
       
+      <ConfirmModal
+        open={confirmModal.open}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={handleConfirmStatusUpdate}
+        onCancel={handleCancelStatusUpdate}
+        confirmText="Update Status"
+        cancelText="Cancel"
+        confirmColor="green"
+      />
+      
       <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white py-6">
         <div className="max-w-7xl mx-auto px-4">
           {/* Header */}
@@ -269,7 +362,8 @@ function SellerDashboard() {
               {[
                 { id: 'overview', label: 'Overview', icon: 'fa-solid fa-chart-line' },
                 { id: 'results', label: 'Auction Results', icon: 'fa-solid fa-trophy' },
-                { id: 'listings', label: 'My Listings', icon: 'fa-solid fa-list' }
+                { id: 'listings', label: 'My Listings', icon: 'fa-solid fa-list' },
+                { id: 'orders', label: 'Manage Orders', icon: 'fa-solid fa-box' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -403,64 +497,73 @@ function SellerDashboard() {
                     <p className="text-gray-400">You haven't completed any auctions yet.</p>
                   </div>
                 ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {auctionResults.map((result) => (
-                      <div 
-                        key={`${result.auction_type}-${result.id}`}
-                        className="bg-white/5 rounded-lg p-4 hover:bg-white/10 transition-colors"
-                      >
-                        {/* Auction Image */}
-                        <div className="mb-3 h-32 bg-white/5 rounded-lg flex items-center justify-center overflow-hidden">
-                          {result.image_url ? (
-                            <img
-                              src={result.image_url}
-                              alt={result.title}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <i className="fa-solid fa-image text-gray-400 text-2xl"></i>
-                          )}
-                        </div>
-
-                        {/* Auction Info */}
-                        <h3 className="font-semibold text-lg mb-2 line-clamp-2">{result.title}</h3>
-                        
-                        <div className="space-y-1 text-sm mb-3">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(result.status || result.result_type)}`}>
-                              {result.status === 'won' || (result.status === 'closed' && result.winner_id) ? 'Sold' : result.status === 'no_bids' ? 'No Bids' : result.status === 'reserve_not_met' ? 'Reserve Not Met' : result.status}
-                            </span>
-                          </div>
-                          <p className="text-gray-400">Ended: {formatDate(result.end_time)}</p>
-                        </div>
-
-                        {/* Result Info */}
-                        {result.result_type === 'sold' ? (
-                          <div className="bg-green-900/20 border border-green-500/30 rounded p-3 mb-3">
-                            <div className="text-center">
-                              <p className="text-sm text-gray-300">Sold for</p>
-                              <p className="text-lg font-bold text-green-400">{formatPrice(result.final_bid)}</p>
-                              <p className="text-xs text-gray-400">Winner: {result.winner_name || 'Unknown'}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-red-900/20 border border-red-500/30 rounded p-3 mb-3">
-                            <div className="text-center">
-                              <p className="text-sm text-gray-300">No bids placed</p>
-                              <p className="text-xs text-gray-400">Starting: {formatPrice(result.starting_price)}</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Action Button */}
-                        <Button
-                          onClick={() => handleViewAuction(result)}
-                          className="w-full text-sm"
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {auctionResults.map((result) => {
+                      const isSold = result.result_type === 'sold' || (result.status === 'closed' && result.winner_id);
+                      const isNoBids = result.result_type === 'no_bids' || (!result.winner_id && !isSold);
+                      return (
+                        <div 
+                          key={`${result.type || result.auction_type || 'settled'}-${result.id || result.auction_id}`}
+                          className="bg-white/5 rounded-lg p-4 hover:bg-white/10 transition-colors relative"
                         >
-                          View Details
-                        </Button>
-                      </div>
-                    ))}
+                          {/* Auction Type Badge */}
+                          <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[11px] font-bold border shadow z-10
+                            ${result.type === 'settled' ? 'bg-blue-500/20 text-blue-400 border-blue-400/30' : 'bg-red-500/20 text-red-400 border-red-400/30'}`}
+                          >
+                            {result.type === 'settled' ? 'Settled' : 'Live'}
+                          </span>
+                          {/* Auction Image */}
+                          <div className="mb-3 h-32 bg-white/5 rounded-lg flex items-center justify-center overflow-hidden">
+                            {result.image_url ? (
+                              <img
+                                src={result.image_url}
+                                alt={result.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <i className="fa-solid fa-image text-gray-400 text-2xl"></i>
+                            )}
+                          </div>
+                          {/* Auction Info */}
+                          <h3 className="font-semibold text-lg mb-2 line-clamp-2">{result.title}</h3>
+                          <div className="space-y-1 text-sm mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(result.status || result.result_type)}`}>
+                                {isSold ? 'Sold' : isNoBids ? 'No Bids' : result.status === 'reserve_not_met' ? 'Reserve Not Met' : result.status}
+                              </span>
+                            </div>
+                            <p className="text-gray-400">Ended: {formatDate(result.end_time)}</p>
+                          </div>
+                          {/* Result Info */}
+                          {isSold ? (
+                            <div className="bg-green-900/20 border border-green-500/30 rounded p-3 mb-3">
+                              <div className="text-center">
+                                <p className="text-sm text-gray-300">Sold for</p>
+                                <p className="text-lg font-bold text-green-400">{formatPrice(result.final_bid)}</p>
+                                <p className="text-xs text-gray-400">
+                                  Winner: {result.winner_name ? result.winner_name : (result.winner_first_name && result.winner_last_name ? `${result.winner_first_name} ${result.winner_last_name}` : 'No Winner')}
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-red-900/20 border border-red-500/30 rounded p-3 mb-3">
+                              <div className="text-center">
+                                <p className="text-sm text-gray-300">No bids placed</p>
+                                <p className="text-xs text-gray-400">Starting: {formatPrice(result.starting_price)}</p>
+                                <p className="text-xs text-gray-400 mt-1">Winner: No Winner</p>
+                              </div>
+                            </div>
+                          )}
+                          {/* Action Button */}
+                          <Button
+                            onClick={() => handleViewAuction(result)}
+                            className="w-full text-sm"
+                          >
+                            View Details
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -521,6 +624,169 @@ function SellerDashboard() {
                             <i className="fas fa-edit mr-1"></i>
                             Edit
                           </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Manage Orders Tab */}
+            {activeTab === 'orders' && (
+              <div>
+                <h2 className="text-2xl font-bold mb-4">📦 Manage Orders</h2>
+                
+                {orderToast.show && (
+                  <Toast
+                    message={orderToast.message}
+                    type={orderToast.type}
+                    onClose={() => setOrderToast({ show: false, message: '', type: 'info' })}
+                    duration={3000}
+                  />
+                )}
+
+                {/* Filter Buttons */}
+                <div className="flex flex-wrap gap-2 mb-6 justify-center">
+                  {[
+                    { value: 'all', label: 'All Orders', icon: 'fa-solid fa-list' },
+                    { value: 'under_process', label: 'Under Process', icon: 'fa-solid fa-clock' },
+                    { value: 'shipped', label: 'Shipped', icon: 'fa-solid fa-shipping-fast' },
+                    { value: 'delivered', label: 'Delivered', icon: 'fa-solid fa-check-circle' }
+                  ].map(filter => (
+                    <button
+                      key={filter.value}
+                      onClick={() => setOrderFilter(filter.value)}
+                      className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-semibold transition-all ${
+                        orderFilter === filter.value
+                          ? 'bg-purple-500/30 text-purple-300 border border-purple-400/40 shadow-[0_0_12px_#a78bfa66]'
+                          : 'bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white border border-white/20'
+                      }`}
+                    >
+                      <i className={filter.icon}></i>
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+                
+                {ordersLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4"></div>
+                    <p className="text-sm">Loading orders...</p>
+                  </div>
+                ) : filteredOrders.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="text-6xl mb-4">📦</div>
+                    <h3 className="text-xl font-semibold mb-2">
+                      {orderFilter === 'all' ? 'No Orders Yet' : `No ${orderFilter.replace('_', ' ')} Orders`}
+                    </h3>
+                    <p className="text-gray-400">
+                      {orderFilter === 'all' 
+                        ? 'Orders will appear here when buyers claim their winning auctions.'
+                        : `No orders with status "${orderFilter.replace('_', ' ')}" found.`
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredOrders.map(order => (
+                      <div key={order.id} className="bg-white/5 rounded-lg p-4 border border-white/20 hover:bg-white/10 transition-colors">
+                        {/* Order Header */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <i className="fa-solid fa-box text-blue-400"></i>
+                            <span className="text-sm text-gray-400">Order #{order.id.slice(0, 8)}</span>
+                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            order.status === 'under_process' ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/30' :
+                            order.status === 'shipped' ? 'bg-blue-900/30 text-blue-400 border border-blue-500/30' :
+                            order.status === 'delivered' ? 'bg-green-900/30 text-green-400 border border-green-500/30' :
+                            'bg-gray-900/30 text-gray-400 border border-gray-500/30'
+                          }`}>
+                            {ORDER_STATUSES.find(s => s.value === order.status)?.label || order.status}
+                          </span>
+                        </div>
+
+                        {/* Product Image */}
+                        <div className="mb-3 h-32 bg-white/5 rounded-lg flex items-center justify-center overflow-hidden">
+                          {order.image_url ? (
+                            <img
+                              src={order.image_url}
+                              alt={order.title || 'Product'}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <i className="fa-solid fa-image text-gray-400 text-2xl"></i>
+                          )}
+                        </div>
+
+                        {/* Auction Info */}
+                        <div className="mb-3">
+                          <h3 className="font-semibold text-lg mb-2 line-clamp-2">{order.title || `Auction #${order.auction_id.slice(0, 8)}`}</h3>
+                          <p className="text-sm text-gray-400 mb-1">
+                            Winner: {order.winner_first_name && order.winner_last_name 
+                              ? `${order.winner_first_name} ${order.winner_last_name}` 
+                              : order.winner_email || `${order.winner_id.slice(0, 8)}...`}
+                          </p>
+                          <p className="text-xs text-gray-500 mb-1">Created: {formatDate(order.created_at)}</p>
+                          {order.final_bid && (
+                            <p className="text-xs text-green-400 font-semibold">Final Bid: {formatPrice(order.final_bid)}</p>
+                          )}
+                        </div>
+
+                        {/* Shipping Address */}
+                        <div className="bg-white/5 rounded p-3 mb-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <i className="fa-solid fa-shipping-fast text-green-400"></i>
+                            <span className="text-sm font-semibold">Shipping Address</span>
+                          </div>
+                          <div className="text-xs text-gray-300 space-y-1">
+                            <p>{order.shipping_address}</p>
+                            <p>{order.shipping_city}, {order.shipping_state} {order.shipping_postal_code}</p>
+                            <p>{order.shipping_country}</p>
+                          </div>
+                        </div>
+
+                        {/* Status Update Buttons */}
+                        <div className="space-y-2">
+                          <p className="text-xs text-gray-400 mb-2">Update Status:</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {ORDER_STATUSES.map(s => {
+                              const isCurrentStatus = order.status === s.value;
+                              let buttonClass = '';
+                              const isDelivered = order.status === 'delivered';
+                              if (isCurrentStatus) {
+                                switch (s.value) {
+                                  case 'under_process':
+                                    buttonClass = 'bg-yellow-500/30 text-yellow-300 border border-yellow-400/50 cursor-not-allowed';
+                                    break;
+                                  case 'shipped':
+                                    buttonClass = 'bg-blue-500/30 text-blue-300 border border-blue-400/50 cursor-not-allowed';
+                                    break;
+                                  case 'delivered':
+                                    buttonClass = 'bg-green-500/30 text-green-300 border border-green-400/50 cursor-not-allowed';
+                                    break;
+                                  default:
+                                    buttonClass = 'bg-purple-500/30 text-purple-300 border border-purple-400/50 cursor-not-allowed';
+                                }
+                              } else {
+                                buttonClass = 'bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white border border-white/20';
+                              }
+                              return (
+                                <button
+                                  key={s.value}
+                                  onClick={() => !isCurrentStatus && !isDelivered && showStatusConfirmation(order.id, s.value)}
+                                  disabled={isCurrentStatus || isDelivered}
+                                  className={`px-2 py-1 text-xs rounded transition-all ${buttonClass}`}
+                                >
+                                  {s.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {order.status === 'delivered' && (
+                            <div className="text-green-300 text-xs mt-2">Order is delivered. Status cannot be changed.</div>
+                          )}
                         </div>
                       </div>
                     ))}

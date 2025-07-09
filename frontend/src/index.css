@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+body, #root {
+    min-height: 100vh;
+    background-image: linear-gradient(to bottom right in oklab, #000 0%, #2a2a72 60%, #6363ee 100%);
+  }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { UserContext } from '../src/context/UserContext';
 import Button from '../src/components/Button';
+import apiService from '../src/services/apiService';
 
 function CompletedAuctionDetails() {
   const { id, type } = useParams();
@@ -33,50 +34,29 @@ function CompletedAuctionDetails() {
     try {
       setLoading(true);
       setError(null);
-
-      const token = localStorage.getItem('justbetToken');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
       // Use seller-specific routes for sellers viewing their own auctions
-      let auctionUrl;
+      let auctionEndpoint;
       if (type === 'live') {
-        auctionUrl = `${import.meta.env.VITE_BACKEND_URL}/api/seller/auctions/live/${id}`;
+        auctionEndpoint = `/api/seller/auctions/live/${id}`;
       } else {
-        auctionUrl = `${import.meta.env.VITE_BACKEND_URL}/api/seller/auctions/settled/${id}`;
+        auctionEndpoint = `/api/seller/auctions/settled/${id}`;
       }
-      
-      const auctionResponse = await fetch(auctionUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!auctionResponse.ok) {
-        throw new Error('Auction not found');
-      }
-
-      const auctionData = await auctionResponse.json();
+      // Use apiService for auction fetch
+      const auctionData = await apiService.get(auctionEndpoint);
       const auctionObj = auctionData.auction || auctionData;
       setAuction(auctionObj);
       console.log('Auction data:', auctionObj);
-
       // Get winner details if auction was sold
       if (auctionObj.status === 'closed' && auctionObj.current_highest_bidder_id) {
-        const winnerUrl = `${import.meta.env.VITE_BACKEND_URL}/api/auth/user/${auctionObj.current_highest_bidder_id}`;
-        const winnerResponse = await fetch(winnerUrl, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (winnerResponse.ok) {
-          const winnerData = await winnerResponse.json();
+        const winnerEndpoint = `/api/auth/user/${auctionObj.current_highest_bidder_id}`;
+        try {
+          const winnerData = await apiService.get(winnerEndpoint);
           setWinner(winnerData.user);
+        } catch (winnerErr) {
+          // If winner fetch fails, just skip
+          setWinner(null);
         }
       }
-
     } catch (err) {
       setError(err.message || 'Failed to load auction details');
     } finally {

@@ -33,6 +33,8 @@ import WonAuctionDetails from '../pages/WonAuctionDetails';
 import EditListing from '../pages/EditListing';
 import CompletedAuctionDetails from '../pages/CompletedAuctionDetails';
 import NotFound from '../pages/NotFound';
+import UserProfile from '../pages/UserProfile';
+import WinningPage from '../pages/WinningPage';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -293,6 +295,16 @@ function AppRoutes() {
         <Route path="/admin/earnings" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
         <Route path="/admin/db-health" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
         <Route path="/not-authorized" element={<NotAuthorized showToast={showToast} />} />
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <UserProfile />
+          </ProtectedRoute>
+        } />
+        <Route path="/winning/:auctionId" element={
+          <ProtectedRoute>
+            <WinningPage />
+          </ProtectedRoute>
+        } />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

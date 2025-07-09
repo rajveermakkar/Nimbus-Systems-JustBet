@@ -9,6 +9,7 @@ const sellerRoutes = require('./routes/sellerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const liveAuctionRoutes = require('./routes/liveAuctionRoutes');
 const auctionsRoutes = require('./routes/auctionsRoutes');
+const userProfileRouter = require('./routes/userProfile');
 const http = require('http');
 const { Server } = require('socket.io');
 const LiveAuctionModel = require('./models/LiveAuction');
@@ -16,6 +17,7 @@ const { verifySocketToken } = require('./middleware/jwtauth');
 const liveAuctionState = require('./services/liveAuctionState');
 const LiveAuctionBid = require('./models/LiveAuctionBid');
 const LiveAuctionResult = require('./models/LiveAuctionResult');
+const ordersRouter = require('./routes/orders');
 
 // Start settled auction cron job
 if (process.env.NODE_ENV !== 'test') {
@@ -39,6 +41,8 @@ app.use('/api/seller', sellerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/live-auction', liveAuctionRoutes);
 app.use('/api/auctions', auctionsRoutes);
+app.use('/api/user', userProfileRouter);
+app.use('/api/orders', ordersRouter);
 
 app.get('/', (req, res) => {
   res.send('Welcome to JustBet!');
