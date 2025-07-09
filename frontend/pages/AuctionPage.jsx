@@ -13,7 +13,7 @@ function AuctionPage() {
   const { id, type } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading: userLoading } = useContext(UserContext);
+  const { user } = useContext(UserContext);
   
   const [auction, setAuction] = useState(null);
   const [recentBids, setRecentBids] = useState([]);
@@ -197,7 +197,14 @@ function AuctionPage() {
           setRecentBids([]);
         }
       } else {
-        setRecentBids(auctionData.recentBids || []);
+        // Sort settled auction bids properly
+        const sortedBids = (auctionData.recentBids || []).sort((a, b) => {
+          if (a.amount !== b.amount) {
+            return b.amount - a.amount; // Highest amount first
+          }
+          return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+        });
+        setRecentBids(sortedBids);
       }
     } catch (err) {
       console.error('[AuctionPage] Error fetching auction:', err);
@@ -722,7 +729,7 @@ function AuctionPage() {
     );
   }
 
-  if (loading || userLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">
         <div className="text-center">

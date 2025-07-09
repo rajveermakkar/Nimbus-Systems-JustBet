@@ -99,14 +99,14 @@ function Navbar() {
                   aria-haspopup="true"
                   aria-expanded={dropdownOpen}
                 >
-                  <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.firstName || 'A')}+${encodeURIComponent(user.lastName || 'D')}&background=2a2a72&color=fff`} alt="avatar" className="w-7 h-7 rounded-full border-2 border-white/30" />
-                  <span>{user.firstName} {user.lastName}</span>
+                  <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || user.firstName || 'A')}+${encodeURIComponent(user.last_name || user.lastName || 'D')}&background=2a2a72&color=fff`} alt="avatar" className="w-7 h-7 rounded-full border-2 border-white/30" />
+                  <span>{user.first_name || user.firstName} {user.last_name || user.lastName}</span>
                 </button>
                 {dropdownOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-[#23235b]/95 rounded-xl shadow-lg py-2 z-50 border border-white/10 flex flex-col min-w-[220px]">
                     {/* User Info */}
                     <div className="px-4 pt-4 pb-2">
-                      <div className="font-bold text-white text-base">{user.firstName} {user.lastName}</div>
+                      <div className="font-bold text-white text-base">{user.first_name || user.firstName} {user.last_name || user.lastName}</div>
                       <div className="text-xs text-gray-300 mb-1">{user.email}</div>
                     </div>
                     {/* Menu Items */}

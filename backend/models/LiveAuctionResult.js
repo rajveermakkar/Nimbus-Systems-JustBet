@@ -76,6 +76,7 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
   }
   // Find highest bid
   const highestBid = bids.reduce((max, bid) => bid.amount > max.amount ? bid : max, bids[0]);
+
   // Check reserve price
   if (auction.reserve_price && highestBid.amount < auction.reserve_price) {
     await LiveAuction.updateAuction(auctionId, { status: 'closed', current_highest_bidder_id: null });
