@@ -21,6 +21,7 @@ const ordersRouter = require('./routes/orders');
 const walletRoutes = require('./routes/walletRoutes');
 const bodyParser = require('body-parser');
 const cookie = require('cookie'); // Add at the top if not present
+const auctionEndLocks = new Set();
 
 // Start settled auction cron job
 if (process.env.NODE_ENV !== 'test') {
@@ -293,8 +294,10 @@ const startServer = async () => {
 
       // Place bid
       socket.on('place_bid', async ({ auctionId, amount }) => {
+        console.log(`[BID] Received place_bid for auctionId=${auctionId}, userId=${socket.user.id}, amount=${amount}`);
         const state = liveAuctionState.getAuction(auctionId);
         if (!state || state.status !== 'open') {
+          console.log(`[BID] Auction not open for bidding. auctionId=${auctionId}`);
           socket.emit('bid_error', 'Auction not open for bidding.');
           return;
         }
@@ -305,11 +308,13 @@ const startServer = async () => {
             [auctionId]
           );
           if (auctionCheck.rows.length === 0) {
+            console.log(`[BID] Auction not found in DB. auctionId=${auctionId}`);
             socket.emit('bid_error', 'Auction not found.');
             return;
           }
           const auction = auctionCheck.rows[0];
           if (auction.status === 'closed') {
+            console.log(`[BID] Auction is closed in DB. auctionId=${auctionId}`);
             socket.emit('bid_error', 'Auction has ended.');
             return;
           }
@@ -317,28 +322,32 @@ const startServer = async () => {
           const now = Date.now();
           const endTime = new Date(auction.end_time).getTime();
           if (endTime <= now) {
+            console.log(`[BID] Auction has ended by time. auctionId=${auctionId}`);
             socket.emit('bid_error', 'Auction has ended.');
             return;
           }
         } catch (err) {
-          console.error('Error checking auction status:', err);
+          console.error(`[BID] Error checking auction status:`, err);
           socket.emit('bid_error', 'Error checking auction status.');
           return;
         }
         // Prevent bidding before auction start time
         const now = Date.now();
         if (state.startTime && now < new Date(state.startTime).getTime()) {
+          console.log(`[BID] Auction not started yet. auctionId=${auctionId}`);
           socket.emit('bid_error', 'Auction has not started yet.');
           return;
         }
         // Check if auction has reached its end time
         if (state.endTime && now >= state.endTime) {
+          console.log(`[BID] Auction has ended by in-memory endTime. auctionId=${auctionId}`);
           socket.emit('bid_error', 'Auction has ended.');
           return;
         }
         // Validate bid
         const bidAmount = Number(amount);
         if (isNaN(bidAmount) || bidAmount < state.currentBid + state.minIncrement) {
+          console.log(`[BID] Bid too low. auctionId=${auctionId}, userId=${socket.user.id}, amount=${amount}`);
           socket.emit('bid_error', `Bid must be at least ${(state.currentBid + state.minIncrement).toFixed(2)}`);
           return;
         }
@@ -349,12 +358,14 @@ const startServer = async () => {
           // Get wallet
           const wallet = await Wallet.getWalletByUserId(socket.user.id);
           if (!wallet) {
+            console.log(`[BID] Wallet not found. userId=${socket.user.id}`);
             socket.emit('bid_error', 'Wallet not found.');
             return;
           }
           const totalBlocked = await Wallet.getTotalBlockedAmount(socket.user.id);
           const available = Number(wallet.balance) - totalBlocked;
           if (available < bidAmount) {
+            console.log(`[BID] Insufficient funds. userId=${socket.user.id}, available=${available}, bidAmount=${bidAmount}`);
             socket.emit('bid_error', 'Insufficient available wallet balance for this bid.');
             return;
           }
@@ -362,16 +373,20 @@ const startServer = async () => {
           const existingBlock = await Wallet.getWalletBlock(socket.user.id, auctionId);
           if (!existingBlock) {
             await Wallet.createWalletBlock(socket.user.id, auctionId, bidAmount);
-          } // else: could update block amount if needed
+            console.log(`[BID] Created wallet block. userId=${socket.user.id}, auctionId=${auctionId}, amount=${bidAmount}`);
+          }
           // Remove previous highest bidder's wallet block (if any and not the current user)
           const previousHighestBidderId = state.currentBidder;
           if (previousHighestBidderId && previousHighestBidderId !== socket.user.id) {
             await Wallet.removeWalletBlock(previousHighestBidderId, auctionId);
+            console.log(`[BID] Removed previous highest bidder's block. userId=${previousHighestBidderId}, auctionId=${auctionId}`);
           }
           // Store the bid in DB
+          console.log(`[BID] Inserting bid into DB. auctionId=${auctionId}, userId=${socket.user.id}, amount=${bidAmount}`);
           await LiveAuctionBid.create({ auctionId, userId: socket.user.id, amount: bidAmount });
+          console.log(`[BID] Bid inserted into DB. auctionId=${auctionId}, userId=${socket.user.id}, amount=${bidAmount}`);
         } catch (err) {
-          console.error('Wallet/funds check or DB error:', err);
+          console.error(`[BID] Wallet/funds check or DB error:`, err);
           socket.emit('bid_error', 'Wallet/funds error: ' + (err.message || 'Unknown error'));
           return;
         }
@@ -384,6 +399,7 @@ const startServer = async () => {
         state.currentBid = bidAmount;
         state.currentBidder = socket.user.id;
         liveAuctionState.addBid(auctionId, bid);
+        console.log(`[BID] Added bid to in-memory state. auctionId=${auctionId}, userId=${socket.user.id}, amount=${bidAmount}`);
         // Persist bid and update auction in DB
         try {
           const LiveAuctionModel = require('./models/LiveAuction');
@@ -391,18 +407,21 @@ const startServer = async () => {
             current_highest_bid: bidAmount,
             current_highest_bidder_id: socket.user.id
           });
+          console.log(`[BID] Updated auction in DB. auctionId=${auctionId}, userId=${socket.user.id}, amount=${bidAmount}`);
         } catch (err) {
-          console.error('Error updating auction in DB:', err);
+          console.error(`[BID] Error updating auction in DB:`, err);
         }
         // Start or reset countdown timer
         liveAuctionState.setTimer(auctionId, 120000, () => handleAuctionEnd(auctionId));
+        console.log(`[BID] Reset inactivity countdown timer. auctionId=${auctionId}`);
         // Get updated bid history with user names
         let updatedBids = [];
         try {
           const LiveAuctionBid = require('./models/LiveAuctionBid');
           updatedBids = await LiveAuctionBid.findByAuctionIdWithNames(auctionId);
+          console.log(`[BID] Loaded updated bid history for auctionId=${auctionId}, count=${updatedBids.length}`);
         } catch (err) {
-          console.error('Error fetching updated bids:', err);
+          console.error(`[BID] Error fetching updated bids:`, err);
         }
         // Broadcast new bid to all users in room, always include user_name and user_id
         io.to(auctionId).emit('bid_update', {
@@ -411,6 +430,7 @@ const startServer = async () => {
           bids: updatedBids,
           timerEnd: state.timerEnd
         });
+        console.log(`[BID] Broadcasted bid_update to room. auctionId=${auctionId}`);
       });
 
       // Handle disconnect
@@ -450,238 +470,250 @@ const startServer = async () => {
 
       // Auction end logic
       async function handleAuctionEnd(auctionId) {
-        const state = liveAuctionState.getAuction(auctionId);
-        if (!state) return;
-        liveAuctionState.closeAuction(auctionId);
-        
-        // Check what's actually in the database
+        if (auctionEndLocks.has(auctionId)) {
+          console.log(`[AUCTION END] handleAuctionEnd already running for auctionId=${auctionId}, skipping.`);
+          return;
+        }
+        auctionEndLocks.add(auctionId);
         try {
-          const dbCheck = await queryWithRetry(`
-            SELECT 
-              la.current_highest_bid,
-              la.current_highest_bidder_id,
-              la.starting_price,
-              la.reserve_price,
-              (SELECT COUNT(*) FROM live_auction_bids WHERE auction_id = $1) as bid_count,
-              (SELECT MAX(amount) FROM live_auction_bids WHERE auction_id = $1) as max_bid_amount,
-              (SELECT user_id FROM live_auction_bids WHERE auction_id = $1 ORDER BY amount DESC, created_at DESC LIMIT 1) as highest_bidder_from_bids
-            FROM live_auctions la 
-            WHERE la.id = $1
-          `, [auctionId]);
-          
-          console.log('Database state at auction end:', {
-            auctionId,
-            dbState: dbCheck.rows[0],
-            inMemoryState: {
-              currentBid: state.currentBid,
-              currentBidder: state.currentBidder,
-              reservePrice: state.reservePrice,
-              bids: state.bids
-            }
-          });
-          
-          // Use database state as the source of truth for winner determination
-          const dbState = dbCheck.rows[0];
-          const finalBid = dbState.current_highest_bid || state.currentBid;
-          const finalBidder = dbState.current_highest_bidder_id || state.currentBidder;
-          
-          console.log('Using database state for winner determination:', {
-            finalBid,
-            finalBidder,
-            reservePrice: dbState.reserve_price
-          });
-          
-          // Determine winner and status
-          let winner = null;
-          let message = '';
-          let status = 'no_winner';
-          let reserveMet = false;
-          
-          if (dbState.reserve_price !== null && finalBid < dbState.reserve_price) {
-            message = 'No winner matched the Reserved Price';
-            status = 'reserve_not_met';
-          } else if (finalBidder) {
-            // Fetch winner's user details
-            try {
-              const winnerQuery = 'SELECT first_name, last_name, email FROM users WHERE id = $1';
-              const winnerResult = await queryWithRetry(winnerQuery, [finalBidder]);
-              const winnerUser = winnerResult.rows[0];
-              
-              console.log('Winner details from DB:', {
-                winnerId: finalBidder,
-                winnerUser: winnerUser
-              });
-              
-              winner = {
-                user_id: finalBidder,
-                user_name: winnerUser ? `${winnerUser.first_name} ${winnerUser.last_name}` : 'Unknown User',
-                amount: finalBid
-              };
-              message = 'Auction ended. Winner: ' + winner.user_name;
-              status = 'won';
-              reserveMet = true;
-            } catch (err) {
-              console.error('Error fetching winner details:', err);
-              winner = {
-                user_id: finalBidder,
-                user_name: 'Unknown User',
-                amount: finalBid
-              };
-              message = 'Auction ended. Winner: Unknown User';
-              status = 'won';
-              reserveMet = true;
-            }
-          } else {
-            message = 'Auction ended. No bids were placed.';
-            status = 'no_bids';
+          const state = liveAuctionState.getAuction(auctionId);
+          if (!state) {
+            console.log(`[AUCTION END] No in-memory state for auctionId=${auctionId}`);
+            return;
           }
+          liveAuctionState.closeAuction(auctionId);
           
-          console.log('Final winner determination:', {
-            winner,
-            status,
-            message,
-            reserveMet
-          });
-          
-          // Save result to database
+          // Check what's actually in the database
           try {
-            // Check if result already exists
-            const existingResult = await queryWithRetry(
-              'SELECT * FROM live_auction_results WHERE auction_id = $1',
-              [auctionId]
-            );
+            const dbCheck = await queryWithRetry(`
+              SELECT 
+                la.current_highest_bid,
+                la.current_highest_bidder_id,
+                la.starting_price,
+                la.reserve_price,
+                (SELECT COUNT(*) FROM live_auction_bids WHERE auction_id = $1) as bid_count,
+                (SELECT MAX(amount) FROM live_auction_bids WHERE auction_id = $1) as max_bid_amount,
+                (SELECT user_id FROM live_auction_bids WHERE auction_id = $1 ORDER BY amount DESC, created_at DESC LIMIT 1) as highest_bidder_from_bids
+              FROM live_auctions la 
+              WHERE la.id = $1
+            `, [auctionId]);
             
-            if (existingResult.rows.length > 0) {
-              console.log('WARNING: Result already exists for auction:', {
-                auctionId,
-                existingResult: existingResult.rows[0]
-              });
-              return; // Don't create duplicate results
+            console.log('Database state at auction end:', {
+              auctionId,
+              dbState: dbCheck.rows[0],
+              inMemoryState: {
+                currentBid: state.currentBid,
+                currentBidder: state.currentBidder,
+                reservePrice: state.reservePrice,
+                bids: state.bids
+              }
+            });
+            
+            // Use database state as the source of truth for winner determination
+            const dbState = dbCheck.rows[0];
+            const finalBid = dbState.current_highest_bid || state.currentBid;
+            const finalBidder = dbState.current_highest_bidder_id || state.currentBidder;
+            
+            console.log('Using database state for winner determination:', {
+              finalBid,
+              finalBidder,
+              reservePrice: dbState.reserve_price
+            });
+            
+            // Determine winner and status
+            let winner = null;
+            let message = '';
+            let status = 'no_winner';
+            let reserveMet = false;
+            
+            if (dbState.reserve_price !== null && finalBid < dbState.reserve_price) {
+              message = 'No winner matched the Reserved Price';
+              status = 'reserve_not_met';
+            } else if (finalBidder) {
+              // Fetch winner's user details
+              try {
+                const winnerQuery = 'SELECT first_name, last_name, email FROM users WHERE id = $1';
+                const winnerResult = await queryWithRetry(winnerQuery, [finalBidder]);
+                const winnerUser = winnerResult.rows[0];
+                
+                console.log('Winner details from DB:', {
+                  winnerId: finalBidder,
+                  winnerUser: winnerUser
+                });
+                
+                winner = {
+                  user_id: finalBidder,
+                  user_name: winnerUser ? `${winnerUser.first_name} ${winnerUser.last_name}` : 'Unknown User',
+                  amount: finalBid
+                };
+                message = 'Auction ended. Winner: ' + winner.user_name;
+                status = 'won';
+                reserveMet = true;
+              } catch (err) {
+                console.error('Error fetching winner details:', err);
+                winner = {
+                  user_id: finalBidder,
+                  user_name: 'Unknown User',
+                  amount: finalBid
+                };
+                message = 'Auction ended. Winner: Unknown User';
+                status = 'won';
+                reserveMet = true;
+              }
+            } else {
+              message = 'Auction ended. No bids were placed.';
+              status = 'no_bids';
             }
             
-            await LiveAuctionResult.create({
-              auctionId,
-              winnerId: winner ? winner.user_id : null,
-              finalBid: finalBid,
-              reserveMet,
-              status
+            console.log('Final winner determination:', {
+              winner,
+              status,
+              message,
+              reserveMet
             });
             
-            console.log('Saved auction result to database:', {
-              auctionId,
-              winnerId: winner ? winner.user_id : null,
+            // Save result to database
+            try {
+              // Check if result already exists
+              const existingResult = await queryWithRetry(
+                'SELECT * FROM live_auction_results WHERE auction_id = $1',
+                [auctionId]
+              );
+              
+              if (existingResult.rows.length > 0) {
+                console.log('WARNING: Result already exists for auction:', {
+                  auctionId,
+                  existingResult: existingResult.rows[0]
+                });
+                return; // Don't create duplicate results
+              }
+              
+              await LiveAuctionResult.create({
+                auctionId,
+                winnerId: winner ? winner.user_id : null,
+                finalBid: finalBid,
+                reserveMet,
+                status
+              });
+              
+              console.log('Saved auction result to database:', {
+                auctionId,
+                winnerId: winner ? winner.user_id : null,
+                finalBid: finalBid,
+                status
+              });
+              
+              // Update the live auction status to 'closed' in the database
+              await LiveAuctionModel.updateAuction(auctionId, {
+                status: 'closed'
+              });
+              
+            } catch (err) {
+              console.error('Error saving auction result:', err);
+            }
+            
+            io.to(auctionId).emit('auction_end', {
+              winner,
               finalBid: finalBid,
-              status
+              message,
+              status,
+              reserveMet
             });
             
-            // Update the live auction status to 'closed' in the database
-            await LiveAuctionModel.updateAuction(auctionId, {
-              status: 'closed'
-            });
+            // Remove in-memory state after short delay
+            setTimeout(() => liveAuctionState.removeAuction(auctionId), 60000);
             
           } catch (err) {
-            console.error('Error saving auction result:', err);
-          }
-          
-          io.to(auctionId).emit('auction_end', {
-            winner,
-            finalBid: finalBid,
-            message,
-            status,
-            reserveMet
-          });
-          
-          // Remove in-memory state after short delay
-          setTimeout(() => liveAuctionState.removeAuction(auctionId), 60000);
-          
-        } catch (err) {
-          console.error('Error checking database state:', err);
-          // Fallback to in-memory state if database check fails
-          console.log('Falling back to in-memory state for winner determination');
-          
-          // Determine winner and status using in-memory state
-          let winner = null;
-          let message = '';
-          let status = 'no_winner';
-          let reserveMet = false;
-          
-          if (state.reservePrice !== null && state.currentBid < state.reservePrice) {
-            message = 'No winner matched the Reserved Price';
-            status = 'reserve_not_met';
-          } else if (state.currentBidder) {
-            // Fetch winner's user details
+            console.error('Error checking database state:', err);
+            // Fallback to in-memory state if database check fails
+            console.log('Falling back to in-memory state for winner determination');
+            
+            // Determine winner and status using in-memory state
+            let winner = null;
+            let message = '';
+            let status = 'no_winner';
+            let reserveMet = false;
+            
+            if (state.reservePrice !== null && state.currentBid < state.reservePrice) {
+              message = 'No winner matched the Reserved Price';
+              status = 'reserve_not_met';
+            } else if (state.currentBidder) {
+              // Fetch winner's user details
+              try {
+                const winnerQuery = 'SELECT first_name, last_name, email FROM users WHERE id = $1';
+                const winnerResult = await queryWithRetry(winnerQuery, [state.currentBidder]);
+                const winnerUser = winnerResult.rows[0];
+                
+                winner = {
+                  user_id: state.currentBidder,
+                  user_name: winnerUser ? `${winnerUser.first_name} ${winnerUser.last_name}` : 'Unknown User',
+                  amount: state.currentBid
+                };
+                message = 'Auction ended. Winner: ' + winner.user_name;
+                status = 'won';
+                reserveMet = true;
+              } catch (err) {
+                console.error('Error fetching winner details:', err);
+                winner = {
+                  user_id: state.currentBidder,
+                  user_name: 'Unknown User',
+                  amount: state.currentBid
+                };
+                message = 'Auction ended. Winner: Unknown User';
+                status = 'won';
+                reserveMet = true;
+              }
+            } else {
+              message = 'Auction ended. No bids were placed.';
+              status = 'no_bids';
+            }
+            
+            // Save result to database
             try {
-              const winnerQuery = 'SELECT first_name, last_name, email FROM users WHERE id = $1';
-              const winnerResult = await queryWithRetry(winnerQuery, [state.currentBidder]);
-              const winnerUser = winnerResult.rows[0];
+              // Check if result already exists
+              const existingResult = await queryWithRetry(
+                'SELECT * FROM live_auction_results WHERE auction_id = $1',
+                [auctionId]
+              );
               
-              winner = {
-                user_id: state.currentBidder,
-                user_name: winnerUser ? `${winnerUser.first_name} ${winnerUser.last_name}` : 'Unknown User',
-                amount: state.currentBid
-              };
-              message = 'Auction ended. Winner: ' + winner.user_name;
-              status = 'won';
-              reserveMet = true;
-            } catch (err) {
-              console.error('Error fetching winner details:', err);
-              winner = {
-                user_id: state.currentBidder,
-                user_name: 'Unknown User',
-                amount: state.currentBid
-              };
-              message = 'Auction ended. Winner: Unknown User';
-              status = 'won';
-              reserveMet = true;
-            }
-          } else {
-            message = 'Auction ended. No bids were placed.';
-            status = 'no_bids';
-          }
-          
-          // Save result to database
-          try {
-            // Check if result already exists
-            const existingResult = await queryWithRetry(
-              'SELECT * FROM live_auction_results WHERE auction_id = $1',
-              [auctionId]
-            );
-            
-            if (existingResult.rows.length > 0) {
-              console.log('WARNING: Result already exists for auction:', {
+              if (existingResult.rows.length > 0) {
+                console.log('WARNING: Result already exists for auction:', {
+                  auctionId,
+                  existingResult: existingResult.rows[0]
+                });
+                return; // Don't create duplicate results
+              }
+              
+              await LiveAuctionResult.create({
                 auctionId,
-                existingResult: existingResult.rows[0]
+                winnerId: winner ? winner.user_id : null,
+                finalBid: state.currentBid,
+                reserveMet,
+                status
               });
-              return; // Don't create duplicate results
+              
+              // Update the live auction status to 'closed' in the database
+              await LiveAuctionModel.updateAuction(auctionId, {
+                status: 'closed'
+              });
+              
+            } catch (err) {
+              console.error('Error saving auction result:', err);
             }
             
-            await LiveAuctionResult.create({
-              auctionId,
-              winnerId: winner ? winner.user_id : null,
+            io.to(auctionId).emit('auction_end', {
+              winner,
               finalBid: state.currentBid,
-              reserveMet,
-              status
+              message,
+              status,
+              reserveMet
             });
             
-            // Update the live auction status to 'closed' in the database
-            await LiveAuctionModel.updateAuction(auctionId, {
-              status: 'closed'
-            });
-            
-          } catch (err) {
-            console.error('Error saving auction result:', err);
+            // Remove in-memory state after short delay
+            setTimeout(() => liveAuctionState.removeAuction(auctionId), 60000);
           }
-          
-          io.to(auctionId).emit('auction_end', {
-            winner,
-            finalBid: state.currentBid,
-            message,
-            status,
-            reserveMet
-          });
-          
-          // Remove in-memory state after short delay
-          setTimeout(() => liveAuctionState.removeAuction(auctionId), 60000);
+        } finally {
+          auctionEndLocks.delete(auctionId);
         }
       }
     });

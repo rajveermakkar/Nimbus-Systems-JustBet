@@ -263,6 +263,9 @@ function AuctionPage() {
               if (data.bids && Array.isArray(data.bids)) {
                 setRecentBids(data.bids);
               }
+              if (data.timerEnd) {
+                setLiveBidTimerEnd(data.timerEnd);
+              }
               const previousId = prevHighestBidderId || auction?.current_highest_bidder_id;
               const currentId = data.currentHighestBidderId || data.currentBidder || (data.bids && data.bids[0]?.user_id);
               if (previousId && previousId !== currentId && previousId === user?.id) {
@@ -277,6 +280,21 @@ function AuctionPage() {
                   current_highest_bidder_id: currentId,
                 };
               });
+            } else if (data.type === 'bid-update') {
+              if (data.bids && Array.isArray(data.bids)) {
+                setRecentBids(data.bids);
+              }
+              setAuction(prevAuction => {
+                if (!prevAuction) return prevAuction;
+                return {
+                  ...prevAuction,
+                  current_highest_bid: data.currentBid,
+                  current_highest_bidder_id: data.currentBidder,
+                };
+              });
+              if (data.timerEnd) {
+                setLiveBidTimerEnd(data.timerEnd);
+              }
             } else if (data.type === 'participant-update') {
               setParticipantCount(data.participantCount);
             } else if (data.type === 'join-error') {
