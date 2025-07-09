@@ -179,7 +179,8 @@ function AuctionPage() {
       // Fetch bid history for live auctions
       if (type === 'live') {
         try {
-          const response = await fetch(`/api/auctions/live/${id}/bids`);
+          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+          const response = await fetch(`${backendUrl}/api/auctions/live/${id}/bids`);
           if (response.ok) {
             const data = await response.json();
             setRecentBids(data.bids || []);
@@ -195,7 +196,8 @@ function AuctionPage() {
       console.error('[AuctionPage] Error fetching auction:', err);
       if (type === 'settled') {
         try {
-          const response = await fetch(`/api/auctions/settled/${id}`);
+          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+          const response = await fetch(`${backendUrl}/api/auctions/settled/${id}`);
           if (response.ok) {
             const auctionData = await response.json();
             if (auctionData.status === 'closed' || auctionData.auction?.status === 'closed') {
@@ -417,7 +419,8 @@ function AuctionPage() {
           }
           
           try {
-            const response = await fetch(`/api/auctions/live/${id}/bids`);
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+            const response = await fetch(`${backendUrl}/api/auctions/live/${id}/bids`);
             if (response.ok) {
               const bidsData = await response.json();
               setRecentBids(bidsData.bids || []);
@@ -432,7 +435,8 @@ function AuctionPage() {
           
           // Check if this might be an ended auction
           try {
-            const response = await fetch(`/api/auctions/live/${id}`);
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+            const response = await fetch(`${backendUrl}/api/auctions/live/${id}`);
             if (response.ok) {
               const auctionData = await response.json();
               if (auctionData.status === 'closed') {
