@@ -32,14 +32,14 @@ const LiveAuctionBid = {
     
     for (const bid of result.rows) {
       // Get user name for each bid
-      const userResult = await pool.query('SELECT first_name, last_name, email FROM users WHERE id = $1', [bid.user_id]);
+      const userResult = await pool.query('SELECT id, first_name, last_name FROM users WHERE id = $1', [bid.user_id]);
       const user = userResult.rows[0];
       
       bidsWithNames.push({
         id: bid.id,
         amount: bid.amount,
         created_at: bid.created_at,
-        user_id: user ? user.email : bid.user_id,
+        user_id: user ? user.id : bid.user_id,
         user_name: user ? `${user.first_name} ${user.last_name}` : `User ${bid.user_id}`
       });
     }

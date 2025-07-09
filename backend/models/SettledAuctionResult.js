@@ -141,7 +141,7 @@ const SettledAuctionResult = {
         walletId: winnerWallet.id,
         type: 'auction_payment',
         amount: -highestBid.amount,
-        description: `Payment for winning auction: ${auction.title} (${auction.id})`,
+        description: `Payment for winning auction: ${auction.title}`, // No id or title
         referenceId: auction.id,
         status: 'succeeded'
       });
@@ -158,7 +158,7 @@ const SettledAuctionResult = {
       walletId: sellerWallet.id,
       type: 'auction_income',
       amount: sellerAmount,
-      description: `Income from auction: ${auction.title} (${auction.id})`,
+      description: `Income from auction: ${auction.title}`, // No id or title
       referenceId: auction.id,
       status: 'succeeded'
     });

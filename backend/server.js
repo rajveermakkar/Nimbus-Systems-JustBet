@@ -298,25 +298,21 @@ const startServer = async () => {
           socket.emit('bid_error', 'Auction not open for bidding.');
           return;
         }
-        
         // Double-check auction status in database
         try {
           const auctionCheck = await queryWithRetry(
-            'SELECT status, end_time FROM live_auctions WHERE id = $1',
+            'SELECT * FROM live_auctions WHERE id = $1',
             [auctionId]
           );
-          
           if (auctionCheck.rows.length === 0) {
             socket.emit('bid_error', 'Auction not found.');
             return;
           }
-          
           const auction = auctionCheck.rows[0];
           if (auction.status === 'closed') {
             socket.emit('bid_error', 'Auction has ended.');
             return;
           }
-          
           // Check if auction has passed its end time
           const now = Date.now();
           const endTime = new Date(auction.end_time).getTime();
@@ -329,85 +325,86 @@ const startServer = async () => {
           socket.emit('bid_error', 'Error checking auction status.');
           return;
         }
-        
         // Prevent bidding before auction start time
         const now = Date.now();
         if (state.startTime && now < new Date(state.startTime).getTime()) {
           socket.emit('bid_error', 'Auction has not started yet.');
           return;
         }
-        
         // Check if auction has reached its end time
         if (state.endTime && now >= state.endTime) {
           socket.emit('bid_error', 'Auction has ended.');
           return;
         }
-
         // Validate bid
         const bidAmount = Number(amount);
         if (isNaN(bidAmount) || bidAmount < state.currentBid + state.minIncrement) {
           socket.emit('bid_error', `Bid must be at least ${(state.currentBid + state.minIncrement).toFixed(2)}`);
           return;
         }
-        
-        // Check if this is the first bid (no current bidder)
-        const isFirstBid = !state.currentBidder;
-        
-        // Accept bid (mock wallet check)
+        // --- WALLET CHECK AND SOFT-BLOCK ---
+        try {
+          const Wallet = require('./models/Wallet');
+          const LiveAuctionBid = require('./models/LiveAuctionBid');
+          // Get wallet
+          const wallet = await Wallet.getWalletByUserId(socket.user.id);
+          if (!wallet) {
+            socket.emit('bid_error', 'Wallet not found.');
+            return;
+          }
+          const totalBlocked = await Wallet.getTotalBlockedAmount(socket.user.id);
+          const available = Number(wallet.balance) - totalBlocked;
+          if (available < bidAmount) {
+            socket.emit('bid_error', 'Insufficient available wallet balance for this bid.');
+            return;
+          }
+          // Check if user already has a block for this auction
+          const existingBlock = await Wallet.getWalletBlock(socket.user.id, auctionId);
+          if (!existingBlock) {
+            await Wallet.createWalletBlock(socket.user.id, auctionId, bidAmount);
+          } // else: could update block amount if needed
+          // Remove previous highest bidder's wallet block (if any and not the current user)
+          const previousHighestBidderId = state.currentBidder;
+          if (previousHighestBidderId && previousHighestBidderId !== socket.user.id) {
+            await Wallet.removeWalletBlock(previousHighestBidderId, auctionId);
+          }
+          // Store the bid in DB
+          await LiveAuctionBid.create({ auctionId, userId: socket.user.id, amount: bidAmount });
+        } catch (err) {
+          console.error('Wallet/funds check or DB error:', err);
+          socket.emit('bid_error', 'Wallet/funds error: ' + (err.message || 'Unknown error'));
+          return;
+        }
+        // Accept bid
         const bid = {
           userId: socket.user.id,
           amount: bidAmount,
           time: Date.now()
         };
-        
-        console.log('Placing bid:', {
-          auctionId,
-          userId: socket.user.id,
-          bidAmount,
-          previousBid: state.currentBid,
-          previousBidder: state.currentBidder
-        });
-        
         state.currentBid = bidAmount;
         state.currentBidder = socket.user.id;
         liveAuctionState.addBid(auctionId, bid);
-        
-        console.log('Bid placed successfully:', {
-          newCurrentBid: state.currentBid,
-          newCurrentBidder: state.currentBidder
-        });
-        
         // Persist bid and update auction in DB
         try {
-          // Save the bid
-          const dbBids = await LiveAuctionBid.findByAuctionId(auctionId);
-          if (dbBids.length >= 5) {
-            await LiveAuctionBid.deleteOldestBid(auctionId);
-          }
-          await LiveAuctionBid.create({ auctionId, userId: socket.user.id, amount: bidAmount });
-          
-          // Update the live auction with current highest bid
+          const LiveAuctionModel = require('./models/LiveAuction');
           await LiveAuctionModel.updateAuction(auctionId, {
             current_highest_bid: bidAmount,
             current_highest_bidder_id: socket.user.id
           });
-          
         } catch (err) {
-          console.error('Error persisting live auction bid:', err);
+          console.error('Error updating auction in DB:', err);
         }
-        
         // Start or reset countdown timer
         liveAuctionState.setTimer(auctionId, 120000, () => handleAuctionEnd(auctionId));
-        
         // Get updated bid history with user names
         let updatedBids = [];
         try {
+          const LiveAuctionBid = require('./models/LiveAuctionBid');
           updatedBids = await LiveAuctionBid.findByAuctionIdWithNames(auctionId);
         } catch (err) {
           console.error('Error fetching updated bids:', err);
         }
-        
-        // Broadcast new bid to all users in room
+        // Broadcast new bid to all users in room, always include user_name and user_id
         io.to(auctionId).emit('bid_update', {
           currentBid: state.currentBid,
           currentBidder: state.currentBidder,

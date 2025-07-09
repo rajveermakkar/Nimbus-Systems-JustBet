@@ -283,7 +283,8 @@ async function getLiveAuctionBids(req, res) {
         lb.created_at,
         u.first_name,
         u.last_name,
-        u.email
+        u.email,
+        u.id as user_id
       FROM live_auction_bids lb
       JOIN users u ON lb.user_id = u.id
       WHERE lb.auction_id = $1
@@ -302,7 +303,7 @@ async function getLiveAuctionBids(req, res) {
       last_name: bid.last_name,
       email: bid.email,
       user_name: `${bid.first_name} ${bid.last_name}`,
-      user_id: bid.email // Using email as user_id for consistency
+      user_id: bid.user_id // Use user_id, not email
     }));
     
     res.json({ bids });

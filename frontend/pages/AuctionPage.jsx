@@ -547,6 +547,28 @@ function AuctionPage() {
     };
   }, [auction?.id, auction?.type]);
 
+  // Add state for live bid countdown
+  const [liveBidCountdown, setLiveBidCountdown] = useState(null);
+  const [liveBidTimerEnd, setLiveBidTimerEnd] = useState(null);
+
+  // Add a useEffect to update the countdown every second
+  useEffect(() => {
+    if (!liveBidTimerEnd) {
+      setLiveBidCountdown(null);
+      return;
+    }
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const diff = Math.max(0, Math.floor((liveBidTimerEnd - now) / 1000));
+      setLiveBidCountdown(diff);
+      if (diff <= 0) {
+        setLiveBidTimerEnd(null);
+        setLiveBidCountdown(null);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [liveBidTimerEnd]);
+
   // Helper to format seconds as HH:MM:SS
   const formatSeconds = (secs) => {
     if (secs == null) return '--:--:--';
@@ -956,6 +978,29 @@ function AuctionPage() {
           </div>
         </div>
       </div>
+      {isLiveAuction && liveBidCountdown !== null && (
+  <div style={{
+    position: 'absolute',
+    top: 24,
+    right: 24,
+    background: 'rgba(35,43,74,0.92)',
+    color: '#fff',
+    borderRadius: 12,
+    padding: '12px 24px',
+    boxShadow: '0 2px 8px #0004',
+    zIndex: 10,
+    minWidth: 180,
+    textAlign: 'center',
+    fontWeight: 600,
+    fontSize: 18
+  }}>
+    <div style={{ fontSize: 15, color: '#6fffbe', fontWeight: 700, marginBottom: 4 }}>Live Bid Countdown</div>
+    <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: 1 }}>{formatSeconds(liveBidCountdown)}</div>
+    <div style={{ fontSize: 13, color: '#ffd166', marginTop: 6 }}>
+      If no bids are placed before this timer ends,<br />the auction will end automatically.<br />Place bids to win!
+    </div>
+  </div>
+)}
     </>
   );
 }

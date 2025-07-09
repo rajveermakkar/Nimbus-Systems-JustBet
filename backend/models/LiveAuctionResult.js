@@ -106,7 +106,12 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
   }
   // 2. For the winner, deduct the bid amount and remove block
   const winnerId = highestBid.user_id;
-  const winnerBlock = await Wallet.getWalletBlock(winnerId, auctionId);
+  let winnerBlock = await Wallet.getWalletBlock(winnerId, auctionId);
+  if (!winnerBlock) {
+    // If no block exists, create one for deduction
+    await Wallet.createWalletBlock(winnerId, auctionId, highestBid.amount);
+    winnerBlock = await Wallet.getWalletBlock(winnerId, auctionId);
+  }
   if (winnerBlock) {
     await Wallet.removeWalletBlock(winnerId, auctionId);
     await Wallet.updateBalance(winnerId, -highestBid.amount);
@@ -116,7 +121,7 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
       walletId: winnerWallet.id,
       type: 'auction_payment',
       amount: -highestBid.amount,
-      description: `Payment for winning live auction: ${auction.title} (${auctionId})`,
+      description: `Payment for winning live auction`, // No id number
       referenceId: auctionId,
       status: 'succeeded'
     });
@@ -133,9 +138,10 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
     walletId: sellerWallet.id,
     type: 'auction_income',
     amount: sellerAmount,
-    description: `Income from live auction: ${auction.title} (${auctionId})`,
+    description: `Income from live auction`, // No id number
     referenceId: auctionId,
     status: 'succeeded'
+    // Frontend: use trophy icon for this type
   });
   // Admin wallet
   const adminUser = await User.findByEmail('admin@justbet.com');
@@ -147,7 +153,7 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
       walletId: adminWallet.id,
       type: 'platform_fee',
       amount: platformFee,
-      description: `Platform fee from live auction ${auctionId}`,
+      description: `Platform fee from live auction`,
       referenceId: auctionId,
       status: 'succeeded'
     });

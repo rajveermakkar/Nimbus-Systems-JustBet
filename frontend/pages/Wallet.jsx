@@ -1187,7 +1187,9 @@ function WithdrawStepper({ open, onClose, onSuccess, onAddCard }) {
 
 // Helper: get icon and color for transaction type
 function getTxIconAndColor(tx) {
-  if (tx.type === 'deposit') {
+  if (tx.type === 'auction_income') {
+    return { icon: faTrophy, color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' };
+  } else if (tx.type === 'deposit') {
     return { icon: faArrowDown, color: '#6fffbe', bg: 'rgba(111,255,190,0.12)' };
   } else if (tx.type === 'withdrawal') {
     return { icon: faArrowUp, color: '#ff6b6b', bg: 'rgba(255,107,107,0.12)' };
