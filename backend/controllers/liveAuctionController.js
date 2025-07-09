@@ -330,14 +330,37 @@ async function getLiveAuctionByIdForSeller(req, res) {
   }
 }
 
-// Get all live auctions for a specific seller (excluding closed ones)
+// Get all live auctions for a specific seller (including closed ones for winner info)
 async function getLiveAuctionsForSeller(req, res) {
   try {
     const user = req.user;
-    // Only get auctions that are not closed
-    const query = 'SELECT * FROM live_auctions WHERE seller_id = $1 AND status != $2';
-    const result = await pool.query(query, [user.id, 'closed']);
-    res.json({ auctions: result.rows });
+    // Get all auctions for the seller (including closed ones for winner info)
+    const query = 'SELECT * FROM live_auctions WHERE seller_id = $1 ORDER BY created_at DESC';
+    const result = await pool.query(query, [user.id]);
+    
+    // Add winner information for closed auctions
+    const auctionsWithWinners = [];
+    for (const auction of result.rows) {
+      let winner = null;
+      if (auction.status === 'closed' && auction.current_highest_bidder_id) {
+        const winnerQuery = 'SELECT first_name, last_name FROM users WHERE id = $1';
+        const winnerResult = await pool.query(winnerQuery, [auction.current_highest_bidder_id]);
+        if (winnerResult.rows[0]) {
+          winner = {
+            id: auction.current_highest_bidder_id,
+            first_name: winnerResult.rows[0].first_name,
+            last_name: winnerResult.rows[0].last_name
+          };
+        }
+      }
+      
+      auctionsWithWinners.push({
+        ...auction,
+        winner
+      });
+    }
+    
+    res.json({ auctions: auctionsWithWinners });
   } catch (error) {
     console.error('Error fetching seller live auctions:', error);
     res.status(500).json({ error: 'Server error' });

@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { UserContext } from '../src/context/UserContext';
 import Button from '../src/components/Button';
 import Toast from '../src/components/Toast';
-
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+import apiService from '../src/services/apiService';
 
 function MyBidHistory() {
   const navigate = useNavigate();
@@ -39,21 +38,14 @@ function MyBidHistory() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${backendUrl}/api/auth/bid-history`, {
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch bid history');
-      }
-
-      const data = await response.json();
+      const data = await apiService.get('/api/auth/bid-history');
       setBidHistory(data.bidHistory || []);
     } catch (err) {
-      setError('Failed to load bid history. Please try again.');
+      if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+        setError('Please log in again to view your bid history.');
+      } else {
+        setError('Failed to load bid history. Please try again.');
+      }
       console.error('Error fetching bid history:', err);
     } finally {
       setLoading(false);
@@ -61,8 +53,11 @@ function MyBidHistory() {
   };
 
   useEffect(() => {
-    if (user && user.token) {
+    if (user) {
       fetchBidHistory();
+    } else {
+      setError('Please log in to view your bid history.');
+      setLoading(false);
     }
   }, [user]);
 
@@ -86,6 +81,24 @@ function MyBidHistory() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4"></div>
           <p className="text-sm">Loading your bid history...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user is logged in
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-6 max-w-md mx-auto">
+            <i className="fas fa-exclamation-triangle text-red-400 text-3xl mb-4"></i>
+            <h3 className="text-lg font-semibold mb-2">Authentication Required</h3>
+            <p className="text-red-300 mb-4">Please log in to view your bid history.</p>
+            <Button onClick={() => navigate('/login')}>
+              Go to Login
+            </Button>
+          </div>
         </div>
       </div>
     );

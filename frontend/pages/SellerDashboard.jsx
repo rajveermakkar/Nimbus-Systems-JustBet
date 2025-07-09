@@ -700,6 +700,16 @@ function SellerDashboard() {
                               {listing.status === 'won' || (listing.status === 'closed' && listing.winner_id) ? 'Sold' : listing.status === 'no_bids' ? 'No Bids' : listing.status === 'reserve_not_met' ? 'Reserve Not Met' : listing.status}
                             </span>
                           </div>
+                          {/* Only show winner info for closed auctions with winners */}
+                          {listing.status === 'closed' && listing.winner && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              <span className="text-green-400">Winner: </span>
+                              {listing.winner.first_name && listing.winner.last_name ? 
+                                `${listing.winner.first_name} ${listing.winner.last_name}` : 
+                                'Unknown'
+                              }
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-2">
                           <Button
