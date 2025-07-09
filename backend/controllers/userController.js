@@ -7,6 +7,7 @@ const RefreshToken = require('../models/RefreshToken');
 const crypto = require('crypto');
 const { auctionCache } = require('../services/redisService');
 const Wallet = require('../models/Wallet');
+const stripeService = require('../services/stripeService');
 
 const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const validatePassword = (password) => password.length >= 8;
@@ -62,6 +63,15 @@ const userController = {
 
       // Create user
       const user = await User.create({ firstName, lastName, email, password });
+
+      // Create Stripe customer and save ID
+      try {
+        const customer = await stripeService.createCustomer(email);
+        await User.setStripeCustomerId(user.id, customer.id);
+      } catch (stripeErr) {
+        console.error('Stripe customer creation error:', stripeErr);
+        // Continue registration even if Stripe fails
+      }
 
       // Create wallet for user
       try {
