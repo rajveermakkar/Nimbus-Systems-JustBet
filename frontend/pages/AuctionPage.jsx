@@ -283,6 +283,7 @@ function AuctionPage() {
                 };
               });
             } else if (data.type === 'auction_state') {
+              // Process existing bids with user names (from backend)
               if (data.existingBids && data.existingBids.length > 0) {
                 // Sort bids properly
                 const sortedBids = data.existingBids.sort((a, b) => {
@@ -293,6 +294,7 @@ function AuctionPage() {
                 });
                 setRecentBids(sortedBids);
               }
+              // Don't process data.bids as it might override the existingBids with proper names
               setAuction(prevAuction => {
                 if (!prevAuction) return data;
                 return {
@@ -301,16 +303,6 @@ function AuctionPage() {
                   current_highest_bidder_id: data.currentBidder,
                 };
               });
-              if (data.bids && Array.isArray(data.bids)) {
-                // Sort bids properly
-                const sortedBids = data.bids.sort((a, b) => {
-                  if (a.amount !== b.amount) {
-                    return b.amount - a.amount; // Highest amount first
-                  }
-                  return new Date(b.created_at) - new Date(a.created_at); // Most recent first
-                });
-                setRecentBids(sortedBids);
-              }
               if (data.timerEnd) {
                 setLiveBidTimerEnd(data.timerEnd);
               }
@@ -328,7 +320,7 @@ function AuctionPage() {
                   current_highest_bidder_id: currentId,
                 };
               });
-            } else if (data.type === 'bid_update') {
+            } else if (data.type === 'bid-update') {
               if (data.bids && Array.isArray(data.bids)) {
                 // Sort bids properly
                 const sortedBids = data.bids.sort((a, b) => {
