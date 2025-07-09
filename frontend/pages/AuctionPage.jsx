@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { UserContext } from '../src/context/UserContext';
 import auctionService from '../src/services/auctionService';
@@ -41,6 +41,9 @@ function AuctionPage() {
 
   // Redirect countdown for ended auctions
   const [redirectCountdown, setRedirectCountdown] = useState(5);
+
+  // Add ref to track socket connection
+  const socketConnectedRef = useRef(false);
 
   // Stable onClose function
   const handleToastClose = useCallback(() => {
@@ -220,119 +223,148 @@ function AuctionPage() {
     }
   }, [id, type, navigate]);
 
-  // Connect to Socket.IO for live auctions
+  // Single socket connection useEffect
   useEffect(() => {
-    if (!isLiveAuction || !user || !user.token) {
+    if (!isLiveAuction || !user || !user.token || socketConnectedRef.current) {
       return;
     }
 
-    // Connect to Socket.IO
-    const socket = socketService.connect(user.token);
-    
-    socket.on('connect', () => {
-      setIsConnected(true);
-      
-      // Join the auction room after connection is established
-      socketService.joinLiveAuction(id, (data) => {
-        if (data.type === 'auction-update') {
-          // Merge socket auction state with existing auction data
-          setAuction(prevAuction => {
-            if (!prevAuction) return data.auction;
-            return {
-              ...prevAuction,
-              current_highest_bid: data.auction.currentBid,
-              current_highest_bidder_id: data.auction.currentBidder,
-              // Keep other fields from the original auction data
-            };
-          });
-        } else if (data.type === 'auction_state') {
-          // Handle initial auction state with existing bids
-          if (data.existingBids && data.existingBids.length > 0) {
-            setRecentBids(data.existingBids);
-          }
-          // Update auction data
-          setAuction(prevAuction => {
-            if (!prevAuction) return data;
-            return {
-              ...prevAuction,
-              current_highest_bid: data.currentBid,
-              current_highest_bidder_id: data.currentBidder,
-            };
-          });
-        } else if (data.type === 'bid-update') {
-          // Use the full bids array from server (with user names)
-          if (data.bids && Array.isArray(data.bids)) {
-            setRecentBids(data.bids);
-          }
-          setAuction(prevAuction => {
-            if (!prevAuction) return data.auction;
-            return {
-              ...prevAuction,
-              current_highest_bid: data.currentBid,
-              current_highest_bidder_id: data.currentBidder,
-            };
-          });
-        } else if (data.type === 'participant-update') {
-          setParticipantCount(data.participantCount);
-        } else if (data.type === 'join-error') {
-          setError(data.error);
-          setToast({ show: true, message: data.error, type: 'error' });
-          
-          // Check if the error is about auction ending and redirect
-          if (data.error && (
-            data.error.includes('ended') || 
-            data.error.includes('closed') ||
-            data.error.includes('not found')
-          )) {
-            // Try to redirect to ended auction page with auction data
-            setTimeout(() => {
-              navigate(`/ended-auction/${id}`, { 
-                replace: true,
-                state: { 
-                  fromRedirect: true,
-                  error: data.error,
-                  auctionType: auction?.type || type || 'settled'
-                }
+    socketConnectedRef.current = true;
+
+    const setupSocket = async () => {
+      try {
+        const socket = await socketService.connect(user.token);
+        let prevHighestBidderId = null;
+
+        // Always join the auction room on connect (including after reconnect)
+        const joinRoom = () => {
+          socketService.joinLiveAuction(id, (data) => {
+            if (data.type === 'auction-update') {
+              setAuction(prevAuction => {
+                if (!prevAuction) return data.auction;
+                return {
+                  ...prevAuction,
+                  current_highest_bid: data.auction.currentBid,
+                  current_highest_bidder_id: data.auction.currentBidder,
+                };
               });
-            }, 2000);
-          }
-        } else if (data.type === 'auction-end') {
-          setPlacingBid(false);
-          setBidAmount('');
-          
-          // Handle different auction end scenarios
-          let message = '';
-          if (data.result.winner) {
-            message = `🎉 Winner: ${data.result.winner.user_name || `User ${data.result.winner.user_id?.slice(0, 8)}`} won with ${formatPrice(data.result.winner.amount)}!`;
-            setWinnerAnnouncement(data.result);
-          } else if (data.result.status === 'reserve_not_met') {
-            message = '❌ Auction ended - Reserve price not met';
-          } else if (data.result.status === 'no_bids') {
-            message = '❌ Auction ended - No bids were placed';
-          } else {
-            message = 'Auction ended';
-          }
-          
-          setToast({ show: true, message, type: 'info' });
-          // Update auction status to show it's ended
-          setAuction(prevAuction => ({
-            ...prevAuction,
-            status: 'closed'
-          }));
+            } else if (data.type === 'auction_state') {
+              if (data.existingBids && data.existingBids.length > 0) {
+                setRecentBids(data.existingBids);
+              }
+              setAuction(prevAuction => {
+                if (!prevAuction) return data;
+                return {
+                  ...prevAuction,
+                  current_highest_bid: data.currentBid,
+                  current_highest_bidder_id: data.currentBidder,
+                };
+              });
+              if (data.bids && Array.isArray(data.bids)) {
+                setRecentBids(data.bids);
+              }
+              const previousId = prevHighestBidderId || auction?.current_highest_bidder_id;
+              const currentId = data.currentHighestBidderId || data.currentBidder || (data.bids && data.bids[0]?.user_id);
+              if (previousId && previousId !== currentId && previousId === user?.id) {
+                setToast({ show: true, message: 'You have been outbid!', type: 'info' });
+              }
+              prevHighestBidderId = currentId;
+              setAuction(prevAuction => {
+                if (!prevAuction) return data.auction;
+                return {
+                  ...prevAuction,
+                  current_highest_bid: data.currentBid,
+                  current_highest_bidder_id: currentId,
+                };
+              });
+            } else if (data.type === 'participant-update') {
+              setParticipantCount(data.participantCount);
+            } else if (data.type === 'join-error') {
+              setError(data.error);
+              setToast({ show: true, message: data.error, type: 'error' });
+              if (data.error && (
+                data.error.includes('ended') || 
+                data.error.includes('closed') ||
+                data.error.includes('not found')
+              )) {
+                setTimeout(() => {
+                  navigate(`/ended-auction/${id}`, { 
+                    replace: true,
+                    state: { 
+                      fromRedirect: true,
+                      error: data.error,
+                      auctionType: auction?.type || type || 'settled'
+                    }
+                  });
+                }, 2000);
+              }
+            } else if (data.type === 'auction-end') {
+              setPlacingBid(false);
+              setBidAmount('');
+              let message = '';
+              if (data.result.winner) {
+                message = `🎉 Winner: ${data.result.winner.user_name || `User ${data.result.winner.user_id?.slice(0, 8)}`} won with ${formatPrice(data.result.winner.amount)}!`;
+                setWinnerAnnouncement(data.result);
+              } else if (data.result.status === 'reserve_not_met') {
+                message = '❌ Auction ended - Reserve price not met';
+              } else if (data.result.status === 'no_bids') {
+                message = '❌ Auction ended - No bids were placed';
+              } else {
+                message = 'Auction ended';
+              }
+              setToast({ show: true, message, type: 'info' });
+              setAuction(prevAuction => ({
+                ...prevAuction,
+                status: 'closed'
+              }));
+            }
+          });
+        };
+
+        // Listen for connect event and always join room
+        socket.on('connect', () => {
+          console.log('Socket connected, joining room...');
+          setIsConnected(true);
+          joinRoom();
+        });
+
+        socket.on('disconnect', () => {
+          console.log('Socket disconnected');
+          setIsConnected(false);
+          socketConnectedRef.current = false;
+        });
+
+        socket.on('connect_error', (error) => {
+          console.error('Socket connection error:', error);
+          setIsConnected(false);
+          socketConnectedRef.current = false;
+        });
+
+        // Check initial connection status
+        if (socket.connected) {
+          console.log('Socket already connected, joining room...');
+          setIsConnected(true);
+          joinRoom();
         }
-      });
-    });
 
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-    });
+        // Also join room on initial connect
+        joinRoom();
+      } catch (error) {
+        console.error('Failed to connect to socket:', error);
+        setError('Failed to connect to live auction');
+        setToast({ show: true, message: 'Failed to connect to live auction', type: 'error' });
+        socketConnectedRef.current = false;
+      }
+    };
 
-    // Cleanup on unmount
+    setupSocket();
+
     return () => {
+      socketConnectedRef.current = false;
       socketService.leaveLiveAuction(id);
       socketService.disconnect();
     };
-  }, [id, user, isLiveAuction]);
+  }, [id, user?.token, isLiveAuction]); // Only depend on these values
 
   // Optimized: Only call fetchAuction for settled auctions, and use Promise.all for live auctions
   useEffect(() => {
@@ -457,7 +489,7 @@ function AuctionPage() {
       setBidError('');
       setBidSuccess('');
       if (isLiveAuction) {
-        socketService.placeLiveBid(id, amount, (response) => {
+        await socketService.placeLiveBid(id, amount, (response) => {
           if (response.success) {
             setBidSuccess('Live bid placed successfully!');
             setBidAmount('');
@@ -479,8 +511,9 @@ function AuctionPage() {
       }
     } catch (err) {
       console.error('[AuctionPage] Error placing bid:', err);
-      setBidError(err.response?.data?.message || 'Failed to place bid. Please try again.');
-      setToast({ show: true, message: err.response?.data?.message || 'Failed to place bid. Please try again.', type: 'error' });
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Failed to place bid. Please try again.';
+      setBidError(errorMsg);
+      setToast({ show: true, message: errorMsg, type: 'error' });
       setPlacingBid(false);
     }
   };

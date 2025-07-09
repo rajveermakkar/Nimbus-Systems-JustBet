@@ -84,8 +84,11 @@ function EndedAuctionPage() {
               let message = '';
               if (result.result.winner_id) {
                 message = `🏆 Winner: ${winnerName} won with ${formatPrice(result.result.final_bid)}!`;
-                if (result.result.winner_id === user?.id) {
+                // Only redirect if the logged-in user is the actual winner
+                if (user && result.result.winner_id === user.id) {
                   message = `🎉 Congratulations! You won this auction with ${formatPrice(result.result.final_bid)}!`;
+                  navigate(`/winning/${auction.id}`, { replace: true, state: { auctionType: auction.type || type } });
+                  return;
                 }
               } else if (result.result.status === 'reserve_not_met') {
                 message = '❌ Auction ended - Reserve price not met';
@@ -135,13 +138,32 @@ function EndedAuctionPage() {
       console.log('[Frontend] Fetching auction with ID:', id, 'and type:', auctionType);
       try {
         let data = null;
-        if (auctionType === 'live') {
+        let actualType = auctionType;
+        
+        // If type is 'settled' or unknown, try settled first, then live
+        if (auctionType === 'settled' || !auctionType) {
+          console.log('[Frontend] Trying settled auction first...');
+          try {
+            data = await auctionService.getSettledAuction(id);
+            console.log('[Frontend] Settled auction fetch response:', data);
+            actualType = 'settled';
+          } catch (err) {
+            console.log('[Frontend] Settled auction not found, trying live auction...');
+            try {
+              data = await auctionService.getLiveAuction(id);
+              console.log('[Frontend] Live auction fetch response:', data);
+              actualType = 'live';
+            } catch (liveErr) {
+              console.log('[Frontend] Live auction also not found');
+              throw liveErr;
+            }
+          }
+        } else if (auctionType === 'live') {
           data = await auctionService.getLiveAuction(id);
           console.log('[Frontend] Live auction fetch response:', data);
-        } else {
-          data = await auctionService.getSettledAuction(id);
-          console.log('[Frontend] Settled auction fetch response:', data);
+          actualType = 'live';
         }
+        
         if (!data) {
           setError('This auction does not exist or is not ended.');
           setAuction(null);
@@ -152,10 +174,10 @@ function EndedAuctionPage() {
           setError('This auction is not ended.');
           setAuction(null);
         } else {
-          setAuction({ ...data, type: auctionType });
+          setAuction({ ...data, type: actualType });
           // Fetch bid history
           try {
-            if (auctionType === 'settled') {
+            if (actualType === 'settled') {
               console.log('[Frontend] Fetching settled auction bids for:', id);
               const bidData = await auctionService.getSettledBids(id);
               console.log('[Frontend] Settled auction bid response:', bidData);

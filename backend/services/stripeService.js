@@ -1,9 +1,6 @@
 const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-console.log('=== Stripe SDK Debug ===');
-console.log('Stripe version:', stripe.VERSION);
-console.log('stripe.testHelpers:', stripe.testHelpers);
-console.log('stripe.testHelpers.accounts:', stripe.testHelpers ? stripe.testHelpers.accounts : undefined);
+// Removed Stripe SDK debug logs
 
 // Create a payment intent for a deposit
 async function createPaymentIntent(userId, amount, currency = 'cad', saveCard = false, customerId = null, paymentMethodId = null, connectedAccountId = null) {
@@ -133,12 +130,8 @@ async function createPayout(accountId, amount, currency = 'cad') {
 
 // Manually verify a connected account (test mode only)
 async function verifyConnectedAccount(accountId) {
-  console.log('verifyConnectedAccount called');
-  console.log('stripe.testHelpers in function:', typeof stripe.testHelpers);
-  console.log('NODE_ENV:', process.env.NODE_ENV);
   // Bypass verification in non-production environments
   if (process.env.NODE_ENV !== 'production') {
-    console.log('Bypassing Stripe verification for dev/test environment.');
     return true;
   }
   if (!stripe.testHelpers || !stripe.testHelpers.accounts) throw new Error('Stripe testHelpers not available');
@@ -150,14 +143,11 @@ async function fulfillAllTestRequirements(accountId) {
   if (process.env.NODE_ENV !== 'production' && stripe.testHelpers && stripe.testHelpers.accounts) {
     try {
       await stripe.testHelpers.accounts.verify(accountId);
-      console.log('All test requirements fulfilled for account:', accountId);
       return true;
     } catch (err) {
-      console.error('Failed to fulfill all test requirements:', err);
       return false;
     }
   } else {
-    console.warn('TestHelpers not available or not in dev/test mode. Skipping fulfillAllTestRequirements.');
     return false;
   }
 }
@@ -218,14 +208,11 @@ async function fulfillAllRequirementsManually(accountId) {
     // 5. Re-check the account status
     account = await stripe.accounts.retrieve(accountId);
     if (account.charges_enabled && account.payouts_enabled) {
-      console.log('All requirements fulfilled manually for account:', accountId);
       return true;
     } else {
-      console.warn('Account still restricted after manual fulfillment:', accountId);
       return false;
     }
   } catch (err) {
-    console.error('Manual requirements fulfillment failed:', err);
     return false;
   }
 }

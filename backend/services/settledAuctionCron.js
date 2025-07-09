@@ -4,6 +4,9 @@ const Bid = require('../models/Bid');
 const SettledAuctionResult = require('../models/SettledAuctionResult');
 const { pool } = require('../db/init');
 const { auctionCache } = require('./redisService');
+const Wallet = require('../models/Wallet');
+const User = require('../models/User');
+const Transaction = require('../models/Transaction');
 
 // Store scheduled timeouts for auctions
 const scheduledAuctions = new Map();
@@ -11,92 +14,7 @@ const scheduledAuctions = new Map();
 // Function to process a single auction
 async function processAuction(auctionId) {
   try {
-    // Get the auction
-    const auction = await SettledAuction.findById(auctionId);
-    if (!auction || auction.status === 'closed') {
-      return; // Auction already processed or doesn't exist
-    }
-
-    // Check if result already exists for this auction (direct DB query for robustness)
-    const existingResult = await pool.query('SELECT 1 FROM settled_auction_results WHERE auction_id = $1', [auction.id]);
-    if (existingResult.rows.length > 0) {
-      // Always update status to closed, even if result exists
-      await SettledAuction.updateAuction(auction.id, { status: 'closed' });
-      console.log(`Result already exists for auction ${auction.id}, status set to closed, skipping`);
-      return;
-    }
-
-    // Get all bids for this auction
-    const bids = await Bid.findByAuctionId(auction.id);
-    if (!bids.length) {
-      // No bids placed
-      await SettledAuction.updateAuction(auction.id, {
-        status: 'closed',
-        current_highest_bidder_id: null
-      });
-      await SettledAuctionResult.create({
-        auctionId: auction.id,
-        winnerId: null,
-        finalBid: null,
-        reserveMet: false,
-        status: 'no_bids'
-      });
-      console.log(`Auction ${auction.id} closed with no bids`);
-      
-      // Invalidate cache for this auction
-      await auctionCache.del(`auction:closed:${auction.id}:full`);
-      console.log(`🗑️ Invalidated cache for auction: ${auction.id}`);
-      return;
-    }
-
-    // Find highest bid
-    const highestBid = bids.reduce((max, bid) => bid.amount > max.amount ? bid : max, bids[0]);
-    
-    // Check reserve price
-    if (auction.reserve_price && highestBid.amount < auction.reserve_price) {
-      // Reserve not met
-      await SettledAuction.updateAuction(auction.id, {
-        status: 'closed',
-        current_highest_bidder_id: null
-      });
-      await SettledAuctionResult.create({
-        auctionId: auction.id,
-        winnerId: null,
-        finalBid: highestBid.amount,
-        reserveMet: false,
-        status: 'reserve_not_met'
-      });
-      console.log(`Auction ${auction.id} closed - reserve not met`);
-      
-      // Invalidate cache for this auction
-      await auctionCache.del(`auction:closed:${auction.id}:full`);
-      console.log(`🗑️ Invalidated cache for auction: ${auction.id}`);
-      return;
-    }
-
-    // Set winner
-    await SettledAuction.updateAuction(auction.id, {
-      status: 'closed',
-      current_highest_bidder_id: highestBid.user_id
-    });
-    await SettledAuctionResult.create({
-      auctionId: auction.id,
-      winnerId: highestBid.user_id,
-      finalBid: highestBid.amount,
-      reserveMet: true,
-      status: 'won'
-    });
-    console.log(`Auction ${auction.id} closed - winner: ${highestBid.user_id}`);
-    
-    // Invalidate cache for this auction
-    await auctionCache.del(`auction:closed:${auction.id}:full`);
-    console.log(`🗑️ Invalidated cache for auction: ${auction.id}`);
-    
-    // Invalidate user winnings cache for the winner
-    if (highestBid && highestBid.user_id) {
-      await auctionCache.del(`user:winnings:${highestBid.user_id}`);
-      console.log(`🗑️ Invalidated winnings cache for winner: ${highestBid.user_id}`);
-    }
+    await SettledAuctionResult.finalizeAuction(auctionId);
   } catch (err) {
     console.error(`Error processing auction ${auctionId}:`, err);
   }

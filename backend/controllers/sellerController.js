@@ -198,7 +198,7 @@ const sellerController = {
       let results = [];
       // Live auction results
       if (!type || type === 'all' || type === 'live') {
-        const liveResults = await pool.query('SELECT * FROM live_auction_results', []);
+        const liveResults = await pool.query('SELECT * FROM live_auction_results WHERE status = $1', ['won']);
         for (const result of liveResults.rows) {
           const auctionRes = await pool.query('SELECT * FROM live_auctions WHERE id = $1 AND seller_id = $2', [result.auction_id, sellerId]);
           const auction = auctionRes.rows[0];
@@ -223,6 +223,7 @@ const sellerController = {
               starting_price: auction.starting_price,
               end_time: auction.end_time,
               status: auction.status,
+              final_bid: result.final_bid,
               winner
             });
           }
@@ -230,7 +231,7 @@ const sellerController = {
       }
       // Settled auction results
       if (!type || type === 'all' || type === 'settled') {
-        const settledResults = await pool.query('SELECT * FROM settled_auction_results', []);
+        const settledResults = await pool.query('SELECT * FROM settled_auction_results WHERE status = $1', ['won']);
         for (const result of settledResults.rows) {
           const auctionRes = await pool.query('SELECT * FROM settled_auctions WHERE id = $1 AND seller_id = $2', [result.auction_id, sellerId]);
           const auction = auctionRes.rows[0];
@@ -255,6 +256,7 @@ const sellerController = {
               starting_price: auction.starting_price,
               end_time: auction.end_time,
               status: auction.status,
+              final_bid: result.final_bid,
               winner
             });
           }

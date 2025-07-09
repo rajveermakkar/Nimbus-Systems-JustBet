@@ -20,6 +20,7 @@ const LiveAuctionResult = require('./models/LiveAuctionResult');
 const ordersRouter = require('./routes/orders');
 const walletRoutes = require('./routes/walletRoutes');
 const bodyParser = require('body-parser');
+const cookie = require('cookie'); // Add at the top if not present
 
 // Start settled auction cron job
 if (process.env.NODE_ENV !== 'test') {
@@ -109,10 +110,30 @@ const startServer = async () => {
     });
 
     io.use(async (socket, next) => {
-      const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
-      if (!token) return next(new Error('Authentication error: No token provided'));
+      // 1. Try to get token from auth field (preferred for frontend)
+      let token = socket.handshake.auth?.token;
+
+      // 2. If not present, try to get token from cookies (cookie name: 'token')
+      if (!token && socket.handshake.headers?.cookie) {
+        const cookies = cookie.parse(socket.handshake.headers.cookie);
+        token = cookies['token'];
+      }
+
+      console.log('Socket handshake.auth:', socket.handshake.auth);
+      console.log('Socket cookies:', socket.handshake.headers?.cookie);
+      console.log('Token used for auth:', token);
+
+      if (!token) {
+        console.log('Socket auth failed: No token provided');
+        return next(new Error('Authentication error: No token provided'));
+      }
+
       const user = await verifySocketToken(token);
-      if (!user) return next(new Error('Authentication error: Invalid token'));
+      if (!user) {
+        console.log('Socket auth failed: Invalid token');
+        return next(new Error('Authentication error: Invalid token'));
+      }
+
       socket.user = user;
       next();
     });
