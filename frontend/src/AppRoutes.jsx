@@ -295,6 +295,7 @@ function AppRoutes() {
         <Route path="/admin/approve-users/:userId" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
         <Route path="/admin/earnings" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
         <Route path="/admin/db-health" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
+        <Route path="/admin/onboarding-approval" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard showToast={showToast} /></ProtectedRoute>} />
         <Route path="/not-authorized" element={<NotAuthorized showToast={showToast} />} />
         <Route path="/profile" element={
           <ProtectedRoute>

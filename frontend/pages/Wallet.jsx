@@ -9,6 +9,7 @@ import { UserContext } from '../src/context/UserContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash, faArrowDown, faArrowUp, faCreditCard, faTrophy, faUndo, faUniversity, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import ConfirmModal from '../src/components/ConfirmModal';
+import LoadingSpinner from '../src/components/LoadingSpinner';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -341,10 +342,17 @@ function SaveCardChoiceStep({ onChoice, loading }) {
 function PaymentElementStep({ clientSecret, onConfirm, confirmError, confirmLoading, cardInfo }) {
   const paymentElementOptions = React.useMemo(() => ({
     layout: 'tabs',
-    appearance: paymentElementAppearance,
     defaultValues: { billingDetails: { email: '' } },
     fields: { billingDetails: { email: 'never' } },
     wallets: { link: 'never' },
+    paymentMethodTypes: ['card'],
+    appearance: {
+      theme: 'night',
+      variables: {
+        colorText: '#fff',
+        colorLabel: '#fff',
+      }
+    }
   }), []);
   const stripe = useStripe();
   const elements = useElements();
@@ -381,6 +389,7 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState('');
   const [clientSecret, setClientSecret] = useState(null);
+  const [stripeAccount, setStripeAccount] = useState(null);
   const [cardError, setCardError] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -400,6 +409,7 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
       setAmount('');
       setAmountError('');
       setClientSecret(null);
+      setStripeAccount(null);
       setCardError('');
       setLoading(false);
       setSuccessMsg('');
@@ -450,14 +460,29 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
     goToStep(3); // Go to payment/confirmation
   }
   async function handleAddNewCard() {
+    console.log('[handleAddNewCard] Starting add new card flow');
     setAddNewCard(true);
     setLoading(true);
     setPreparingPayment(true);
     try {
+      // For new cards, we'll ask if they want to save it during the payment flow
+      console.log('[handleAddNewCard] Creating deposit intent for new card');
+      
+      // Always use platform account for consistency
+      console.log('[handleAddNewCard] Always using platform account');
+      
       const resp = await walletService.createDepositIntent(Number(amount), false);
+      console.log('[handleAddNewCard] DepositIntent response:', resp);
       setClientSecret(resp.clientSecret);
-      // Do NOT setStep(3) here!
+      
+      // Always use platform account (no stripeAccount)
+      setStripeAccount(null);
+      console.log('[handleAddNewCard] Using platform account (no stripeAccount)');
+      
+      console.log('[handleAddNewCard] Client secret set, waiting for useEffect to advance step');
+      // Do NOT setStep(3) here! Let useEffect handle it
     } catch (err) {
+      console.error('[handleAddNewCard] Error:', err);
       setCardError(err.message || 'Failed to create deposit');
       goToStep(0);
       setPreparingPayment(false);
@@ -472,7 +497,9 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
     setPreparingPayment(true);
     try {
       const resp = await walletService.createDepositIntent(Number(amount), !!choice);
+      console.log('DepositIntent response (save card):', resp);
       setClientSecret(resp.clientSecret);
+      setStripeAccount(resp.stripeAccount || null);
     } catch (err) {
       setCardError(err.message || 'Failed to create deposit');
       goToStep(0);
@@ -483,7 +510,15 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
 
   // Watch for clientSecret and advance step
   useEffect(() => {
+    console.log('[useEffect] Checking step progression:', { 
+      preparingPayment, 
+      clientSecret: !!clientSecret, 
+      currentStep: step,
+      addNewCard,
+      selectedCardId 
+    });
     if (preparingPayment && clientSecret) {
+      console.log('[useEffect] Advancing to step 3');
       goToStep(3);
       setPreparingPayment(false);
     }
@@ -525,6 +560,10 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
       }
       goToStep(4);
       setSuccessMsg('Deposit successful!');
+      // Refresh payment methods so new cards appear immediately
+      if (typeof window.fetchPaymentMethods === 'function') {
+        window.fetchPaymentMethods();
+      }
       setTimeout(() => {
         onClose();
       }, 1200);
@@ -557,6 +596,10 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
       }
       goToStep(4);
       setSuccessMsg('Deposit successful!');
+      // Refresh payment methods so new cards appear immediately
+      if (typeof window.fetchPaymentMethods === 'function') {
+        window.fetchPaymentMethods();
+      }
       setTimeout(() => {
         onClose();
       }, 1200);
@@ -754,55 +797,61 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
         </motion.div>
       )}
       {/* PaymentElement and confirmation (step 3+) only when clientSecret is present and adding new card */}
-      {clientSecret && step >= 3 && !preparingPayment && (!selectedCardId || addNewCard) && (
-        <Elements stripe={stripePromise} options={{ clientSecret, locale: 'en-CA' }}>
-          <motion.div
-            style={{ ...modalCardStyle, minWidth: 440, maxWidth: 540, minHeight: 340, padding: '54px 48px 48px 48px', position: 'relative' }}
-            transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
-          >
-            {/* Top left back arrow (only if step > 0) */}
-            {stepHistory.length > 1 && (
-              <button type="button" aria-label="Back" style={modalBackBtnStyle} onClick={() => !lockModal && goBackStep()} disabled={lockModal}>
-                <span aria-hidden="true">&#8592;</span>
-              </button>
-            )}
-            {/* Top right close X (always) */}
-            <button type="button" aria-label="Close" style={modalCloseBtnStyle} onClick={() => { if (!lockModal) onClose(); }} disabled={lockModal}>
-              <span aria-hidden="true">&times;</span>
-            </button>
-            <h3 style={{ fontWeight: 700, fontSize: 26, marginBottom: 18, textAlign: 'center' }}>Add Funds</h3>
-            <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 18, fontWeight: 500, minHeight: 24 }}>
-              You are adding <span style={{ color: '#6fffbe', fontWeight: 700 }}>${amount && !isNaN(Number(amount)) && Number(amount) > 0 ? Number(amount).toFixed(2) : '0.00'}</span> to your Wallet
-            </div>
-            {/* Step 3: PaymentElement or confirm with saved card */}
-            <div style={getStepDisplay(3)}>
-              {/* If using saved card, show confirmation, else show PaymentElementStep */}
-              {selectedCardId && !addNewCard ? (
-                <div style={{ textAlign: 'center', margin: '40px 0 30px 0', color: '#6fffbe', fontSize: 22, fontWeight: 700 }}>
-                  Using saved card for deposit.<br />
-                  (Card: {paymentMethods.find(pm => pm.id === selectedCardId)?.card.brand?.toUpperCase()} •••• {paymentMethods.find(pm => pm.id === selectedCardId)?.card.last4})
-                  <br /><Button variant="primary" size="default" style={{ marginTop: 24 }} onClick={() => goToStep(4)}>Confirm & Pay</Button>
+      {(() => {
+        const shouldShowPaymentElement = clientSecret && step >= 3 && !preparingPayment && (!selectedCardId || addNewCard);
+        console.log('[PaymentElement] Condition check:', {
+          clientSecret: !!clientSecret,
+          step,
+          preparingPayment,
+          selectedCardId,
+          addNewCard,
+          shouldShow: shouldShowPaymentElement
+        });
+        return shouldShowPaymentElement;
+      })() && (
+        <Elements key={clientSecret} stripe={stripePromise} options={{ 
+          clientSecret, 
+          locale: 'en-CA',
+          ...(stripeAccount && { stripeAccount })
+        }}>
+              <motion.div
+                style={{ ...modalCardStyle, minWidth: 440, maxWidth: 540, minHeight: 340, padding: '54px 48px 48px 48px', position: 'relative' }}
+                transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
+              >
+                {/* Top left back arrow (only if step > 0) */}
+                {stepHistory.length > 1 && (
+                  <button type="button" aria-label="Back" style={modalBackBtnStyle} onClick={() => !lockModal && goBackStep()} disabled={lockModal}>
+                    <span aria-hidden="true">&#8592;</span>
+                  </button>
+                )}
+                {/* Top right close X (always) */}
+                <button type="button" aria-label="Close" style={modalCloseBtnStyle} onClick={() => { if (!lockModal) onClose(); }} disabled={lockModal}>
+                  <span aria-hidden="true">&times;</span>
+                </button>
+                <h3 style={{ fontWeight: 700, fontSize: 26, marginBottom: 18, textAlign: 'center' }}>Add Funds</h3>
+                <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 18, fontWeight: 500, minHeight: 24 }}>
+                  You are adding <span style={{ color: '#6fffbe', fontWeight: 700 }}>${amount && !isNaN(Number(amount)) && Number(amount) > 0 ? Number(amount).toFixed(2) : '0.00'}</span> to your Wallet
                 </div>
-              ) : (
-                <PaymentElementStep
-                  clientSecret={clientSecret}
-                  onConfirm={handleConfirmAndPay}
-                  confirmError={confirmError}
-                  confirmLoading={confirmLoading}
-                  cardInfo={cardInfo}
-                />
-              )}
-            </div>
-            {/* Step 4: Success */}
-            <div style={getStepDisplay(4)}>
-              <div style={{ textAlign: 'center', margin: '40px 0 30px 0', color: '#6fffbe', fontSize: 22, fontWeight: 700 }}>
-                {successMsg}
-              </div>
-            </div>
-            <StepDots step={step} total={paymentMethods && paymentMethods.length > 0 ? 5 : 4} />
-          </motion.div>
-        </Elements>
-      )}
+                {/* Step 3: PaymentElement */}
+                <div style={getStepDisplay(3)}>
+                  <PaymentElementStep
+                    clientSecret={clientSecret}
+                    onConfirm={handleConfirmAndPay}
+                    confirmError={confirmError}
+                    confirmLoading={confirmLoading}
+                    cardInfo={cardInfo}
+                  />
+                </div>
+                {/* Step 4: Success */}
+                <div style={getStepDisplay(4)}>
+                  <div style={{ textAlign: 'center', margin: '40px 0 30px 0', color: '#6fffbe', fontSize: 22, fontWeight: 700 }}>
+                    {successMsg}
+                  </div>
+                </div>
+                <StepDots step={step} total={paymentMethods && paymentMethods.length > 0 ? 5 : 4} />
+              </motion.div>
+            </Elements>
+          )}
     </div>
   ) : null;
 }
@@ -835,10 +884,17 @@ function AddCardPaymentElement({ onSuccess, onError, onClose }) {
   // Use the same PaymentElement options as the deposit modal
   const paymentElementOptions = React.useMemo(() => ({
     layout: 'tabs',
-    appearance: paymentElementAppearance,
     defaultValues: { billingDetails: { email: '' } },
     fields: { billingDetails: { email: 'never' } },
     wallets: { link: 'never' },
+    paymentMethodTypes: ['card'],
+    appearance: {
+      theme: 'stripe',
+      variables: {
+        colorText: '#fff',
+        colorLabel: '#fff',
+      }
+    }
   }), []);
 
   const handleSubmit = async (e) => {
@@ -890,6 +946,7 @@ function AddCardPaymentElement({ onSuccess, onError, onClose }) {
 function AddCardStepper({ open, onClose, onSuccess }) {
   const [step, setStep] = useState(0); // 0: Card Details, 1: Success
   const [clientSecret, setClientSecret] = useState(null);
+  const [stripeAccount, setStripeAccount] = useState(null);
   const [cardError, setCardError] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -898,6 +955,7 @@ function AddCardStepper({ open, onClose, onSuccess }) {
     if (open) {
       setStep(0);
       setClientSecret(null);
+      setStripeAccount(null);
       setCardError('');
       setLoading(false);
       setSuccessMsg('');
@@ -911,7 +969,9 @@ function AddCardStepper({ open, onClose, onSuccess }) {
     try {
       // Simulate backend call to get setup intent
       const resp = await walletService.createSetupIntent();
+      console.log('SetupIntent response:', resp);
       setClientSecret(resp.clientSecret);
+      setStripeAccount(resp.stripeAccount || null);
     } catch (err) {
       setCardError(err.message || 'Failed to start card setup');
     }
@@ -955,9 +1015,16 @@ function AddCardStepper({ open, onClose, onSuccess }) {
               transition={{ type: 'spring', bounce: 0.18, duration: 0.45 }}
             >
               {clientSecret ? (
-                <Elements stripe={stripePromise} options={{ clientSecret, locale: 'en-CA' }}>
-                  <AddCardPaymentElement onSuccess={handleCardSuccess} onError={setCardError} onClose={onClose} />
-                </Elements>
+                <>
+                  {console.log('AddCardStepper Elements options:', { clientSecret, stripeAccount })}
+                  <Elements key={clientSecret} stripe={stripePromise} options={{ 
+                    clientSecret, 
+                    locale: 'en-CA',
+                    ...(stripeAccount && { stripeAccount })
+                  }}>
+                    <AddCardPaymentElement onSuccess={handleCardSuccess} onError={setCardError} onClose={onClose} />
+                  </Elements>
+                </>
               ) : (
                 <>
                   <Button variant="primary" size="default" style={{ width: '100%', height: 52, fontSize: 18, borderRadius: 12, marginTop: 0, marginBottom: 0 }} onClick={handleCardSubmit} disabled={loading}>
@@ -1165,21 +1232,22 @@ function Wallet() {
   const [error, setError] = useState('');
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
-  const [depositAmount, setDepositAmount] = useState('');
-  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const [successMsg, setSuccessMsg] = useState('');
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [pmLoading, setPmLoading] = useState(false);
+  const [showAddCard, setShowAddCard] = useState(false);
+  
+  // Add missing state variables
+  const [addCardError, setAddCardError] = useState('');
+  const [addCardClientSecret, setAddCardClientSecret] = useState(null);
   const [depositLoading, setDepositLoading] = useState(false);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [depositError, setDepositError] = useState('');
   const [withdrawError, setWithdrawError] = useState('');
   const [clientSecret, setClientSecret] = useState(null);
-  const [successMsg, setSuccessMsg] = useState('');
-  const [paymentMethods, setPaymentMethods] = useState([]);
-  const [pmLoading, setPmLoading] = useState(false);
-  const [showAddCard, setShowAddCard] = useState(false);
-  const [addCardClientSecret, setAddCardClientSecret] = useState(null);
-  const [addCardError, setAddCardError] = useState('');
-  // Track if AddFundsStepper is open and payment is processing, to avoid parent state updates
-  const [depositProcessing, setDepositProcessing] = useState(false);
+  
   // Add state for confirm modal
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [removeCardId, setRemoveCardId] = useState(null);
@@ -1263,6 +1331,11 @@ function Wallet() {
     }
     setPmLoading(false);
   }
+  // Expose globally for AddFundsStepper
+  useEffect(() => {
+    window.fetchPaymentMethods = fetchPaymentMethods;
+    return () => { delete window.fetchPaymentMethods; };
+  }, []);
 
   // Monthly summary
   const now = new Date();
@@ -1282,40 +1355,9 @@ function Wallet() {
   // Only fetchWallet after AddFundsStepper closes, not during payment
   function handleAddFundsModalClose() {
     setShowDeposit(false);
-    setTimeout(() => {
-      fetchWallet();
-    }, 400); // Wait for modal animation to finish
-  }
-
-  // Deposit modal logic
-  async function handleDeposit() {
-    setDepositLoading(true);
-    setDepositError('');
-    setSuccessMsg('');
-    try {
-      const resp = await walletService.createDepositIntent(Number(depositAmount));
-      setClientSecret(resp.clientSecret);
-    } catch (err) {
-      setDepositError(err.message || 'Failed to create deposit');
-    }
-    setDepositLoading(false);
-  }
-
-  // Withdraw modal logic
-  async function handleWithdraw() {
-    setWithdrawLoading(true);
-    setWithdrawError('');
-    setSuccessMsg('');
-    try {
-      await walletService.createWithdrawal(Number(withdrawAmount));
-      setSuccessMsg('Withdrawal request submitted.');
-      setWithdrawAmount('');
-      setShowWithdraw(false);
-      fetchWallet();
-    } catch (err) {
-      setWithdrawError(err.message || 'Failed to withdraw');
-    }
-    setWithdrawLoading(false);
+    setShowDeposit(false);
+  setIsUpdating(true);
+  fetchWallet().finally(() => setIsUpdating(false)); // Wait for modal animation to finish
   }
 
   // Add card modal logic
@@ -1431,6 +1473,7 @@ function Wallet() {
               <div style={{ fontSize: 18, color: '#fff', fontWeight: 500, marginBottom: 6 }}>Available Balance</div>
               <div style={{ fontSize: 36, fontWeight: 700, color: '#6fffbe', letterSpacing: 1, marginBottom: 18, textShadow: '0 2px 8px #6fffbe, 0 1px 2px #fff' }}>
                 ${Number(balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {isUpdating && <LoadingSpinner message={null} />}
               </div>
               <Button
                 variant="primary"
@@ -1676,8 +1719,7 @@ function Wallet() {
           </Button>
         </div>
       )}
-      {loadingTransactions && <div style={{ textAlign: 'center', color: '#6fffbe', marginTop: 12 }}>Loading transactions...</div>}
-    </div>
+      {loadingTransactions && <LoadingSpinner message="Loading transactions..." />}    </div>
   );
 }
 

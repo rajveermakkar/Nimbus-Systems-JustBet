@@ -148,6 +148,7 @@ const updateUsersTable = async () => {
       `);
     }
 
+
     // Check for Stripe customer ID column
     const stripeCustomerIdCheck = await pool.query(`
       SELECT column_name 
@@ -159,6 +160,20 @@ const updateUsersTable = async () => {
       await pool.query(`
         ALTER TABLE users 
         ADD COLUMN stripe_customer_id VARCHAR(255)
+      `);
+    }
+
+    // Check for Stripe Connect account ID column
+    const stripeAccountIdCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'stripe_account_id'
+    `);
+    if (stripeAccountIdCheck.rows.length === 0) {
+      logDbChange('Adding stripe_account_id column to users table');
+      await pool.query(`
+        ALTER TABLE users 
+        ADD COLUMN stripe_account_id VARCHAR(255)
       `);
     }
   } catch (error) {
@@ -263,6 +278,26 @@ const initDatabase = async () => {
     // Always check and create admin user if it doesn't exist
     await createInitialAdmin();
     
+    // Backfill: create Stripe customers for users missing stripe_customer_id
+    const usersWithoutCustomer = await pool.query(
+      "SELECT id, email FROM users WHERE stripe_customer_id IS NULL"
+    );
+    if (usersWithoutCustomer.rows.length > 0) {
+      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      for (const user of usersWithoutCustomer.rows) {
+        try {
+          const customer = await stripe.customers.create({ email: user.email });
+          await pool.query(
+            "UPDATE users SET stripe_customer_id = $1 WHERE id = $2",
+            [customer.id, user.id]
+          );
+          logDbChange(`Created Stripe customer for user ${user.email}`);
+        } catch (err) {
+          console.error(`Failed to create Stripe customer for user ${user.email}:`, err.message);
+        }
+      }
+    }
+
     // Check if settled_auctions table exists
     const settledAuctionsTableCheck = await pool.query(`
       SELECT EXISTS (
@@ -847,6 +882,27 @@ const initDatabase = async () => {
         await pool.query(`ALTER TABLE wallet_transactions ALTER COLUMN reference_id TYPE TEXT`);
         console.log('Altered wallet_transactions.reference_id to TEXT');
       }
+    }
+    
+    // Check if stripe_connected_customers table exists
+    const connectedCustomersTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'stripe_connected_customers'
+      );
+    `);
+    if (!connectedCustomersTableCheck.rows[0].exists) {
+      logDbChange('Creating stripe_connected_customers table');
+      await pool.query(`
+        CREATE TABLE stripe_connected_customers (
+          id SERIAL PRIMARY KEY,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          connected_account_id VARCHAR(255) NOT NULL,
+          customer_id VARCHAR(255) NOT NULL,
+          UNIQUE (user_id, connected_account_id)
+        );
+      `);
+      console.log('Created stripe_connected_customers table');
     }
     
     console.log('Database initialization complete!');

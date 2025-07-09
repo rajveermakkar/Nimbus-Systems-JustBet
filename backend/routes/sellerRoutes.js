@@ -38,4 +38,7 @@ router.delete('/auctions/live/:id', jwtauth, roleAuth('seller'), liveAuctionCont
 router.get('/analytics', jwtauth, roleAuth('seller'), sellerController.getSellerAnalytics);
 router.get('/auction-results', jwtauth, roleAuth('seller'), sellerController.getAuctionResults);
 
+// Seller earnings withdrawal
+router.post('/earnings/withdraw', jwtauth, roleAuth('seller'), require('../controllers/walletController').createSellerEarningsWithdrawal);
+
 module.exports = router; 

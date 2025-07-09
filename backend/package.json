@@ -30,7 +30,7 @@
     "redis": "^5.5.6",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
-    "stripe": "^12.18.0",
+    "stripe": "^18.3.0",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

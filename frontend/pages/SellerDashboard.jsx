@@ -6,6 +6,7 @@ import Toast from "../src/components/Toast";
 import { getStatusBadgeClass } from '../src/utils/statusBadgeUtils';
 import ConfirmModal from "../src/components/ConfirmModal";
 import apiService from "../src/services/apiService";
+import { walletService } from '../src/services/walletService';
 
 // Tooltip component for rejection reason
 function Tooltip({ children, text }) {
@@ -77,6 +78,19 @@ function SellerDashboard() {
     message: '' 
   });
   const [orderFilter, setOrderFilter] = useState('all');
+  // Stripe Connect onboarding/payout state
+  const [stripeStatus, setStripeStatus] = useState(null);
+  const [stripeStatusLoading, setStripeStatusLoading] = useState(false);
+  const [stripeStatusError, setStripeStatusError] = useState('');
+  const [onboardingUrl, setOnboardingUrl] = useState('');
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutLoading, setPayoutLoading] = useState(false);
+  const [payoutError, setPayoutError] = useState('');
+  const [payoutSuccess, setPayoutSuccess] = useState('');
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [walletTransactions, setWalletTransactions] = useState([]);
+  const [walletLoading, setWalletLoading] = useState(false);
 
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -111,6 +125,23 @@ function SellerDashboard() {
       setError(err.message || "Failed to fetch analytics");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch wallet balance and transactions
+  const fetchWalletInfo = async () => {
+    try {
+      setWalletLoading(true);
+      const [balanceData, transactionsData] = await Promise.all([
+        apiService.get('/api/wallet/balance'),
+        apiService.get('/api/wallet/transactions')
+      ]);
+      setWalletBalance(balanceData.balance);
+      setWalletTransactions(transactionsData.transactions || []);
+    } catch (err) {
+      console.error('Failed to fetch wallet info:', err);
+    } finally {
+      setWalletLoading(false);
     }
   };
 
@@ -192,18 +223,19 @@ function SellerDashboard() {
 
   // Load data based on active tab
   useEffect(() => {
-    if (user && user.isApproved) {
-      if (activeTab === 'overview') {
-        fetchAnalytics();
-      } else if (activeTab === 'results') {
-        fetchAuctionResults();
-      } else if (activeTab === 'listings') {
-        fetchListings(false); // Initial load, not polling
-      } else if (activeTab === 'orders') {
-        fetchOrders();
-      }
+    if (activeTab === 'overview') {
+      fetchAnalytics();
+      fetchWalletInfo();
+    } else if (activeTab === 'results') {
+      fetchAuctionResults();
+    } else if (activeTab === 'listings') {
+      fetchListings(false); // Initial load, not polling
+    } else if (activeTab === 'orders') {
+      fetchOrders();
+    } else if (activeTab === 'settings') {
+      fetchStripeStatus();
     }
-  }, [activeTab, user]);
+  }, [activeTab]);
 
   // Simple polling for listings - just fetch data every 5 seconds
   useEffect(() => {
@@ -303,6 +335,57 @@ function SellerDashboard() {
     navigate(`${location.pathname}?${params.toString()}`, { replace: true });
   };
 
+  // Fetch Stripe Connect status on mount (if seller)
+  useEffect(() => {
+    if (user && user.role === 'seller') {
+      fetchStripeStatus();
+    }
+  }, [user]);
+
+  async function fetchStripeStatus() {
+    setStripeStatusLoading(true);
+    setStripeStatusError('');
+    try {
+      const res = await walletService.getStripeConnectStatus();
+      setStripeStatus(res);
+    } catch (err) {
+      setStripeStatusError(err?.response?.data?.error || err.message || 'Failed to fetch payout status');
+      setStripeStatus(null);
+    }
+    setStripeStatusLoading(false);
+  }
+
+  // Start onboarding and get link
+  async function handleStartOnboarding() {
+    setOnboardingLoading(true);
+    setStripeStatusError('');
+    try {
+      const res = await walletService.startStripeOnboarding();
+      setOnboardingUrl(res.url);
+      // Auto-redirect to Stripe onboarding as soon as link is received
+      window.location.href = res.url;
+    } catch (err) {
+      setStripeStatusError(err?.response?.data?.error || err.message || 'Failed to start onboarding');
+    }
+    setOnboardingLoading(false);
+  }
+
+  // Request payout
+  async function handlePayout() {
+    setPayoutLoading(true);
+    setPayoutError('');
+    setPayoutSuccess('');
+    try {
+      await walletService.createStripePayout(Number(payoutAmount));
+      setPayoutSuccess('Payout requested!');
+      setPayoutAmount('');
+      fetchStripeStatus();
+    } catch (err) {
+      setPayoutError(err?.response?.data?.error || err.message || 'Failed to request payout');
+    }
+    setPayoutLoading(false);
+  }
+
   if (!user || !user.isApproved) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
@@ -363,7 +446,8 @@ function SellerDashboard() {
                 { id: 'overview', label: 'Overview', icon: 'fa-solid fa-chart-line' },
                 { id: 'results', label: 'Auction Results', icon: 'fa-solid fa-trophy' },
                 { id: 'listings', label: 'My Listings', icon: 'fa-solid fa-list' },
-                { id: 'orders', label: 'Manage Orders', icon: 'fa-solid fa-box' }
+                { id: 'orders', label: 'Manage Orders', icon: 'fa-solid fa-box' },
+                { id: 'settings', label: 'Seller Management', icon: 'fa-solid fa-user-cog' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -403,6 +487,41 @@ function SellerDashboard() {
             {activeTab === 'overview' && analytics && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold mb-4">📊 Analytics Overview</h2>
+                
+                {/* Wallet Overview */}
+                <div className="bg-white/5 rounded-lg p-6 border border-white/20 mb-6">
+                  <h3 className="text-lg font-semibold mb-4 text-green-400">💰 Wallet Overview</h3>
+                  {walletLoading ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto"></div>
+                      <p className="text-sm mt-2">Loading wallet info...</p>
+                    </div>
+                  ) : walletBalance !== null ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-green-400">{formatPrice(walletBalance)}</div>
+                        <div className="text-sm text-gray-300">Total Balance</div>
+                      </div>
+                      <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-blue-400">
+                          {formatPrice(walletTransactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + Math.abs(t.amount), 0))}
+                        </div>
+                        <div className="text-sm text-gray-300">Total Deposited</div>
+                      </div>
+                      <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-purple-400">
+                          {formatPrice(walletTransactions.filter(t => t.type === 'deposit' && t.description.includes('earnings')).reduce((sum, t) => sum + Math.abs(t.amount), 0))}
+                        </div>
+                        <div className="text-sm text-gray-300">Total Earned</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-400">
+                      <i className="fa-solid fa-wallet text-2xl mb-2"></i>
+                      <p>No wallet information available</p>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Overall Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -792,6 +911,118 @@ function SellerDashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Seller Management/Settings Tab */}
+            {activeTab === 'settings' && (
+              <div>
+                <h2 className="text-2xl font-bold mb-4">⚙️ Seller Management</h2>
+                <div className="max-w-lg mx-auto bg-white/5 rounded-lg p-6 border border-white/20">
+                  {/* Stripe Connect Onboarding Status */}
+                  {stripeStatusLoading ? (
+                    <div className="text-center py-4">Checking onboarding status...</div>
+                  ) : (
+                    (!stripeStatus || (stripeStatusError && /no connected account|not found|404/i.test(stripeStatusError))) ? (
+                      <div className="text-center py-8">
+                        <div className="text-4xl mb-3">🔗</div>
+                        <div className="text-lg font-semibold mb-2 text-red-400">No Stripe account connected</div>
+                        <div className="text-gray-300 mb-4">To receive payouts, you must connect your Stripe account. Click below to create or connect your account.</div>
+                        <Button
+                          variant="primary"
+                          size="default"
+                          style={{ minWidth: 220, fontSize: 18, borderRadius: 10, fontWeight: 600 }}
+                          onClick={async () => {
+                            await handleStartOnboarding();
+                            if (onboardingUrl) window.open(onboardingUrl, '_blank', 'noopener');
+                          }}
+                          disabled={onboardingLoading}
+                        >
+                          {onboardingLoading ? 'Loading...' : 'Create/Connect Stripe Account'}
+                        </Button>
+                        {stripeStatusError && !/no connected account|not found|404/i.test(stripeStatusError) && (
+                          <div className="text-red-400 text-sm mt-4">{stripeStatusError}</div>
+                        )}
+                      </div>
+                    ) : stripeStatusError ? (
+                      <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-4 text-center text-red-400">{stripeStatusError}</div>
+                    ) : (
+                      <>
+                        <div className="mb-4 text-center">
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mb-2 ${
+                            stripeStatus.payouts_enabled ? 'bg-green-900/30 text-green-400 border border-green-500/30' :
+                            stripeStatus.details_submitted ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/30' :
+                            'bg-red-900/30 text-red-400 border border-red-500/30'
+                          }`}>
+                            {stripeStatus.payouts_enabled ? 'Ready for Payouts' :
+                              stripeStatus.details_submitted ? 'Pending Verification' :
+                              'Onboarding Required'}
+                          </span>
+                          <div className="text-gray-300 mt-2">
+                            {stripeStatus.payouts_enabled ? (
+                              <>Your Stripe account is fully onboarded and ready to receive payouts.</>
+                            ) : stripeStatus.details_submitted ? (
+                              <>Your onboarding is submitted and pending verification by Stripe. You will be notified when payouts are enabled.</>
+                            ) : (
+                              <>You must complete onboarding to receive payouts. Click below to start or continue onboarding.</>
+                            )}
+                          </div>
+                        </div>
+                        {/* Onboarding Button */}
+                        {!stripeStatus.payouts_enabled && (
+                          <div className="text-center mb-6">
+                            <button
+                              className="bg-gradient-to-r from-purple-500 to-green-400 text-white font-bold py-2 px-6 rounded-lg shadow hover:from-purple-600 hover:to-green-500 transition-all disabled:opacity-60"
+                              onClick={async () => {
+                                if (onboardingUrl) {
+                                  window.open(onboardingUrl, '_blank', 'noopener');
+                                } else {
+                                  await handleStartOnboarding();
+                                  if (onboardingUrl) window.open(onboardingUrl, '_blank', 'noopener');
+                                }
+                              }}
+                              disabled={onboardingLoading}
+                            >
+                              {onboardingLoading ? 'Loading...' : 'Start/Continue Stripe Onboarding'}
+                            </button>
+                          </div>
+                        )}
+                        {/* Payout Form */}
+                        {stripeStatus.payouts_enabled && (
+                          <div className="mt-8">
+                            <h3 className="text-lg font-semibold mb-2 text-green-400">Request Payout</h3>
+                            <form
+                              onSubmit={e => {
+                                e.preventDefault();
+                                handlePayout();
+                              }}
+                              className="flex flex-col gap-3"
+                            >
+                              <input
+                                type="number"
+                                min="1"
+                                step="0.01"
+                                placeholder="Amount to withdraw (CAD)"
+                                value={payoutAmount}
+                                onChange={e => setPayoutAmount(e.target.value)}
+                                className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-400"
+                              />
+                              <button
+                                type="submit"
+                                className="bg-gradient-to-r from-green-500 to-blue-400 text-white font-bold py-2 px-6 rounded-lg shadow hover:from-green-600 hover:to-blue-500 transition-all disabled:opacity-60"
+                                disabled={payoutLoading || !payoutAmount}
+                              >
+                                {payoutLoading ? 'Processing...' : 'Request Payout'}
+                              </button>
+                              {payoutError && <div className="text-red-400 text-sm mt-1">{payoutError}</div>}
+                              {payoutSuccess && <div className="text-green-400 text-sm mt-1">{payoutSuccess}</div>}
+                            </form>
+                          </div>
+                        )}
+                      </>
+                    )
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -3,6 +3,7 @@ const { generateToken } = require('../utils/tokenUtils');
 const LiveAuction = require('../models/LiveAuction');
 const SettledAuction = require('../models/SettledAuction');
 const { auctionCache } = require('../services/redisService');
+const stripeService = require('../services/stripeService');
 
 // Use 120s TTL for admin dashboard cache
 const ADMIN_CACHE_TTL = 120;
