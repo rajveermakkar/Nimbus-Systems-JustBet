@@ -453,16 +453,29 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
     goToStep(3); // Go to payment/confirmation
   }
   async function handleAddNewCard() {
+    console.log('[handleAddNewCard] Starting add new card flow');
     setAddNewCard(true);
     setLoading(true);
     setPreparingPayment(true);
     try {
+      // For new cards, we'll ask if they want to save it during the payment flow
+      console.log('[handleAddNewCard] Creating deposit intent for new card');
+      
+      // Always use platform account for consistency
+      console.log('[handleAddNewCard] Always using platform account');
+      
       const resp = await walletService.createDepositIntent(Number(amount), false);
-      console.log('DepositIntent response:', resp);
+      console.log('[handleAddNewCard] DepositIntent response:', resp);
       setClientSecret(resp.clientSecret);
-      setStripeAccount(resp.stripeAccount || null);
-      // Do NOT setStep(3) here!
+      
+      // Always use platform account (no stripeAccount)
+      setStripeAccount(null);
+      console.log('[handleAddNewCard] Using platform account (no stripeAccount)');
+      
+      console.log('[handleAddNewCard] Client secret set, waiting for useEffect to advance step');
+      // Do NOT setStep(3) here! Let useEffect handle it
     } catch (err) {
+      console.error('[handleAddNewCard] Error:', err);
       setCardError(err.message || 'Failed to create deposit');
       goToStep(0);
       setPreparingPayment(false);
@@ -490,7 +503,15 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
 
   // Watch for clientSecret and advance step
   useEffect(() => {
+    console.log('[useEffect] Checking step progression:', { 
+      preparingPayment, 
+      clientSecret: !!clientSecret, 
+      currentStep: step,
+      addNewCard,
+      selectedCardId 
+    });
     if (preparingPayment && clientSecret) {
+      console.log('[useEffect] Advancing to step 3');
       goToStep(3);
       setPreparingPayment(false);
     }
@@ -761,7 +782,18 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
         </motion.div>
       )}
       {/* PaymentElement and confirmation (step 3+) only when clientSecret is present and adding new card */}
-      {clientSecret && step >= 3 && !preparingPayment && (!selectedCardId || addNewCard) && (
+      {(() => {
+        const shouldShowPaymentElement = clientSecret && step >= 3 && !preparingPayment && (!selectedCardId || addNewCard);
+        console.log('[PaymentElement] Condition check:', {
+          clientSecret: !!clientSecret,
+          step,
+          preparingPayment,
+          selectedCardId,
+          addNewCard,
+          shouldShow: shouldShowPaymentElement
+        });
+        return shouldShowPaymentElement;
+      })() && (
         <Elements key={clientSecret} stripe={stripePromise} options={{ 
           clientSecret, 
           locale: 'en-CA',

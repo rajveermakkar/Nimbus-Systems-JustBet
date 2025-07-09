@@ -123,8 +123,7 @@ async function createDepositIntent(req, res) {
     if (todayDeposits + amount > DAILY_DEPOSIT_LIMIT) {
       return res.status(400).json({ error: 'Daily deposit limit exceeded' });
     }
-    let customerId = null;
-    let user = await User.findById(userId);
+    const user = await User.findById(userId);
     const connectedAccountId = user.stripe_account_id || null;
     
     console.log('[createDepositIntent] Debug:', {
@@ -137,36 +136,21 @@ async function createDepositIntent(req, res) {
       paymentMethodId
     });
     
-    if (paymentMethodId) {
-      // For saved cards: always use platform customer
-      customerId = user.stripe_customer_id;
-      if (!customerId) {
-        console.log('[createDepositIntent] Creating new platform customer for saved card');
-        const customer = await stripeService.createCustomer(user.email);
-        await User.setStripeCustomerId(user.id, customer.id);
-        customerId = customer.id;
-        console.log('[createDepositIntent] New platform customer created:', customerId);
-      }
-    } else if (connectedAccountId) {
-      // For Connect: get or create customer on connected account
-      let connectedCustomer = await StripeConnectedCustomer.findByUserAndAccount(userId, connectedAccountId);
-      console.log('[createDepositIntent] Connected customer lookup:', connectedCustomer);
-      
-      if (!connectedCustomer) {
-        console.log('[createDepositIntent] Creating new connected customer for account:', connectedAccountId);
-        const customer = await stripe.customers.create(
-          { email: user.email },
-          { stripeAccount: connectedAccountId }
-        );
-        console.log('[createDepositIntent] New connected customer created:', customer.id);
-        connectedCustomer = await StripeConnectedCustomer.create(userId, connectedAccountId, customer.id);
-      }
-      customerId = connectedCustomer.customer_id;
-    } else if (saveCard) {
-      // For new cards with save option: use platform customer
-      customerId = user.stripe_customer_id;
-      if (!customerId) {
-        console.log('[createDepositIntent] Creating new platform customer');
+    // Always use platform customer for consistency
+    let customerId = user.stripe_customer_id;
+    if (!customerId) {
+      console.log('[createDepositIntent] Creating new platform customer');
+      const customer = await stripeService.createCustomer(user.email);
+      await User.setStripeCustomerId(user.id, customer.id);
+      customerId = customer.id;
+      console.log('[createDepositIntent] New platform customer created:', customerId);
+    } else {
+      // Verify the customer exists on platform account
+      try {
+        await stripe.customers.retrieve(customerId);
+        console.log('[createDepositIntent] Platform customer verified:', customerId);
+      } catch (err) {
+        console.log('[createDepositIntent] Platform customer not found, creating new one');
         const customer = await stripeService.createCustomer(user.email);
         await User.setStripeCustomerId(user.id, customer.id);
         customerId = customer.id;
@@ -177,7 +161,13 @@ async function createDepositIntent(req, res) {
     console.log('[createDepositIntent] Final customerId:', customerId);
     console.log('[createDepositIntent] Creating PaymentIntent with connectedAccountId:', connectedAccountId);
     
-    const paymentIntent = await stripeService.createPaymentIntent(userId, amount, 'cad', saveCard, customerId, paymentMethodId, connectedAccountId);
+    // Always use platform account for consistency
+    // Platform customer will be created on first interaction if it doesn't exist
+    const finalConnectedAccountId = null; // Always use platform account
+    
+    console.log('[createDepositIntent] Final connectedAccountId (always platform):', finalConnectedAccountId);
+    
+    const paymentIntent = await stripeService.createPaymentIntent(userId, amount, 'cad', saveCard, customerId, paymentMethodId, finalConnectedAccountId);
     console.log('[createDepositIntent] PaymentIntent created:', {
       clientSecret: paymentIntent.client_secret,
       connectedAccountId,
@@ -185,8 +175,8 @@ async function createDepositIntent(req, res) {
       paymentIntentId: paymentIntent.id
     });
     res.json({ 
-      clientSecret: paymentIntent.client_secret,
-      ...(connectedAccountId && { stripeAccount: connectedAccountId })
+      clientSecret: paymentIntent.client_secret
+      // No stripeAccount since we always use platform account
     });
   } catch (err) {
     console.error('Failed to create payment intent:', err);
