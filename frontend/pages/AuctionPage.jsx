@@ -242,7 +242,7 @@ function AuctionPage() {
   // Single socket connection useEffect
   useEffect(() => {
     // Wait for user to be available before connecting
-    if (!isLiveAuction || !user || !user.token || socketConnectedRef.current) {
+    if (!isLiveAuction || !user || !user.token || !user.id || socketConnectedRef.current) {
       return;
     }
 
@@ -256,6 +256,12 @@ function AuctionPage() {
         // Always join the auction room on connect (including after reconnect)
         const joinRoom = () => {
           socketService.joinLiveAuction(id, (data) => {
+            // Only process updates if user is fully loaded
+            if (!user || !user.id) {
+              console.log('[AuctionPage] Skipping socket update - user not fully loaded');
+              return;
+            }
+            
             if (data.type === 'auction-update') {
               setAuction(prevAuction => {
                 if (!prevAuction) return data.auction;
@@ -741,7 +747,7 @@ function AuctionPage() {
   }
 
   // Show loading while user is being loaded for live auctions
-  if (isLiveAuction && !user) {
+  if (isLiveAuction && (!user || !user.id)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">
         <div className="text-center">
@@ -1060,7 +1066,7 @@ function AuctionPage() {
       {isLiveAuction && liveBidCountdown !== null && (
   <div style={{
     position: 'absolute',
-    top: 24,
+    top: 80,
     right: 24,
     background: 'rgba(35,43,74,0.92)',
     color: '#fff',
