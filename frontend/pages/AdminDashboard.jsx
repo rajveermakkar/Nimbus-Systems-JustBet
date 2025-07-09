@@ -121,6 +121,15 @@ function AdminDashboard() {
     withCredentials: true
   });
 
+  // Add request interceptor to include JWT token
+  api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('justbetToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  });
+
   // Fetch dashboard stats
   const fetchStats = async () => {
     setStatsLoading(true); setStatsError(null);
