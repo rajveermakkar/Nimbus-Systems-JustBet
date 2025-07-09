@@ -1,7 +1,8 @@
 import React from 'react';
 import LoadingSpinner from '../LoadingSpinner';
+import { getStatusBadgeClass } from '../../utils/statusBadgeUtils';
 
-function AuctionDetailsPanel({ auction, onViewSeller, onBack, onUserClick, winnerLoading }) {
+function AuctionDetailsPanel({ auction, onViewSeller, onBack, onUserClick, winnerLoading, winnerChecked }) {
   if (!auction) return null;
   // Winner info
   const winner = auction.winner;
@@ -29,8 +30,17 @@ function AuctionDetailsPanel({ auction, onViewSeller, onBack, onUserClick, winne
             <div className="text-gray-300 mb-2">{auction.description}</div>
             <div className="flex gap-4 mb-2">
               <span className={`px-3 py-1 rounded font-semibold text-sm ${auction.type === 'live' ? 'bg-red-900/60 text-red-200' : 'bg-blue-900/60 text-blue-200'}`}>{auction.type === 'live' ? 'Live Auction' : 'Settled Auction'}</span>
-              <span className="px-3 py-1 rounded bg-blue-900/60 text-blue-200 font-semibold text-sm">{auction.status}</span>
+              <span className={`px-3 py-1 rounded font-semibold text-sm ${getStatusBadgeClass(auction.status)}`}>
+                {auction.status === 'rejected' ? 'Rejected'
+                  : auction.status === 'closed' ? 'Closed'
+                  : auction.status === 'pending' ? 'Pending'
+                  : auction.status === 'approved' ? 'Approved'
+                  : auction.status}
+              </span>
             </div>
+            {auction.status === 'rejected' && auction.rejection_reason && (
+              <div className="text-red-300 text-sm mb-2">Reason: {auction.rejection_reason}</div>
+            )}
             <div className="flex items-center gap-2 mb-2">
               <span className="font-semibold">Seller:</span>
               <span
@@ -67,7 +77,9 @@ function AuctionDetailsPanel({ auction, onViewSeller, onBack, onUserClick, winne
                 </div>
               </div>
             ) : (
-              <div className="text-yellow-300 font-semibold mt-2">No winner (reserve not met or no valid bids)</div>
+              winnerChecked && !winnerLoading && (
+                <div className="text-yellow-300 font-semibold mt-2">No winner (reserve not met or no valid bids)</div>
+              )
             )}
           </div>
         </div>

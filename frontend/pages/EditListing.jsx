@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Button from "../src/components/Button";
 import Toast from "../src/components/Toast";
-import { ConfirmModal } from "../src/components/SessionExpiryModal";
+import ConfirmModal from "../src/components/ConfirmModal";
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
@@ -719,6 +719,7 @@ function EditListing({ showToast: _showToast }) {
         onCancel={() => setShowConfirm(false)}
         confirmText="Delete"
         cancelText="Cancel"
+        confirmColor="red"
       />
     </div>
   );

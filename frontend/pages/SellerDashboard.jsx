@@ -3,6 +3,7 @@ import { UserContext } from "../src/context/UserContext";
 import Button from "../src/components/Button";
 import { useNavigate, useLocation } from "react-router-dom";
 import Toast from "../src/components/Toast";
+import { getStatusBadgeClass } from '../src/utils/statusBadgeUtils';
 
 // Tooltip component for rejection reason
 function Tooltip({ children, text }) {
@@ -426,19 +427,8 @@ function SellerDashboard() {
                         
                         <div className="space-y-1 text-sm mb-3">
                           <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              result.auction_type === 'live' 
-                                ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-                                : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                            }`}>
-                              {result.auction_type}
-                            </span>
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              result.result_type === 'sold' 
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                            }`}>
-                              {result.result_type === 'sold' ? 'Sold' : 'No Bids'}
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(result.status || result.result_type)}`}>
+                              {result.status === 'won' || (result.status === 'closed' && result.winner_id) ? 'Sold' : result.status === 'no_bids' ? 'No Bids' : result.status === 'reserve_not_met' ? 'Reserve Not Met' : result.status}
                             </span>
                           </div>
                           <p className="text-gray-400">Ended: {formatDate(result.end_time)}</p>
@@ -511,25 +501,9 @@ function SellerDashboard() {
                         </div>
                         <div className="text-xs mb-3">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              listing.type === 'live' || listing.auction_type === 'live'
-                                ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-                                : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                            }`}>
-                              {listing.type === 'live' || listing.auction_type === 'live' ? 'Live' : 'Settled'}
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(listing.status || (listing.is_approved ? 'approved' : 'pending'))}`}>
+                              {listing.status === 'won' || (listing.status === 'closed' && listing.winner_id) ? 'Sold' : listing.status === 'no_bids' ? 'No Bids' : listing.status === 'reserve_not_met' ? 'Reserve Not Met' : listing.status}
                             </span>
-                            {/* Status badge logic */}
-                            {listing.status === 'rejected' ? (
-                              <Tooltip text={listing.rejection_reason || 'No reason provided'}>
-                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30 cursor-pointer transition-all duration-300">
-                                  Rejected <i className="fa-solid fa-circle-info ml-1"></i>
-                                </span>
-                              </Tooltip>
-                            ) : (listing.is_approved || listing.status === 'approved') ? (
-                              <span className="text-green-400 transition-colors duration-300">Approved</span>
-                            ) : (
-                              <span className="text-yellow-300 transition-colors duration-300">Pending</span>
-                            )}
                           </div>
                         </div>
                         <div className="flex gap-2">

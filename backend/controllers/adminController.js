@@ -2,6 +2,10 @@ const User = require('../models/User');
 const { generateToken } = require('../utils/tokenUtils');
 const LiveAuction = require('../models/LiveAuction');
 const SettledAuction = require('../models/SettledAuction');
+const { auctionCache } = require('../services/redisService');
+
+// Use 120s TTL for admin dashboard cache
+const ADMIN_CACHE_TTL = 120;
 
 const adminController = {
   // Get all pending seller approvals
@@ -48,6 +52,11 @@ const adminController = {
       const updatedUser = await User.updateRoleAndApproval(userId, 'seller', approved, businessDetails);
       const token = generateToken(req.user);
 
+      await auctionCache.del('admin:stats');
+      await auctionCache.del('admin:users:all');
+      await auctionCache.del('admin:auctions:settled');
+      await auctionCache.del('admin:auctions:live');
+
       res.json({
         user: updatedUser,
         token
@@ -82,6 +91,11 @@ const adminController = {
 
       const rejectedAuction = await LiveAuction.rejectAuction(id, rejectionReason, req.user.id);
       const token = generateToken(req.user);
+
+      await auctionCache.del('admin:stats');
+      await auctionCache.del('admin:users:all');
+      await auctionCache.del('admin:auctions:settled');
+      await auctionCache.del('admin:auctions:live');
 
       res.json({
         auction: rejectedAuction,
@@ -118,6 +132,11 @@ const adminController = {
       const rejectedAuction = await SettledAuction.rejectAuction(id, rejectionReason, req.user.id);
       const token = generateToken(req.user);
 
+      await auctionCache.del('admin:stats');
+      await auctionCache.del('admin:users:all');
+      await auctionCache.del('admin:auctions:settled');
+      await auctionCache.del('admin:auctions:live');
+
       res.json({
         auction: rejectedAuction,
         token
@@ -129,6 +148,12 @@ const adminController = {
 
   // Get stats: detailed breakdown including rejected auctions
   async getStats(req, res) {
+    const cacheKey = 'admin:stats';
+    const cached = await auctionCache.get(cacheKey);
+    if (cached) {
+      console.log('[REDIS] Admin stats - CACHE HIT');
+      return res.json(cached);
+    }
     try {
       const [
         totalUsers,
@@ -162,7 +187,7 @@ const adminController = {
         User.countPendingSellerRequests()
       ]);
       const totalAuctions = totalLiveAuctions + totalSettledAuctions;
-      res.json({
+      const stats = {
         users: {
           buyers: totalBuyers,
           sellers: totalSellers,
@@ -186,7 +211,10 @@ const adminController = {
           },
           total: totalAuctions
         }
-      });
+      };
+      await auctionCache.set(cacheKey, stats, ADMIN_CACHE_TTL);
+      console.log('[DB] Admin stats - CACHE MISS');
+      return res.json(stats);
     } catch (error) {
       res.status(500).json({ error: 'Error fetching stats' });
     }
@@ -194,9 +222,18 @@ const adminController = {
 
   // Get all users (admin only)
   async getAllUsers(req, res) {
+    const cacheKey = 'admin:users:all';
+    const cached = await auctionCache.get(cacheKey);
+    if (cached) {
+      console.log('[REDIS] Admin users - CACHE HIT');
+      return res.json(cached);
+    }
     try {
       const users = await User.getAll();
-      res.json({ users });
+      const response = { users };
+      await auctionCache.set(cacheKey, response, ADMIN_CACHE_TTL);
+      console.log('[DB] Admin users - CACHE MISS');
+      res.json(response);
     } catch (error) {
       res.status(500).json({ error: 'Error fetching users' });
     }
@@ -204,6 +241,12 @@ const adminController = {
 
   // Get all settled auctions (admin only)
   async getAllSettledAuctions(req, res) {
+    const cacheKey = 'admin:auctions:settled';
+    const cached = await auctionCache.get(cacheKey);
+    if (cached) {
+      console.log('[REDIS] Admin settled auctions - CACHE HIT');
+      return res.json(cached);
+    }
     try {
       const { pool } = require('../db/init');
       const result = await pool.query('SELECT * FROM settled_auctions ORDER BY start_time DESC');
@@ -226,7 +269,10 @@ const adminController = {
           type: 'settled'
         });
       }
-      res.json({ auctions: auctionsWithSellers });
+      const response = { auctions: auctionsWithSellers };
+      await auctionCache.set(cacheKey, response, ADMIN_CACHE_TTL);
+      console.log('[DB] Admin settled auctions - CACHE MISS');
+      res.json(response);
     } catch (error) {
       res.status(500).json({ error: 'Error fetching all settled auctions' });
     }
@@ -234,6 +280,12 @@ const adminController = {
 
   // Get all live auctions (admin only)
   async getAllLiveAuctions(req, res) {
+    const cacheKey = 'admin:auctions:live';
+    const cached = await auctionCache.get(cacheKey);
+    if (cached) {
+      console.log('[REDIS] Admin live auctions - CACHE HIT');
+      return res.json(cached);
+    }
     try {
       const { pool } = require('../db/init');
       const result = await pool.query('SELECT * FROM live_auctions ORDER BY start_time DESC');
@@ -256,7 +308,10 @@ const adminController = {
           type: 'live'
         });
       }
-      res.json({ auctions: auctionsWithSellers });
+      const response = { auctions: auctionsWithSellers };
+      await auctionCache.set(cacheKey, response, ADMIN_CACHE_TTL);
+      console.log('[DB] Admin live auctions - CACHE MISS');
+      res.json(response);
     } catch (error) {
       res.status(500).json({ error: 'Error fetching all live auctions' });
     }
@@ -311,6 +366,44 @@ const adminController = {
     } catch (error) {
       console.error('Error in getAuctionsBySeller:', error);
       res.status(500).json({ error: 'Error fetching auctions for seller' });
+    }
+  },
+
+  // PATCH /admin/users/:userId/role - change user role
+  async changeUserRole(req, res) {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+      const allowedRoles = ['buyer', 'seller', 'admin'];
+      if (!allowedRoles.includes(role)) {
+        return res.status(400).json({ error: 'Invalid role' });
+      }
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      // If changing to seller, keep business details if present
+      const businessDetails = (role === 'seller') ? {
+        businessName: user.business_name,
+        businessDescription: user.business_description,
+        businessAddress: user.business_address,
+        businessPhone: user.business_phone
+      } : null;
+      // If changing to seller, set isApproved to false (require approval)
+      // If changing to buyer or admin, set isApproved to true
+      const isApproved = (role === 'seller') ? false : true;
+      const updatedUser = await User.updateRoleAndApproval(userId, role, isApproved, businessDetails);
+      res.json({
+        message: `Role updated to ${role}`,
+        user: updatedUser
+      });
+
+      await auctionCache.del('admin:stats');
+      await auctionCache.del('admin:users:all');
+      await auctionCache.del('admin:auctions:settled');
+      await auctionCache.del('admin:auctions:live');
+    } catch (error) {
+      res.status(500).json({ error: 'Error updating user role' });
     }
   }
 };

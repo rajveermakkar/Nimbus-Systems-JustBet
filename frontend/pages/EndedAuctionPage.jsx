@@ -234,7 +234,7 @@ function EndedAuctionPage() {
       )}
 
       {/* Winner Announcement Modal */}
-      {winnerAnnouncement && !location.state?.fromMyWinnings && !location.state?.fromMyBids && (
+      {winnerChecked && winnerAnnouncement && !location.state?.fromMyWinnings && !location.state?.fromMyBids && (
         <WinnerDeclaration
           winnerAnnouncement={winnerAnnouncement}
           onClose={() => setWinnerAnnouncement(null)}
