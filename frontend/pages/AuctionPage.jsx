@@ -200,7 +200,8 @@ function AuctionPage() {
                 replace: true,
                 state: { 
                   auctionData: auctionData,
-                  fromRedirect: true
+                  fromRedirect: true,
+                  auctionType: auctionData.type || type || 'settled'
                 }
               });
               return;
@@ -289,7 +290,8 @@ function AuctionPage() {
                 replace: true,
                 state: { 
                   fromRedirect: true,
-                  error: data.error
+                  error: data.error,
+                  auctionType: auction?.type || type || 'settled'
                 }
               });
             }, 2000);
@@ -357,7 +359,8 @@ function AuctionPage() {
               replace: true,
               state: { 
                 auctionData: auctionData,
-                fromRedirect: true
+                fromRedirect: true,
+                auctionType: auctionData.type || type || 'settled'
               }
             });
             return;
@@ -388,7 +391,8 @@ function AuctionPage() {
                   replace: true,
                   state: { 
                     auctionData: auctionData,
-                    fromRedirect: true
+                    fromRedirect: true,
+                    auctionType: auctionData.type || type || 'settled'
                   }
                 });
                 return;
@@ -562,7 +566,8 @@ function AuctionPage() {
           replace: true,
           state: { 
             auctionData: auction,
-            fromRedirect: true
+            fromRedirect: true,
+            auctionType: auction?.type || type || 'settled'
           }
         });
       }, 1000);

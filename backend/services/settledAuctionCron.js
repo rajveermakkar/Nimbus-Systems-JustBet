@@ -3,6 +3,7 @@ const SettledAuction = require('../models/SettledAuction');
 const Bid = require('../models/Bid');
 const SettledAuctionResult = require('../models/SettledAuctionResult');
 const { pool } = require('../db/init');
+const { auctionCache } = require('./redisService');
 
 // Store scheduled timeouts for auctions
 const scheduledAuctions = new Map();
@@ -41,6 +42,10 @@ async function processAuction(auctionId) {
         status: 'no_bids'
       });
       console.log(`Auction ${auction.id} closed with no bids`);
+      
+      // Invalidate cache for this auction
+      await auctionCache.del(`auction:closed:${auction.id}:full`);
+      console.log(`🗑️ Invalidated cache for auction: ${auction.id}`);
       return;
     }
 
@@ -62,6 +67,10 @@ async function processAuction(auctionId) {
         status: 'reserve_not_met'
       });
       console.log(`Auction ${auction.id} closed - reserve not met`);
+      
+      // Invalidate cache for this auction
+      await auctionCache.del(`auction:closed:${auction.id}:full`);
+      console.log(`🗑️ Invalidated cache for auction: ${auction.id}`);
       return;
     }
 
@@ -78,6 +87,16 @@ async function processAuction(auctionId) {
       status: 'won'
     });
     console.log(`Auction ${auction.id} closed - winner: ${highestBid.user_id}`);
+    
+    // Invalidate cache for this auction
+    await auctionCache.del(`auction:closed:${auction.id}:full`);
+    console.log(`🗑️ Invalidated cache for auction: ${auction.id}`);
+    
+    // Invalidate user winnings cache for the winner
+    if (highestBid && highestBid.user_id) {
+      await auctionCache.del(`user:winnings:${highestBid.user_id}`);
+      console.log(`🗑️ Invalidated winnings cache for winner: ${highestBid.user_id}`);
+    }
   } catch (err) {
     console.error(`Error processing auction ${auctionId}:`, err);
   }

@@ -55,6 +55,7 @@ const MOCK_API_RESPONSES = {
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
   useLocation: () => ({ pathname: '/admin' }),
+  useParams: () => ({}),
   BrowserRouter: ({ children }) => children
 }));
 

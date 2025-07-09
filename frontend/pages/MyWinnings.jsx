@@ -73,7 +73,7 @@ function MyWinnings() {
   const handleViewAuction = (winning) => {
     if (winning.status === "closed" || winning.status === "ended") {
       navigate(`/ended-auction/${winning.auction_id}`, {
-        state: { fromMyWinnings: true }
+        state: { fromMyWinnings: true, auctionType: winning.auction_type || 'settled' }
       });
     } else {
       navigate(`/auction/${winning.auction_type}/${winning.auction_id}`);
@@ -158,15 +158,22 @@ function MyWinnings() {
 
                   {/* Auction Info */}
                   <div className="space-y-2">
-                    <h3 className="font-semibold text-lg line-clamp-2">{winning.title}</h3>
-                    
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-lg line-clamp-2 flex-1">{winning.title}</h3>
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        winning.auction_type === 'live'
+                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                          : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      }`}>
+                        {winning.auction_type}
+                      </span>
+                    </div>
                     <div className="text-sm text-gray-300">
                       <p>Seller: <span className="text-white">{
                         winning.seller
                           ? `${winning.seller.first_name} ${winning.seller.last_name}${winning.seller.business_name ? ` (${winning.seller.business_name})` : ''}`
                           : 'Unknown'
                       }</span></p>
-                      <p>Type: <span className="text-blue-400 font-semibold capitalize">{winning.auction_type}</span></p>
                       <p>Ended: <span className="text-white">{formatDate(winning.end_time)}</span></p>
                     </div>
 
