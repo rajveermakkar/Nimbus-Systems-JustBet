@@ -74,8 +74,26 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
     });
     return;
   }
-  // Find highest bid
-  const highestBid = bids.reduce((max, bid) => bid.amount > max.amount ? bid : max, bids[0]);
+  
+  // Find highest bid - sort by amount descending, then by time ascending (earliest wins in tie)
+  const sortedBids = bids.sort((a, b) => {
+    if (a.amount !== b.amount) {
+      return b.amount - a.amount; // Highest amount first
+    }
+    return new Date(a.created_at) - new Date(b.created_at); // Earliest time first (wins in tie)
+  });
+  const highestBid = sortedBids[0];
+  
+  console.log(`[LIVE AUCTION ${auctionId}] Winner selection:`, {
+    totalBids: bids.length,
+    highestBid: {
+      user_id: highestBid.user_id,
+      amount: highestBid.amount,
+      created_at: highestBid.created_at
+    },
+    reservePrice: auction.reserve_price,
+    reserveMet: !auction.reserve_price || highestBid.amount >= auction.reserve_price
+  });
 
   // Check reserve price
   if (auction.reserve_price && highestBid.amount < auction.reserve_price) {
