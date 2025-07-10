@@ -78,6 +78,11 @@ class ApiService {
     });
     return response.json();
   }
+
+  // Fetch admin activity logs
+  async getActivityLogs() {
+    return this.get('/api/admin/activity-logs');
+  }
 }
 
 // Export singleton instance
