@@ -367,12 +367,12 @@ function AuctionPage() {
               setPlacingBid(false);
               setBidAmount('');
               let message = '';
-              if (data.result.winner) {
-                message = `🎉 Winner: ${data.result.winner.user_name || `User ${data.result.winner.user_id?.slice(0, 8)}`} won with ${formatPrice(data.result.winner.amount)}!`;
-                setWinnerAnnouncement(data.result);
-              } else if (data.result.status === 'reserve_not_met') {
+              if (data.winner) {
+                message = `🎉 Winner: ${data.winner.user_name || `User ${data.winner.user_id?.slice(0, 8)}`} won with ${formatPrice(data.winner.amount)}!`;
+                setWinnerAnnouncement(data);
+              } else if (data.status === 'reserve_not_met') {
                 message = '❌ Auction ended - Reserve price not met';
-              } else if (data.result.status === 'no_bids') {
+              } else if (data.status === 'no_bids') {
                 message = '❌ Auction ended - No bids were placed';
               } else {
                 message = 'Auction ended';
@@ -382,6 +382,21 @@ function AuctionPage() {
                 ...prevAuction,
                 status: 'closed'
               }));
+              
+              // Auto-redirect after 3 seconds
+              setTimeout(() => {
+                setToast({ show: true, message: 'Redirecting to ended auction page...', type: 'info' });
+                setTimeout(() => {
+                  navigate(`/ended-auction/${id}`, { 
+                    replace: true,
+                    state: { 
+                      auctionData: auction,
+                      fromRedirect: true,
+                      auctionType: auction?.type || type || 'settled'
+                    }
+                  });
+                }, 1000);
+              }, 3000);
             }
           });
         };
@@ -1001,7 +1016,7 @@ function AuctionPage() {
                 ) : (
                   <form onSubmit={handlePlaceBid}>
                     <div className="mb-2">
-                      <label className="block text-xs font-medium mb-1 text-left mt-2 mb-2">Bid Amount (USD)</label>
+                      <label className="block text-xs font-medium mb-1 text-left mt-2 mb-2">Bid Amount (CAD)</label>
                       <input
                         type="number"
                         step="0.01"

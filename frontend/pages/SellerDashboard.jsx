@@ -731,7 +731,7 @@ function SellerDashboard() {
                           </div>
                           <div className="flex gap-2">
                             <Button
-                              onClick={() => navigate(listing.auction_type === 'live' ? `/live-auctions/${listing.id}` : `/auctions/${listing.id}`)}
+                              onClick={() => navigate(`/auction/${listing.auction_type}/${listing.id}`)}
                               className="flex-1 text-sm"
                             >
                               View Auction

@@ -17,6 +17,19 @@ async function createAuction(req, res) {
     if (!user || user.role !== 'seller') {
       return res.status(403).json({ error: 'Only sellers can create auctions.' });
     }
+    
+    // Ensure seller has a wallet (create if missing)
+    let wallet = await Wallet.getWalletByUserId(user.id);
+    if (!wallet) {
+      try {
+        console.log(`Creating wallet for seller ${user.id} during first auction creation`);
+        wallet = await Wallet.createWallet(user.id);
+      } catch (walletErr) {
+        console.error('Failed to create wallet for seller:', walletErr);
+        return res.status(500).json({ error: 'Failed to create seller wallet. Please try again.' });
+      }
+    }
+    
     const { title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, minBidIncrement } = req.body;
 
     // Validate required fields are present and not blank
