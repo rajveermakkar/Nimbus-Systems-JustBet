@@ -111,7 +111,18 @@ const sellerController = {
     try {
       const sellerId = req.user.id;
       const { pool } = require('../db/init');
-
+      // Get seller's wallet id
+      const walletIdResult = await pool.query('SELECT id FROM wallets WHERE user_id = $1', [sellerId]);
+      const walletId = walletIdResult.rows[0]?.id;
+      let totalEarned = 0;
+      if (walletId) {
+        const incomeResult = await pool.query(
+          `SELECT COALESCE(SUM(amount), 0) as total_income FROM wallet_transactions WHERE wallet_id = $1 AND type = 'auction_income' AND status = 'succeeded'`,
+          [walletId]
+        );
+        totalEarned = parseFloat(incomeResult.rows[0]?.total_income || 0);
+      }
+      // Keep the rest of the analytics as before, but override overall.totalRevenue
       // Get live auction stats
       const liveQuery = `
         SELECT 
@@ -156,7 +167,6 @@ const sellerController = {
 
       // Calculate totals
       const totalAuctions = parseInt(live.total) + parseInt(settled.total);
-      const totalRevenue = parseFloat(live.revenue) + parseFloat(settled.revenue);
       const totalCompleted = parseInt(live.completed) + parseInt(settled.completed);
 
       const analytics = {
@@ -178,7 +188,7 @@ const sellerController = {
         },
         overall: {
           totalAuctions: totalAuctions,
-          totalRevenue: totalRevenue,
+          totalRevenue: totalEarned, // Use wallet sum as source of truth
           totalCompleted: totalCompleted
         }
       };

@@ -50,7 +50,7 @@ function MyWinnings() {
     if (!price && price !== 0) return '-';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'CAD'
     }).format(price);
   };
 

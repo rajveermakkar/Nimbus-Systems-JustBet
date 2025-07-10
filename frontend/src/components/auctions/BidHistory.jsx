@@ -12,7 +12,7 @@ function BidHistory({ auctionId, type = 'settled', bids: propBids }) {
   const formatPrice = (price) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'CAD'
     }).format(price);
   };
 

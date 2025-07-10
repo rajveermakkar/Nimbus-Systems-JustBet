@@ -106,11 +106,11 @@ const SettledAuctionResult = {
         created_at: highestBid.created_at
       },
       reservePrice: auction.reserve_price,
-      reserveMet: !auction.reserve_price || highestBid.amount >= auction.reserve_price
+      reserveMet: !auction.reserve_price || Number(highestBid.amount) >= Number(auction.reserve_price)
     });
 
     // Check reserve price
-    if (auction.reserve_price && highestBid.amount < auction.reserve_price) {
+    if (auction.reserve_price && Number(highestBid.amount) < Number(auction.reserve_price)) {
       await SettledAuction.updateAuction(auction.id, {
         status: 'closed',
         current_highest_bidder_id: null
