@@ -198,18 +198,14 @@ function SellerDashboard() {
       if (!isPolling) {
         setLoading(true);
       }
-      
       // Fetch both live and settled auctions
       const liveData = await apiService.get('/api/seller/auctions/live');
       const settledData = await apiService.get('/api/seller/auctions/settled');
-      
-      // Combine the listings
-      const liveListings = liveData.auctions || [];
-      const settledListings = settledData.auctions || [];
+      // Add auction_type to each listing
+      const liveListings = (liveData.auctions || []).map(a => ({ ...a, auction_type: 'live' }));
+      const settledListings = (settledData.auctions || []).map(a => ({ ...a, auction_type: 'settled' }));
       const allListings = [...liveListings, ...settledListings];
-      
       setListings(allListings);
-      
     } catch (err) {
       if (!isPolling) {
         setError(err.message || "Failed to fetch listings");
