@@ -564,6 +564,72 @@ const adminController = {
       console.error('Error fetching activity logs:', error);
       res.status(500).json({ error: 'Error fetching activity logs' });
     }
+  },
+
+  // Get platform earnings/fees
+  async getPlatformEarnings(req, res) {
+    try {
+      const { pool } = require('../db/init');
+      
+      // Get all platform fee transactions
+      const earningsQuery = `
+        SELECT 
+          wt.*,
+          u.email as user_email,
+          u.first_name,
+          u.last_name,
+          w.currency
+        FROM wallet_transactions wt
+        JOIN wallets w ON wt.wallet_id = w.id
+        JOIN users u ON w.user_id = u.id
+        WHERE wt.type = 'platform_fee'
+        ORDER BY wt.created_at DESC
+      `;
+      
+      const earningsResult = await pool.query(earningsQuery);
+      const earnings = earningsResult.rows;
+      
+      // Calculate totals
+      const totalEarnings = earnings.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+      
+      // Group by month for chart data
+      const monthlyEarnings = {};
+      earnings.forEach(tx => {
+        const date = new Date(tx.created_at);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthlyEarnings[monthKey]) {
+          monthlyEarnings[monthKey] = 0;
+        }
+        monthlyEarnings[monthKey] += parseFloat(tx.amount);
+      });
+      
+      // Convert to array for frontend
+      const monthlyData = Object.entries(monthlyEarnings).map(([month, amount]) => ({
+        month,
+        amount: parseFloat(amount.toFixed(2))
+      })).sort((a, b) => a.month.localeCompare(b.month));
+      
+      // Get recent earnings (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const recentEarnings = earnings.filter(tx => 
+        new Date(tx.created_at) >= thirtyDaysAgo
+      );
+      
+      const recentTotal = recentEarnings.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+      
+      res.json({
+        earnings,
+        totalEarnings: parseFloat(totalEarnings.toFixed(2)),
+        recentEarnings: parseFloat(recentTotal.toFixed(2)),
+        monthlyData,
+        totalCount: earnings.length
+      });
+    } catch (error) {
+      console.error('Error fetching platform earnings:', error);
+      res.status(500).json({ error: 'Error fetching platform earnings' });
+    }
   }
 };
 

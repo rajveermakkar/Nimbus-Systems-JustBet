@@ -46,6 +46,9 @@ router.get('/auctions/by-seller/:sellerId', adminController.getAuctionsBySeller)
 // Add new route for aggregated activity logs
 router.get('/activity-logs', adminController.getActivityLogs);
 
+// Get platform earnings/fees
+router.get('/earnings', adminController.getPlatformEarnings);
+
 // PATCH user role
 router.patch('/users/:userId/role', adminController.changeUserRole);
 
