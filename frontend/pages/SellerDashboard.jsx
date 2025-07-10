@@ -677,58 +677,60 @@ function SellerDashboard() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {listings.map((listing) => (
-                      <div key={listing.id} className="bg-white/5 rounded-lg p-4 border border-white/20">
-                        <h3 className="font-semibold text-lg mb-2">{listing.title}</h3>
-                        <img 
-                          src={listing.image_url} 
-                          alt={listing.title} 
-                          className="w-full h-32 object-cover rounded mb-3" 
-                        />
-                        <div className="text-xs text-gray-300 space-y-1 mb-3">
-                          <p className="line-clamp-2">{listing.description}</p>
-                          <p>Start: {formatDate(listing.start_time)}</p>
-                          <p>End: {formatDate(listing.end_time)}</p>
-                          <p>Starting Price: {formatPrice(listing.starting_price)}</p>
-                          {listing.reserve_price && (
-                            <p>Reserve Price: {formatPrice(listing.reserve_price)}</p>
-                          )}
-                        </div>
-                        <div className="text-xs mb-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(listing.status || (listing.is_approved ? 'approved' : 'pending'))}`}>
-                              {listing.status === 'won' || (listing.status === 'closed' && listing.winner_id) ? 'Sold' : listing.status === 'no_bids' ? 'No Bids' : listing.status === 'reserve_not_met' ? 'Reserve Not Met' : listing.status}
-                            </span>
+                    {listings
+                      .filter(listing => listing.status !== 'closed')
+                      .map((listing) => (
+                        <div key={listing.id} className="bg-white/5 rounded-lg p-4 border border-white/20">
+                          <h3 className="font-semibold text-lg mb-2">{listing.title}</h3>
+                          <img 
+                            src={listing.image_url} 
+                            alt={listing.title} 
+                            className="w-full h-32 object-cover rounded mb-3" 
+                          />
+                          <div className="text-xs text-gray-300 space-y-1 mb-3">
+                            <p className="line-clamp-2">{listing.description}</p>
+                            <p>Start: {formatDate(listing.start_time)}</p>
+                            <p>End: {formatDate(listing.end_time)}</p>
+                            <p>Starting Price: {formatPrice(listing.starting_price)}</p>
+                            {listing.reserve_price && (
+                              <p>Reserve Price: {formatPrice(listing.reserve_price)}</p>
+                            )}
                           </div>
-                          {/* Only show winner info for closed auctions with winners */}
-                          {listing.status === 'closed' && listing.winner && (
-                            <div className="text-xs text-gray-400 mt-1">
-                              <span className="text-green-400">Winner: </span>
-                              {listing.winner.first_name && listing.winner.last_name ? 
-                                `${listing.winner.first_name} ${listing.winner.last_name}` : 
-                                'Unknown'
-                              }
+                          <div className="text-xs mb-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(listing.status || (listing.is_approved ? 'approved' : 'pending'))}`}>
+                                {listing.status === 'won' || (listing.status === 'closed' && listing.winner_id) ? 'Sold' : listing.status === 'no_bids' ? 'No Bids' : listing.status === 'reserve_not_met' ? 'Reserve Not Met' : listing.status}
+                              </span>
                             </div>
-                          )}
+                            {/* Only show winner info for closed auctions with winners */}
+                            {listing.status === 'closed' && listing.winner && (
+                              <div className="text-xs text-gray-400 mt-1">
+                                <span className="text-green-400">Winner: </span>
+                                {listing.winner.first_name && listing.winner.last_name ? 
+                                  `${listing.winner.first_name} ${listing.winner.last_name}` : 
+                                  'Unknown'
+                                }
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => navigate(listing.auction_type === 'live' ? `/live-auctions/${listing.id}` : `/auctions/${listing.id}`)}
+                              className="flex-1 text-sm"
+                            >
+                              View Auction
+                            </Button>
+                            <Button
+                              onClick={() => navigate(`/seller/edit-listing/${listing.id}?type=${listing.auction_type}`)}
+                              variant="secondary"
+                              className="flex-1 text-sm"
+                            >
+                              <i className="fas fa-edit mr-1"></i>
+                              Edit
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => navigate(listing.auction_type === 'live' ? `/live-auctions/${listing.id}` : `/auctions/${listing.id}`)}
-                            className="flex-1 text-sm"
-                          >
-                            View Auction
-                          </Button>
-                          <Button
-                            onClick={() => navigate(`/seller/edit-listing/${listing.id}?type=${listing.auction_type}`)}
-                            variant="secondary"
-                            className="flex-1 text-sm"
-                          >
-                            <i className="fas fa-edit mr-1"></i>
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 )}
               </div>
