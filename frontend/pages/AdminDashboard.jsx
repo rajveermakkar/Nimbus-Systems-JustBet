@@ -573,6 +573,12 @@ function AdminDashboard() {
     }
   }, [section, type, auctionId, allLiveAuctions, allSettledAuctions]);
 
+  // Add this callback to update user in allUsers and pendingSellers after ban/unban
+  const handleBanUnban = (updatedUser) => {
+    setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? { ...u, ...updatedUser } : u));
+    setPendingSellers(prev => prev.map(u => u.id === updatedUser.id ? { ...u, ...updatedUser } : u));
+  };
+
   // Restore the renderSection function after the section variable is defined
   const renderSection = () => {
     // User details panel for manage-users and approve-users
@@ -586,6 +592,7 @@ function AdminDashboard() {
             onBack={closeDetails}
             onAuctionClick={openAuctionDetails}
             onUserClick={openUserDetails}
+            onBanUnban={handleBanUnban}
           />
         );
       }

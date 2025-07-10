@@ -173,6 +173,70 @@ const User = {
     `;
     const result = await queryWithRetry(query, [customerId, userId]);
     return result.rows[0];
+  },
+
+  // Ban a user with progressive logic
+  async banUser(userId, reason) {
+    const user = await this.findById(userId);
+    if (!user) throw new Error('User not found');
+    let banCount = user.ban_count || 0;
+    banCount++;
+    let banDuration = null;
+    let banExpiry = null;
+    let isPermanent = false;
+    if (banCount === 1) {
+      banDuration = 7; // days
+    } else if (banCount === 2) {
+      banDuration = 30;
+    } else {
+      isPermanent = true;
+    }
+    if (!isPermanent) {
+      banExpiry = new Date(Date.now() + banDuration * 24 * 60 * 60 * 1000);
+    }
+    // Update ban history
+    const prevHistory = user.ban_history || [];
+    const newRecord = {
+      date: new Date().toISOString(),
+      reason,
+      duration: isPermanent ? 'permanent' : `${banDuration} days`,
+    };
+    const newHistory = [...prevHistory, newRecord];
+    const query = `
+      UPDATE users SET 
+        ban_count = $1,
+        is_banned = true,
+        ban_reason = $2,
+        ban_expiry = $3,
+        ban_history = $4
+      WHERE id = $5
+      RETURNING *
+    `;
+    const result = await queryWithRetry(query, [banCount, reason, banExpiry, JSON.stringify(newHistory), userId]);
+    return result.rows[0];
+  },
+
+  // Unban a user
+  async unbanUser(userId) {
+    const user = await this.findById(userId);
+    if (!user) throw new Error('User not found');
+    const query = `
+      UPDATE users SET 
+        is_banned = false,
+        ban_reason = NULL,
+        ban_expiry = NULL
+      WHERE id = $1
+      RETURNING *
+    `;
+    const result = await queryWithRetry(query, [userId]);
+    return result.rows[0];
+  },
+
+  // Get ban history for a user
+  async getBanHistory(userId) {
+    const user = await this.findById(userId);
+    if (!user) throw new Error('User not found');
+    return user.ban_history || [];
   }
 };
 

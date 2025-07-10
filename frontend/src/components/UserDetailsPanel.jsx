@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ConfirmModal from './ConfirmModal';
 import Select from 'react-select';
+import Modal from './Modal';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -27,8 +28,15 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
   const [pendingRole, setPendingRole] = useState(user.role);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [roleLoading, setRoleLoading] = useState(false);
+  const [banModalOpen, setBanModalOpen] = useState(false);
+  const [banReason, setBanReason] = useState('');
+  const [banLoading, setBanLoading] = useState(false);
+  const [banError, setBanError] = useState(null);
+  const [banHistory, setBanHistory] = useState([]);
+  const [userState, setUserState] = useState(user);
 
   useEffect(() => {
+    setUserState(user);
     if (user && user.id && user.role === 'seller') {
       setAuctionsLoading(true);
       setAuctionsError(null);
@@ -45,14 +53,37 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
     } else {
       setAuctions([]);
     }
+    // Fetch ban history
+    if (user && user.id) {
+      api.get(`/admin/users/${user.id}/ban-history`).then(res => {
+        setBanHistory(res.data.banHistory || []);
+      }).catch(() => setBanHistory([]));
+    }
   }, [user.id, user.role]);
 
-  if (!user) return null;
-  const handleBanUnban = () => {
-    if (onBanUnban) onBanUnban(user);
-    setToast(user.is_banned ? 'User unbanned (UI only)' : 'User banned (UI only)');
-    setTimeout(() => setToast(null), 2000);
+  const handleBanUnban = async () => {
+    setBanError(null);
+    if (!userState.is_banned) {
+      setBanModalOpen(true);
+    } else {
+      // Unban
+      setBanLoading(true);
+      try {
+        const res = await api.post(`/admin/users/${userState.id}/unban`);
+        setUserState(res.data.user);
+        setToast('User unbanned successfully');
+        if (onBanUnban) onBanUnban(res.data.user);
+        // Refresh ban history
+        const hist = await api.get(`/admin/users/${user.id}/ban-history`);
+        setBanHistory(hist.data.banHistory || []);
+      } catch (err) {
+        setBanError('Failed to unban user');
+      } finally {
+        setBanLoading(false);
+      }
+    }
   };
+
   const handleRoleChange = (e) => {
     setPendingRole(e.target.value);
   };
@@ -75,6 +106,29 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
       setToast('Failed to change role');
     } finally {
       setRoleLoading(false);
+    }
+  };
+  const confirmBan = async () => {
+    if (!banReason.trim()) {
+      setBanError('Ban reason is required');
+      return;
+    }
+    setBanLoading(true);
+    setBanError(null);
+    try {
+      const res = await api.post(`/admin/users/${userState.id}/ban`, { reason: banReason });
+      setUserState(res.data.user);
+      setToast('User banned successfully');
+      setBanModalOpen(false);
+      setBanReason('');
+      if (onBanUnban) onBanUnban(res.data.user);
+      // Refresh ban history
+      const hist = await api.get(`/admin/users/${user.id}/ban-history`);
+      setBanHistory(hist.data.banHistory || []);
+    } catch (err) {
+      setBanError('Failed to ban user');
+    } finally {
+      setBanLoading(false);
     }
   };
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || '')}+${encodeURIComponent(user.last_name || '')}&background=2a2a72&color=fff`;
@@ -154,6 +208,54 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
           <div className="text-gray-300 text-sm mb-2">{user.email}</div>
         </div>
         <div className="max-w-2xl mx-auto flex flex-col gap-2 text-left">
+          {/* Ban status */}
+          {userState.is_banned && (
+            <div className="mb-2 p-2 rounded bg-red-900/60 text-red-200">
+              <b>Banned</b>{userState.ban_expiry ? ` until ${new Date(userState.ban_expiry).toLocaleString()}` : ' (Permanent)'}<br/>
+              <span className="text-xs">Reason: {userState.ban_reason || 'No reason provided'}</span>
+            </div>
+          )}
+          {/* Ban/Unban button */}
+          <button
+            className={`mt-2 w-48 px-6 py-2 rounded-lg font-semibold text-left border transition-colors duration-150
+              ${userState.is_banned
+                ? 'bg-green-900/60 text-green-200 border-green-500 hover:bg-green-700 hover:text-white'
+                : 'bg-red-900/60 text-red-200 border-red-500 hover:bg-red-700 hover:text-white'}
+            `}
+            onClick={handleBanUnban}
+            disabled={banLoading}
+          >
+            {userState.is_banned ? 'Unban User' : 'Ban User'}
+          </button>
+          {banError && <div className="text-red-400 mt-2">{banError}</div>}
+          {/* Ban history */}
+          <div className="mt-4">
+            <b className="text-white">Ban History:</b>
+            {banHistory.length === 0 ? (
+              <div className="text-gray-400 text-sm">No ban history.</div>
+            ) : (
+              <ul className="text-sm text-gray-200 mt-1">
+                {banHistory.map((ban, idx) => (
+                  <li key={idx} className="mb-1">{ban.date ? new Date(ban.date).toLocaleString() : ''} — <b>{ban.duration}</b> — {ban.reason}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {/* Ban reason modal */}
+          {banModalOpen && (
+            <Modal open={banModalOpen} onClose={() => setBanModalOpen(false)}>
+              <div className="p-4">
+                <h2 className="text-lg font-bold mb-2">Ban User</h2>
+                <label className="block mb-2">Reason for ban:</label>
+                <textarea className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 mb-2" rows={3} value={banReason} onChange={e => setBanReason(e.target.value)} />
+                {banError && <div className="text-red-400 mb-2">{banError}</div>}
+                <div className="flex gap-2 justify-end mt-2">
+                  <button className="px-4 py-2 rounded bg-gray-700 text-white" onClick={() => setBanModalOpen(false)}>Cancel</button>
+                  <button className="px-4 py-2 rounded bg-red-700 text-white" onClick={confirmBan} disabled={banLoading}>{banLoading ? 'Banning...' : 'Confirm Ban'}</button>
+                </div>
+              </div>
+            </Modal>
+          )}
           <label className="font-semibold text-white mb-1">Change Role</label>
           <div className="flex items-center mb-4">
             <div className="w-48">
@@ -202,16 +304,6 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
           {user.business_phone && <div><b>Phone:</b> {user.business_phone}</div>}
           {user.business_address && <div><b>Address:</b> {user.business_address}</div>}
           {user.business_description && <div><b>Description:</b> {user.business_description}</div>}
-          <button
-            className={`mt-6 w-48 px-6 py-2 rounded-lg font-semibold text-left border transition-colors duration-150
-              ${user.is_banned
-                ? 'bg-green-900/60 text-green-200 border-green-500 hover:bg-green-700 hover:text-white'
-                : 'bg-red-900/60 text-red-200 border-red-500 hover:bg-red-700 hover:text-white'}
-            `}
-            onClick={handleBanUnban}
-          >
-            {user.is_banned ? 'Unban User' : 'Ban User'}
-          </button>
         </div>
         {/* Seller Stats & Listings */}
         {user.role === 'seller' && (

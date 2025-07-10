@@ -46,6 +46,11 @@ router.get('/auctions/by-seller/:sellerId', adminController.getAuctionsBySeller)
 // PATCH user role
 router.patch('/users/:userId/role', adminController.changeUserRole);
 
+// Ban/unban/ban-history endpoints
+router.post('/users/:userId/ban', adminController.banUser);
+router.post('/users/:userId/unban', adminController.unbanUser);
+router.get('/users/:userId/ban-history', adminController.getBanHistory);
+
 // Database health monitoring endpoint
 router.get('/db-health', async (req, res) => {
   try {
