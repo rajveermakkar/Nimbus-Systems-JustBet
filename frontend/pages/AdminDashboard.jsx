@@ -7,6 +7,7 @@ import UserDetailsPanel from '../src/components/UserDetailsPanel';
 import AuctionDetailsPanel from '../src/components/auctions/AuctionDetailsPanel';
 import LoadingSpinner from '../src/components/LoadingSpinner';
 import ConfirmModal from '../src/components/ConfirmModal';
+import apiService from '../src/services/apiService';
 
 function AdminDashboard() {
   const { user, setUser } = useContext(UserContext);
@@ -19,14 +20,17 @@ function AdminDashboard() {
 
   // Derive section from URL at the top
   const getSectionFromPath = (pathname) => {
+    console.log('getSectionFromPath called with:', pathname);
     if (pathname.startsWith('/admin/manage-users')) return 'manage-users';
     if (pathname.startsWith('/admin/manage-auctions')) return 'manage-auctions';
     if (pathname.startsWith('/admin/approve-users')) return 'approve-users';
     if (pathname.startsWith('/admin/earnings')) return 'earnings';
     if (pathname.startsWith('/admin/db-health')) return 'db-health';
+    if (pathname.startsWith('/admin/activity-logs')) return 'activity-logs';
     return 'dashboard';
   };
   const section = getSectionFromPath(location.pathname);
+  console.log('Current section:', section, 'Pathname:', location.pathname);
 
   // Redirect non-admin users
   if (!user || user.role !== 'admin') {
@@ -42,6 +46,7 @@ function AdminDashboard() {
     { key: "approve-users", label: "Approve Users", icon: "fa-user-check" },
     { key: "earnings", label: "Earnings", icon: "fa-dollar-sign" },
     { key: "db-health", label: "DB Health", icon: "fa-database" },
+    { key: "activity-logs", label: "Activity Logs", icon: "fa-list-alt" },
   ];
 
   // --- STATE FOR ADMIN DATA ---
@@ -334,6 +339,24 @@ function AdminDashboard() {
     }
   };
 
+  // Add Activity Logs state
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [activityLogsLoading, setActivityLogsLoading] = useState(false);
+  const [activityLogsError, setActivityLogsError] = useState(null);
+
+  // Fetch activity logs
+  const fetchActivityLogs = async () => {
+    setActivityLogsLoading(true); setActivityLogsError(null);
+    try {
+      const res = await apiService.getActivityLogs();
+      setActivityLogs(res.logs || []);
+    } catch (e) {
+      setActivityLogsError('Failed to load activity logs');
+    } finally {
+      setActivityLogsLoading(false);
+    }
+  };
+
   // --- EFFECTS: FETCH DATA ON SECTION CHANGE ---
   useEffect(() => {
     // Log section change and what will be fetched
@@ -349,7 +372,17 @@ function AdminDashboard() {
       fetchAllLiveAuctions();
     }
     if (section === "db-health") fetchDbHealth();
+    if (section === 'activity-logs') {
+      console.log('Fetching activity logs...');
+      fetchActivityLogs();
+    }
   }, [section]);
+
+  // Force fetch activity logs on mount for testing
+  useEffect(() => {
+    console.log('Component mounted, forcing activity logs fetch...');
+    fetchActivityLogs();
+  }, []);
 
   // --- MODAL FOR REJECTING AUCTION ---
   const openRejectModal = (type, id) => {
@@ -944,6 +977,47 @@ function AdminDashboard() {
             )}
           </div>
         );
+      case "activity-logs":
+        return (
+          <div className="flex flex-col flex-1 h-full min-h-0">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Activity Logs</h2>
+              <div className="text-sm text-gray-400">
+                Showing {activityLogs.length} logs from the last 48 hours
+              </div>
+            </div>
+            <div className="flex-1 h-full min-h-0 overflow-auto">
+              <table className="w-full bg-transparent rounded-xl overflow-hidden">
+                <thead>
+                  <tr>
+                    <th className="w-1/6 text-left px-4 py-2 font-bold text-base">Date</th>
+                    <th className="w-1/6 text-left px-4 py-2 font-bold text-base">User</th>
+                    <th className="max-w-xs text-left px-4 py-2 font-bold text-base">Action</th>
+                    <th className="min-w-0 text-left px-4 py-2 font-bold text-base">Description</th>
+                  </tr>
+                </thead>
+                <tbody className="h-full min-h-0 text-left text-sm">
+                  {activityLogsLoading ? (
+                    <tr><td colSpan={4} className="text-center text-gray-300 p-8">Loading activity logs...</td></tr>
+                  ) : activityLogsError ? (
+                    <tr><td colSpan={4} className="text-center text-red-400 p-8">{activityLogsError}</td></tr>
+                  ) : activityLogs.length === 0 ? (
+                    <tr><td colSpan={4} className="text-center text-gray-400 p-8">No activity logs found</td></tr>
+                  ) : activityLogs.map((log, idx) => (
+                    <tr key={idx} className="border-b border-white/10">
+                      <td className="p-2 align-middle text-left text-white">{log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}</td>
+                      <td className="p-2 align-middle text-left text-white font-medium">{log.user || '-'}</td>
+                      <td className="p-2 align-middle text-left text-white max-w-xs truncate">
+                        <span className="px-2 py-1 bg-blue-600/20 text-blue-300 rounded text-xs font-medium">{log.action || '-'}</span>
+                      </td>
+                      <td className="p-2 align-middle text-left text-gray-300 min-w-0 break-words whitespace-pre-line">{log.description || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
       default:
         return null;
     }
@@ -975,6 +1049,7 @@ function AdminDashboard() {
                     else if (link.key === 'approve-users') navigate('/admin/approve-users');
                     else if (link.key === 'earnings') navigate('/admin/earnings');
                     else if (link.key === 'db-health') navigate('/admin/db-health');
+                    else if (link.key === 'activity-logs') navigate('/admin/activity-logs');
                   }}
                   className={`flex items-center gap-3 px-4 py-2 rounded-lg text-left transition font-semibold ${section === link.key ? 'bg-blue-900/60 text-blue-300' : 'hover:bg-blue-900/40 text-gray-200'}`}
                 >
