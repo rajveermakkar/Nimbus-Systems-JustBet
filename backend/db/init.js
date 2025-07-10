@@ -569,6 +569,31 @@ const initDatabase = async () => {
       `);
     }
 
+    // Always check and add unique constraint to live_auction_results if it doesn't exist
+    try {
+      const uniqueConstraintCheck = await pool.query(`
+        SELECT COUNT(*) FROM information_schema.table_constraints
+        WHERE table_name = 'live_auction_results' 
+        AND constraint_type = 'UNIQUE' 
+        AND constraint_name LIKE '%auction_id%'
+      `);
+      
+      if (parseInt(uniqueConstraintCheck.rows[0].count) === 0) {
+        logDbChange('Adding unique constraint to live_auction_results.auction_id');
+        await pool.query(`
+          ALTER TABLE live_auction_results 
+          ADD CONSTRAINT UQ_live_auction_results_auction_id 
+          UNIQUE (auction_id)
+        `);
+        console.log('Added unique constraint to live_auction_results.auction_id');
+      }
+    } catch (err) {
+      if (!err.message.includes('already exists')) {
+        console.error('Error adding unique constraint to live_auction_results.auction_id:', err);
+        throw err;
+      }
+    }
+
     // Check if settled_auction_results table exists
     const settledAuctionResultsTableCheck = await pool.query(`
       SELECT EXISTS (
