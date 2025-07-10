@@ -127,7 +127,7 @@ function CreateListing() {
     try {
       let finalImageUrl = imageUrl;
       const token = localStorage.getItem("justbetToken");
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const apiUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
       // If user uploaded an image, upload it to backend first
       if (imageFiles.length > 0) {
         const formData = new FormData();
@@ -137,7 +137,10 @@ function CreateListing() {
           : `${apiUrl}/api/seller/auctions/settled/upload-image`;
         const uploadRes = await fetch(uploadEndpoint, {
           method: "POST",
-          headers: { 'Authorization': `Bearer ${token}` },
+          headers: { 
+            'Authorization': `Bearer ${token}` 
+          },
+          credentials: "include",
           body: formData
         });
         const uploadData = await uploadRes.json();
@@ -183,6 +186,7 @@ function CreateListing() {
           "Content-Type": "application/json",
           'Authorization': `Bearer ${token}`
         },
+        credentials: "include",
         body: JSON.stringify({
           title,
           description,

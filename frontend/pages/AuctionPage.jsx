@@ -179,23 +179,39 @@ function AuctionPage() {
       // Fetch bid history for live auctions
       if (type === 'live') {
         try {
-          const response = await fetch(`/api/auctions/live/${id}/bids`);
+          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+          const response = await fetch(`${backendUrl}/api/auctions/live/${id}/bids`);
           if (response.ok) {
             const data = await response.json();
-            setRecentBids(data.bids || []);
+            // Sort bids by amount descending (highest first) and then by time
+            const sortedBids = (data.bids || []).sort((a, b) => {
+              if (a.amount !== b.amount) {
+                return b.amount - a.amount; // Highest amount first
+              }
+              return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+            });
+            setRecentBids(sortedBids);
           }
         } catch (bidError) {
           console.error('[AuctionPage] Error fetching live bids:', bidError);
           setRecentBids([]);
         }
       } else {
-        setRecentBids(auctionData.recentBids || []);
+        // Sort settled auction bids properly
+        const sortedBids = (auctionData.recentBids || []).sort((a, b) => {
+          if (a.amount !== b.amount) {
+            return b.amount - a.amount; // Highest amount first
+          }
+          return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+        });
+        setRecentBids(sortedBids);
       }
     } catch (err) {
       console.error('[AuctionPage] Error fetching auction:', err);
       if (type === 'settled') {
         try {
-          const response = await fetch(`/api/auctions/settled/${id}`);
+          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+          const response = await fetch(`${backendUrl}/api/auctions/settled/${id}`);
           if (response.ok) {
             const auctionData = await response.json();
             if (auctionData.status === 'closed' || auctionData.auction?.status === 'closed') {
@@ -225,10 +241,18 @@ function AuctionPage() {
 
   // Single socket connection useEffect
   useEffect(() => {
-    if (!isLiveAuction || !user || !user.token || socketConnectedRef.current) {
+    // Wait for user to be available before connecting
+    if (!isLiveAuction || !user || !user.token || !user.id || socketConnectedRef.current) {
+      console.log('[AuctionPage] Socket connection delayed - waiting for user:', { 
+        isLiveAuction, 
+        hasUser: !!user, 
+        hasToken: !!user?.token, 
+        hasUserId: !!user?.id 
+      });
       return;
     }
 
+    console.log('[AuctionPage] User fully loaded, connecting socket...');
     socketConnectedRef.current = true;
 
     const setupSocket = async () => {
@@ -239,6 +263,16 @@ function AuctionPage() {
         // Always join the auction room on connect (including after reconnect)
         const joinRoom = () => {
           socketService.joinLiveAuction(id, (data) => {
+            // Only process updates if user is fully loaded
+            if (!user || !user.id || !user.token) {
+              console.log('[AuctionPage] Skipping socket update - user not fully loaded:', { 
+                hasUser: !!user, 
+                hasUserId: !!user?.id, 
+                hasToken: !!user?.token 
+              });
+              return;
+            }
+            
             if (data.type === 'auction-update') {
               setAuction(prevAuction => {
                 if (!prevAuction) return data.auction;
@@ -249,9 +283,18 @@ function AuctionPage() {
                 };
               });
             } else if (data.type === 'auction_state') {
+              // Process existing bids with user names (from backend)
               if (data.existingBids && data.existingBids.length > 0) {
-                setRecentBids(data.existingBids);
+                // Sort bids properly
+                const sortedBids = data.existingBids.sort((a, b) => {
+                  if (a.amount !== b.amount) {
+                    return b.amount - a.amount; // Highest amount first
+                  }
+                  return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+                });
+                setRecentBids(sortedBids);
               }
+              // Don't process data.bids as it might override the existingBids with proper names
               setAuction(prevAuction => {
                 if (!prevAuction) return data;
                 return {
@@ -260,9 +303,6 @@ function AuctionPage() {
                   current_highest_bidder_id: data.currentBidder,
                 };
               });
-              if (data.bids && Array.isArray(data.bids)) {
-                setRecentBids(data.bids);
-              }
               if (data.timerEnd) {
                 setLiveBidTimerEnd(data.timerEnd);
               }
@@ -282,7 +322,14 @@ function AuctionPage() {
               });
             } else if (data.type === 'bid-update') {
               if (data.bids && Array.isArray(data.bids)) {
-                setRecentBids(data.bids);
+                // Sort bids properly
+                const sortedBids = data.bids.sort((a, b) => {
+                  if (a.amount !== b.amount) {
+                    return b.amount - a.amount; // Highest amount first
+                  }
+                  return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+                });
+                setRecentBids(sortedBids);
               }
               setAuction(prevAuction => {
                 if (!prevAuction) return prevAuction;
@@ -417,10 +464,18 @@ function AuctionPage() {
           }
           
           try {
-            const response = await fetch(`/api/auctions/live/${id}/bids`);
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+            const response = await fetch(`${backendUrl}/api/auctions/live/${id}/bids`);
             if (response.ok) {
               const bidsData = await response.json();
-              setRecentBids(bidsData.bids || []);
+              // Sort bids properly
+              const sortedBids = (bidsData.bids || []).sort((a, b) => {
+                if (a.amount !== b.amount) {
+                  return b.amount - a.amount; // Highest amount first
+                }
+                return new Date(b.created_at) - new Date(a.created_at); // Most recent first
+              });
+              setRecentBids(sortedBids);
             } else {
               setRecentBids([]);
             }
@@ -432,7 +487,8 @@ function AuctionPage() {
           
           // Check if this might be an ended auction
           try {
-            const response = await fetch(`/api/auctions/live/${id}`);
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+            const response = await fetch(`${backendUrl}/api/auctions/live/${id}`);
             if (response.ok) {
               const auctionData = await response.json();
               if (auctionData.status === 'closed') {
@@ -693,6 +749,21 @@ function AuctionPage() {
     );
   }
 
+  // Show loading while user is being loaded for live auctions
+  if (isLiveAuction && (!user || !user.id || !user.token)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-sm">Loading user session...</p>
+          <p className="text-xs text-gray-400 mt-2">
+            {!user ? 'No user data' : !user.id ? 'Missing user ID' : !user.token ? 'Missing token' : 'Loading...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (error || !auction) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex items-center justify-center">
@@ -917,7 +988,9 @@ function AuctionPage() {
                 )}
                 {!user ? (
                   <div className="text-center py-4">
-                    <p className="text-gray-400 mb-4 text-sm">Please log in to place a bid</p>
+                    <p className="text-gray-400 mb-4 text-sm">
+                      {isLiveAuction ? 'Your session has expired. Please log in again to continue bidding.' : 'Please log in to place a bid'}
+                    </p>
                     <button 
                       onClick={() => navigate('/login')}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm transition-colors"
@@ -993,32 +1066,24 @@ function AuctionPage() {
                 )}
               </div>
             )}
+            
+            {/* Live Bid Countdown - moved inline below bid form */}
+            {isLiveAuction && liveBidCountdown !== null && (
+              <div className="rounded-lg bg-white/10 shadow p-4 mt-4">
+                <div className="text-center">
+                  <div className="text-sm text-green-400 font-semibold mb-2">Live Bid Countdown</div>
+                  <div className="text-2xl font-bold text-white mb-2">{formatSeconds(liveBidCountdown)}</div>
+                  <div className="text-xs text-yellow-400">
+                    If no bids are placed before this timer ends,<br />
+                    the auction will end automatically.<br />
+                    Place bids to win!
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-      {isLiveAuction && liveBidCountdown !== null && (
-  <div style={{
-    position: 'absolute',
-    top: 24,
-    right: 24,
-    background: 'rgba(35,43,74,0.92)',
-    color: '#fff',
-    borderRadius: 12,
-    padding: '12px 24px',
-    boxShadow: '0 2px 8px #0004',
-    zIndex: 10,
-    minWidth: 180,
-    textAlign: 'center',
-    fontWeight: 600,
-    fontSize: 18
-  }}>
-    <div style={{ fontSize: 15, color: '#6fffbe', fontWeight: 700, marginBottom: 4 }}>Live Bid Countdown</div>
-    <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: 1 }}>{formatSeconds(liveBidCountdown)}</div>
-    <div style={{ fontSize: 13, color: '#ffd166', marginTop: 6 }}>
-      If no bids are placed before this timer ends,<br />the auction will end automatically.<br />Place bids to win!
-    </div>
-  </div>
-)}
     </>
   );
 }

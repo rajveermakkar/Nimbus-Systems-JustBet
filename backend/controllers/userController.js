@@ -170,12 +170,14 @@ const userController = {
       // Set cookies
       res.cookie('token', token, {
         httpOnly: true,
-        sameSite: 'strict',
+        sameSite: 'none',
+        secure: true,
         maxAge: SESSION_DURATION_MS
       });
       res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
-        sameSite: 'strict',
+        sameSite: 'none',
+        secure: true,
         maxAge: REFRESH_TOKEN_DURATION_MS
       });
       res.json({
@@ -305,18 +307,20 @@ const userController = {
       }
       res.clearCookie('token', {
         httpOnly: true,
-        sameSite: 'strict',
+        sameSite: 'none',
+        secure: true,
         path: '/',
       });
       res.clearCookie('refreshToken', {
         httpOnly: true,
-        sameSite: 'strict',
+        sameSite: 'none',
+        secure: true,
         path: '/',
       });
       res.json({ message: 'Logged out successfully' });
     } catch (error) {
-      res.clearCookie('token', { httpOnly: true, sameSite: 'strict', path: '/' });
-      res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'strict', path: '/' });
+      res.clearCookie('token', { httpOnly: true, sameSite: 'none', secure: true, path: '/' });
+      res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'none', secure: true, path: '/' });
       res.status(500).json({ error: 'Logout failed' });
     }
   },
@@ -332,16 +336,16 @@ const userController = {
       if (!found || new Date(found.expires_at) < new Date()) {
         // Invalidate cookie if expired/invalid
         await RefreshToken.deleteByToken(refreshToken);
-        res.clearCookie('token', { httpOnly: true, sameSite: 'strict' });
-        res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'strict' });
+        res.clearCookie('token', { httpOnly: true, sameSite: 'none', secure: true });
+        res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'none', secure: true });
         return errorResponse(res, 401, 'Refresh token expired or invalid, please log in again');
       }
       // Get user
       const user = await User.findById(found.user_id);
       if (!user) {
         await RefreshToken.deleteByToken(refreshToken);
-        res.clearCookie('token', { httpOnly: true, sameSite: 'strict' });
-        res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'strict' });
+        res.clearCookie('token', { httpOnly: true, sameSite: 'none', secure: true });
+        res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'none', secure: true });
         return errorResponse(res, 401, 'User not found');
       }
       // Issue new access token
@@ -357,7 +361,8 @@ const userController = {
       );
       res.cookie('token', token, {
         httpOnly: true,
-        sameSite: 'strict',
+        sameSite: 'none',
+        secure: true,
         maxAge: SESSION_DURATION_MS
       });
       res.json({

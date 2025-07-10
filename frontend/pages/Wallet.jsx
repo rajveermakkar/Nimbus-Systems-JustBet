@@ -1279,6 +1279,18 @@ function Wallet() {
     fetchMonthlySummary();
   }, []);
 
+  // Add polling for balance updates (every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Only poll if wallet exists and user is on the wallet page
+      if (balance !== null && !loading) {
+        fetchWallet();
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [balance, loading]);
+
   async function fetchMonthlySummary() {
     try {
       const summary = await walletService.getMonthlySummary();

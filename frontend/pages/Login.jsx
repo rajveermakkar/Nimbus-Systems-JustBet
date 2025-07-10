@@ -118,6 +118,10 @@ function Login({ showToast }) {
         try {
           // Fetch user profile after login
           const profileRes = await fetch(`${backendUrl}/api/auth/profile`, {
+            headers: {
+              "Authorization": `Bearer ${data.token}`,
+              "Content-Type": "application/json",
+            },
             credentials: "include",
           });
           if (profileRes.ok) {
@@ -126,6 +130,10 @@ function Login({ showToast }) {
             if (profileData.user.role === "seller") {
               // Fetch latest seller status
               const statusRes = await fetch(`${backendUrl}/api/seller/status`, {
+                headers: {
+                  "Authorization": `Bearer ${data.token}`,
+                  "Content-Type": "application/json",
+                },
                 credentials: "include",
               });
               if (statusRes.ok) {

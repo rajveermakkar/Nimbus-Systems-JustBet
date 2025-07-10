@@ -23,9 +23,10 @@ function SellerRequestForm({ showToast }) {
     setLoading(true);
     try {
       const token = localStorage.getItem("justbetToken");
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const apiUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
       const res = await fetch(`${apiUrl}/api/seller/status`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: "include"
       });
       const data = await res.json();
       setStatus(data);
@@ -64,13 +65,14 @@ function SellerRequestForm({ showToast }) {
     setSubmitting(true);
     try {
       const token = localStorage.getItem("justbetToken");
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const apiUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
       const res = await fetch(`${apiUrl}/api/seller/request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           'Authorization': `Bearer ${token}`
         },
+        credentials: "include",
         body: JSON.stringify(form)
       });
       const data = await res.json();
