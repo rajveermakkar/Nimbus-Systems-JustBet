@@ -176,6 +176,26 @@ const updateUsersTable = async () => {
         ADD COLUMN stripe_account_id VARCHAR(255)
       `);
     }
+
+    // Check and add ban-related columns individually
+    const banColumns = [
+      { name: 'ban_count', sql: 'ADD COLUMN ban_count INTEGER NOT NULL DEFAULT 0' },
+      { name: 'is_banned', sql: 'ADD COLUMN is_banned BOOLEAN NOT NULL DEFAULT false' },
+      { name: 'ban_reason', sql: 'ADD COLUMN ban_reason TEXT' },
+      { name: 'ban_expiry', sql: 'ADD COLUMN ban_expiry TIMESTAMP WITH TIME ZONE' },
+      { name: 'ban_history', sql: "ADD COLUMN ban_history JSONB DEFAULT '[]'::jsonb" }
+    ];
+    for (const col of banColumns) {
+      const check = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = $1
+      `, [col.name]);
+      if (check.rows.length === 0) {
+        logDbChange(`Adding column ${col.name} to users table`);
+        await pool.query(`ALTER TABLE users ${col.sql}`);
+      }
+    }
   } catch (error) {
     console.error('Error updating users table:', error);
     throw error;

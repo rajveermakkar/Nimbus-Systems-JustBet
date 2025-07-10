@@ -141,6 +141,15 @@ const userController = {
         return errorResponse(res, 401, 'Please verify your email first');
       }
 
+      // Check if user is banned
+      if (user.is_banned) {
+        if (user.ban_expiry) {
+          return errorResponse(res, 403, `You are banned until ${new Date(user.ban_expiry).toLocaleString()}. Reason: ${user.ban_reason || 'No reason provided'}`);
+        } else {
+          return errorResponse(res, 403, `You are permanently banned. Reason: ${user.ban_reason || 'No reason provided'}`);
+        }
+      }
+
       // Generate token
       const token = jwt.sign(
         { 

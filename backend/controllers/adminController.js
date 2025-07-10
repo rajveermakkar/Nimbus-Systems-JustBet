@@ -406,6 +406,43 @@ const adminController = {
     } catch (error) {
       res.status(500).json({ error: 'Error updating user role' });
     }
+  },
+
+  // Ban a user (progressive)
+  async banUser(req, res) {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+      if (!reason || reason.trim() === '') {
+        return res.status(400).json({ error: 'Ban reason is required' });
+      }
+      const updatedUser = await User.banUser(userId, reason);
+      res.json({ user: updatedUser });
+    } catch (error) {
+      res.status(500).json({ error: error.message || 'Error banning user' });
+    }
+  },
+
+  // Unban a user
+  async unbanUser(req, res) {
+    try {
+      const { userId } = req.params;
+      const updatedUser = await User.unbanUser(userId);
+      res.json({ user: updatedUser });
+    } catch (error) {
+      res.status(500).json({ error: error.message || 'Error unbanning user' });
+    }
+  },
+
+  // Get ban history for a user
+  async getBanHistory(req, res) {
+    try {
+      const { userId } = req.params;
+      const history = await User.getBanHistory(userId);
+      res.json({ banHistory: history });
+    } catch (error) {
+      res.status(500).json({ error: error.message || 'Error fetching ban history' });
+    }
   }
 };
 
