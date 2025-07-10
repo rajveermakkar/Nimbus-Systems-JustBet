@@ -50,6 +50,22 @@ const adminController = {
         businessAddress: user.business_address,
         businessPhone: user.business_phone
       };
+      
+      // If approving seller, ensure they have a wallet
+      if (approved) {
+        const Wallet = require('../models/Wallet');
+        let wallet = await Wallet.getWalletByUserId(userId);
+        if (!wallet) {
+          try {
+            console.log(`Creating wallet for approved seller ${userId}`);
+            wallet = await Wallet.createWallet(userId);
+          } catch (walletErr) {
+            console.error('Failed to create wallet for approved seller:', walletErr);
+            return res.status(500).json({ error: 'Failed to create seller wallet during approval. Please try again.' });
+          }
+        }
+      }
+      
       const updatedUser = await User.updateRoleAndApproval(userId, 'seller', approved, businessDetails);
       const token = generateToken(req.user);
 

@@ -8,10 +8,24 @@ const Wallet = require('../models/Wallet');
 async function createLiveAuction(req, res) {
   try {
     const user = req.user;
+    // Only sellers can create auctions
     if (!user || user.role !== 'seller') {
-      return res.status(403).json({ error: 'Only sellers can create live auctions.' });
+      return res.status(403).json({ error: 'Only sellers can create auctions.' });
     }
-    const { title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, maxParticipants } = req.body;
+    
+    // Ensure seller has a wallet (create if missing)
+    let wallet = await Wallet.getWalletByUserId(user.id);
+    if (!wallet) {
+      try {
+        console.log(`Creating wallet for seller ${user.id} during first live auction creation`);
+        wallet = await Wallet.createWallet(user.id);
+      } catch (walletErr) {
+        console.error('Failed to create wallet for seller:', walletErr);
+        return res.status(500).json({ error: 'Failed to create seller wallet. Please try again.' });
+      }
+    }
+    
+    const { title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, minBidIncrement, maxParticipants } = req.body;
 
     if (!title || !startTime || !endTime || !startingPrice || !maxParticipants) {
       return res.status(400).json({ error: 'Missing required fields.' });
@@ -32,7 +46,9 @@ async function createLiveAuction(req, res) {
       endTime,
       startingPrice: Number(startingPrice),
       reservePrice: reservePrice !== undefined && reservePrice !== null && reservePrice !== '' ? Number(reservePrice) : null,
-      maxParticipants: Number(maxParticipants)
+      maxParticipants: Number(maxParticipants),
+      min_bid_increment: minBidIncrement !== undefined && minBidIncrement !== null && minBidIncrement !== '' ? Number(minBidIncrement) : 1,
+      status: 'pending' // Default to pending for admin approval
     });
     res.status(201).json({ auction });
   } catch (error) {

@@ -9,37 +9,26 @@ const emailService = require('../services/emailService');
 const { queryWithRetry } = require('../db/init');
 
 
-// Get seller earnings (total sales minus withdrawals)
+// Get seller earnings (sum of auction_income minus withdrawals)
 async function getSellerEarnings(userId) {
   const { pool } = require('../db/init');
-  
-  // Get total sales from auction results
-  const salesQuery = `
-    SELECT COALESCE(SUM(final_bid), 0) as total_sales
-    FROM (
-      SELECT final_bid FROM settled_auction_results 
-      WHERE winner_id IN (SELECT id FROM users WHERE id = $1)
-      UNION ALL
-      SELECT final_bid FROM live_auction_results 
-      WHERE winner_id IN (SELECT id FROM users WHERE id = $1)
-    ) as all_sales
-  `;
-  
-  const salesResult = await pool.query(salesQuery, [userId]);
-  const totalSales = parseFloat(salesResult.rows[0]?.total_sales || 0);
-  
-  // Get total withdrawals
-  const withdrawalsQuery = `
-    SELECT COALESCE(SUM(ABS(amount)), 0) as total_withdrawals
-    FROM wallet_transactions wt
-    JOIN wallets w ON wt.wallet_id = w.id
-    WHERE w.user_id = $1 AND wt.type = 'withdrawal' AND wt.status = 'succeeded'
-  `;
-  
-  const withdrawalsResult = await pool.query(withdrawalsQuery, [userId]);
-  const totalWithdrawals = parseFloat(withdrawalsResult.rows[0]?.total_withdrawals || 0);
-  
-  return totalSales - totalWithdrawals;
+  // Get seller's wallet id
+  const walletIdResult = await pool.query('SELECT id FROM wallets WHERE user_id = $1', [userId]);
+  const walletId = walletIdResult.rows[0]?.id;
+  if (!walletId) return 0;
+  // Sum auction_income
+  const incomeResult = await pool.query(
+    `SELECT COALESCE(SUM(amount), 0) as total_income FROM wallet_transactions WHERE wallet_id = $1 AND type = 'auction_income' AND status = 'succeeded'`,
+    [walletId]
+  );
+  const totalIncome = parseFloat(incomeResult.rows[0]?.total_income || 0);
+  // Sum withdrawals
+  const withdrawalResult = await pool.query(
+    `SELECT COALESCE(SUM(ABS(amount)), 0) as total_withdrawals FROM wallet_transactions WHERE wallet_id = $1 AND type = 'withdrawal' AND status = 'succeeded'`,
+    [walletId]
+  );
+  const totalWithdrawals = parseFloat(withdrawalResult.rows[0]?.total_withdrawals || 0);
+  return totalIncome - totalWithdrawals;
 }
 
 // Get buyer unspent deposits (deposits minus spent on auctions)
@@ -282,20 +271,40 @@ async function createSellerEarningsWithdrawal(req, res) {
     if (wallet.balance < amount) {
       return res.status(400).json({ error: 'Insufficient wallet balance' });
     }
-    
-    // Initiate payout via Stripe Connect
-    const payout = await stripeService.createPayout(user.stripe_account_id, amount, wallet.currency || 'cad');
+
+    // --- Manual transfer from platform to seller's connected account ---
+    let transfer;
+    try {
+      transfer = await stripe.transfers.create({
+        amount: Math.round(amount * 100),
+        currency: wallet.currency || 'cad',
+        destination: user.stripe_account_id,
+        description: 'Seller earnings withdrawal (manual transfer)'
+      });
+    } catch (transferErr) {
+      console.error('Stripe transfer to connected account failed:', transferErr);
+      return res.status(500).json({ error: 'Failed to transfer funds to seller account. Please try again later.' });
+    }
+
+    // --- Now create payout from connected account to seller's bank ---
+    let payout;
+    try {
+      payout = await stripeService.createPayout(user.stripe_account_id, amount, wallet.currency || 'cad');
+    } catch (payoutErr) {
+      console.error('Stripe payout from connected account failed:', payoutErr);
+      return res.status(500).json({ error: 'Failed to create payout from seller account. Please try again later.' });
+    }
     
     // Debit wallet
     await Wallet.updateBalance(userId, -amount);
     
-    // Record payout transaction
+    // Record payout transaction (include both transfer and payout IDs)
     await Transaction.createTransaction({
       walletId: wallet.id,
       type: 'withdrawal',
       amount: -amount,
-      description: 'Seller earnings withdrawal (Stripe Connect)',
-      referenceId: payout.id,
+      description: 'Seller earnings withdrawal (manual transfer + payout)',
+      referenceId: `${transfer.id}|${payout.id}`,
       status: 'succeeded'
     });
     
@@ -308,7 +317,7 @@ async function createSellerEarningsWithdrawal(req, res) {
       }
     }
     
-    return res.json({ message: 'Earnings withdrawal processed successfully', amount });
+    return res.json({ message: 'Earnings withdrawal processed successfully', amount, transferId: transfer.id, payoutId: payout.id });
   } catch (err) {
     console.error('Seller earnings withdrawal error:', err);
     res.status(500).json({ error: 'Failed to process earnings withdrawal' });
@@ -629,13 +638,65 @@ async function createPayout(req, res) {
     // Check wallet balance (seller earnings)
     const earnings = await getSellerEarnings(userId);
     if (earnings < amount) return res.status(400).json({ error: 'Insufficient earnings for payout' });
-    // Initiate payout
-    await stripeService.createPayout(user.stripe_account_id, amount, 'cad');
-    // Log payout (optional: create a transaction record)
-    res.json({ success: true });
+
+    // --- Manual transfer from platform to seller's connected account ---
+    let transfer;
+    try {
+      transfer = await stripe.transfers.create({
+        amount: Math.round(amount * 100),
+        currency: 'cad',
+        destination: user.stripe_account_id,
+        description: 'Seller earnings withdrawal (manual transfer)'
+      });
+    } catch (transferErr) {
+      console.error('Stripe transfer to connected account failed:', transferErr);
+      return res.status(500).json({ error: 'Failed to transfer funds to seller account. Please try again later.' });
+    }
+
+    // --- Now create payout from connected account to seller's bank ---
+    let payout;
+    try {
+      payout = await stripeService.createPayout(user.stripe_account_id, amount, 'cad');
+    } catch (payoutErr) {
+      console.error('Stripe payout from connected account failed:', payoutErr);
+      return res.status(500).json({ error: 'Failed to create payout from seller account. Please try again later.' });
+    }
+
+    // Record payout transaction (include both transfer and payout IDs)
+    // Get the user's wallet
+    const wallet = await Wallet.getWalletByUserId(userId);
+    if (!wallet) {
+      return res.status(404).json({ error: 'Wallet not found' });
+    }
+    
+    await Transaction.createTransaction({
+      walletId: wallet.id,
+      type: 'withdrawal',
+      amount: -amount,
+      description: 'Seller earnings withdrawal (manual transfer + payout)',
+      referenceId: `${transfer.id}|${payout.id}`,
+      status: 'succeeded'
+    });
+
+    res.json({ success: true, transferId: transfer.id, payoutId: payout.id });
   } catch (err) {
     console.error('Stripe Connect payout error:', err);
     res.status(500).json({ error: 'Failed to create payout' });
+  }
+}
+
+// Get seller earnings balance (for Seller Dashboard)
+async function getSellerEarningsBalance(req, res) {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    if (!user || user.role !== 'seller') {
+      return res.status(403).json({ error: 'Only sellers can view earnings balance' });
+    }
+    const earnings = await getSellerEarnings(userId);
+    res.json({ earnings });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get seller earnings balance' });
   }
 }
 
@@ -654,5 +715,6 @@ module.exports = {
   startOnboarding,
   getOnboardingStatus,
   createPayout,
-  createSellerEarningsWithdrawal
+  createSellerEarningsWithdrawal,
+  getSellerEarningsBalance
 }; 

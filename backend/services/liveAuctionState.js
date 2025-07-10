@@ -37,10 +37,15 @@ function addBid(auctionId, bid) {
 
 // Remove manual close: closeAuction should do nothing
 function closeAuction(auctionId) {
-  // Manual close is disabled. Auctions can only be closed by timer.
-  // This function is intentionally left blank.
-  // If needed, you can throw an error here.
-  // throw new Error('Manual close is disabled.');
+  const auction = auctions.get(auctionId);
+  if (auction) {
+    auction.status = 'closed';
+    if (auction.timer) {
+      clearTimeout(auction.timer);
+      auction.timer = null;
+      auction.timerEnd = null;
+    }
+  }
 }
 
 function removeAuction(auctionId) {
@@ -52,7 +57,9 @@ function setTimer(auctionId, duration, onEnd) {
   if (!auction) return;
   if (auction.timer) clearTimeout(auction.timer);
   auction.timerEnd = Date.now() + duration;
+  console.log(`[TIMER] Setting timer for auctionId=${auctionId}, duration=${duration}ms, ends at ${new Date(auction.timerEnd).toLocaleString()}`);
   auction.timer = setTimeout(() => {
+    console.log(`[TIMER] Timer expired for auctionId=${auctionId}, calling onEnd callback`);
     auction.status = 'closed';
     auction.timer = null;
     auction.timerEnd = null;

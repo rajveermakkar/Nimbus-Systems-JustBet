@@ -78,7 +78,11 @@ const userController = {
         await Wallet.createWallet(user.id);
       } catch (walletErr) {
         console.error('Wallet creation error:', walletErr);
-        // Continue registration even if wallet creation fails
+        // For sellers, wallet creation is required
+        if (user.role === 'seller') {
+          return errorResponse(res, 500, 'Failed to create seller wallet. Please try again.');
+        }
+        // For buyers, continue registration even if wallet creation fails
       }
 
       // Generate verification token

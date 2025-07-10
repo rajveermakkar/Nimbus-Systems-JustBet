@@ -412,8 +412,8 @@ const startServer = async () => {
           console.error(`[BID] Error updating auction in DB:`, err);
         }
         // Start or reset countdown timer
-        liveAuctionState.setTimer(auctionId, 120000, () => handleAuctionEnd(auctionId));
-        console.log(`[BID] Reset inactivity countdown timer. auctionId=${auctionId}`);
+        liveAuctionState.setTimer(auctionId, 120000, () => handleAuctionEnd(auctionId)); // 2 minutes
+        console.log(`[BID] Reset inactivity countdown timer for 2 minutes. auctionId=${auctionId}`);
         // Get updated bid history with user names
         let updatedBids = [];
         try {
@@ -470,6 +470,19 @@ const startServer = async () => {
 
       // Auction end logic
       async function handleAuctionEnd(auctionId) {
+        console.log(`[AUCTION END] Starting handleAuctionEnd for auctionId=${auctionId}`);
+        
+        // Check if auction is already closed in database FIRST
+        try {
+          const dbAuction = await LiveAuctionModel.findById(auctionId);
+          if (dbAuction && dbAuction.status === 'closed') {
+            console.log(`[AUCTION END] Auction ${auctionId} already closed in database, skipping.`);
+            return;
+          }
+        } catch (err) {
+          console.error(`[AUCTION END] Error checking auction status:`, err);
+        }
+        
         if (auctionEndLocks.has(auctionId)) {
           console.log(`[AUCTION END] handleAuctionEnd already running for auctionId=${auctionId}, skipping.`);
           return;
@@ -481,6 +494,17 @@ const startServer = async () => {
             console.log(`[AUCTION END] No in-memory state for auctionId=${auctionId}`);
             return;
           }
+          
+          // Check if result already exists in database
+          const existingResult = await LiveAuctionResult.findByAuctionId(auctionId);
+          if (existingResult) {
+            console.log(`[AUCTION END] Result already exists for auctionId=${auctionId}, skipping processing.`);
+            // Still update auction status to closed if needed
+            await LiveAuctionModel.updateAuction(auctionId, { status: 'closed' });
+            return;
+          }
+          
+          console.log(`[AUCTION END] Closing auction in memory state. auctionId=${auctionId}`);
           liveAuctionState.closeAuction(auctionId);
           
           // Check what's actually in the database
@@ -585,6 +609,40 @@ const startServer = async () => {
                   auctionId,
                   existingResult: existingResult.rows[0]
                 });
+                
+                // Still send the auction_end event to connected clients
+                const existingResultData = existingResult.rows[0];
+                let winner = null;
+                if (existingResultData.winner_id) {
+                  try {
+                    const winnerQuery = 'SELECT first_name, last_name, email FROM users WHERE id = $1';
+                    const winnerResult = await queryWithRetry(winnerQuery, [existingResultData.winner_id]);
+                    const winnerUser = winnerResult.rows[0];
+                    winner = {
+                      user_id: existingResultData.winner_id,
+                      user_name: winnerUser ? `${winnerUser.first_name} ${winnerUser.last_name}` : 'Unknown User',
+                      amount: existingResultData.final_bid
+                    };
+                  } catch (err) {
+                    console.error('Error fetching winner details:', err);
+                    winner = {
+                      user_id: existingResultData.winner_id,
+                      user_name: 'Unknown User',
+                      amount: existingResultData.final_bid
+                    };
+                  }
+                }
+                
+                io.to(auctionId).emit('auction_end', {
+                  winner,
+                  finalBid: existingResultData.final_bid,
+                  message: existingResultData.status === 'won' ? 'Auction ended with winner' : 
+                           existingResultData.status === 'reserve_not_met' ? 'Auction ended - Reserve price not met' :
+                           existingResultData.status === 'no_bids' ? 'Auction ended - No bids were placed' : 'Auction ended',
+                  status: existingResultData.status,
+                  reserveMet: existingResultData.reserve_met
+                });
+                
                 return; // Don't create duplicate results
               }
               
@@ -681,6 +739,40 @@ const startServer = async () => {
                   auctionId,
                   existingResult: existingResult.rows[0]
                 });
+                
+                // Still send the auction_end event to connected clients
+                const existingResultData = existingResult.rows[0];
+                let winner = null;
+                if (existingResultData.winner_id) {
+                  try {
+                    const winnerQuery = 'SELECT first_name, last_name, email FROM users WHERE id = $1';
+                    const winnerResult = await queryWithRetry(winnerQuery, [existingResultData.winner_id]);
+                    const winnerUser = winnerResult.rows[0];
+                    winner = {
+                      user_id: existingResultData.winner_id,
+                      user_name: winnerUser ? `${winnerUser.first_name} ${winnerUser.last_name}` : 'Unknown User',
+                      amount: existingResultData.final_bid
+                    };
+                  } catch (err) {
+                    console.error('Error fetching winner details:', err);
+                    winner = {
+                      user_id: existingResultData.winner_id,
+                      user_name: 'Unknown User',
+                      amount: existingResultData.final_bid
+                    };
+                  }
+                }
+                
+                io.to(auctionId).emit('auction_end', {
+                  winner,
+                  finalBid: existingResultData.final_bid,
+                  message: existingResultData.status === 'won' ? 'Auction ended with winner' : 
+                           existingResultData.status === 'reserve_not_met' ? 'Auction ended - Reserve price not met' :
+                           existingResultData.status === 'no_bids' ? 'Auction ended - No bids were placed' : 'Auction ended',
+                  status: existingResultData.status,
+                  reserveMet: existingResultData.reserve_met
+                });
+                
                 return; // Don't create duplicate results
               }
               
