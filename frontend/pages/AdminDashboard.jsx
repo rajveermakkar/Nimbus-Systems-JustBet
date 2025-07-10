@@ -7,6 +7,7 @@ import UserDetailsPanel from '../src/components/UserDetailsPanel';
 import AuctionDetailsPanel from '../src/components/auctions/AuctionDetailsPanel';
 import LoadingSpinner from '../src/components/LoadingSpinner';
 import ConfirmModal from '../src/components/ConfirmModal';
+import apiService from '../src/services/apiService';
 
 function AdminDashboard() {
   const { user, setUser } = useContext(UserContext);
@@ -19,14 +20,17 @@ function AdminDashboard() {
 
   // Derive section from URL at the top
   const getSectionFromPath = (pathname) => {
+    console.log('getSectionFromPath called with:', pathname);
     if (pathname.startsWith('/admin/manage-users')) return 'manage-users';
     if (pathname.startsWith('/admin/manage-auctions')) return 'manage-auctions';
     if (pathname.startsWith('/admin/approve-users')) return 'approve-users';
     if (pathname.startsWith('/admin/earnings')) return 'earnings';
     if (pathname.startsWith('/admin/db-health')) return 'db-health';
+    if (pathname.startsWith('/admin/activity-logs')) return 'activity-logs';
     return 'dashboard';
   };
   const section = getSectionFromPath(location.pathname);
+  console.log('Current section:', section, 'Pathname:', location.pathname);
 
   // Redirect non-admin users
   if (!user || user.role !== 'admin') {
@@ -42,6 +46,7 @@ function AdminDashboard() {
     { key: "approve-users", label: "Approve Users", icon: "fa-user-check" },
     { key: "earnings", label: "Earnings", icon: "fa-dollar-sign" },
     { key: "db-health", label: "DB Health", icon: "fa-database" },
+    { key: "activity-logs", label: "Activity Logs", icon: "fa-list-alt" },
   ];
 
   // --- STATE FOR ADMIN DATA ---
@@ -90,6 +95,11 @@ function AdminDashboard() {
   const [dbHealthData, setDbHealthData] = useState(null);
   const [dbHealthLoading, setDbHealthLoading] = useState(false);
   const [dbHealthError, setDbHealthError] = useState(null);
+
+  // --- STATE FOR EARNINGS ---
+  const [earningsData, setEarningsData] = useState(null);
+  const [earningsLoading, setEarningsLoading] = useState(false);
+  const [earningsError, setEarningsError] = useState(null);
 
   // --- MODAL FOR APPROVING AUCTION ---
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -334,6 +344,37 @@ function AdminDashboard() {
     }
   };
 
+  // Add Activity Logs state
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [activityLogsLoading, setActivityLogsLoading] = useState(false);
+  const [activityLogsError, setActivityLogsError] = useState(null);
+
+  // Fetch activity logs
+  const fetchActivityLogs = async () => {
+    setActivityLogsLoading(true); setActivityLogsError(null);
+    try {
+      const res = await apiService.getActivityLogs();
+      setActivityLogs(res.logs || []);
+    } catch (e) {
+      setActivityLogsError('Failed to load activity logs');
+    } finally {
+      setActivityLogsLoading(false);
+    }
+  };
+
+  // Fetch platform earnings
+  const fetchEarnings = async () => {
+    setEarningsLoading(true); setEarningsError(null);
+    try {
+      const res = await api.get("/admin/earnings");
+      setEarningsData(res.data);
+    } catch (e) {
+      setEarningsError("Failed to load earnings data");
+    } finally {
+      setEarningsLoading(false);
+    }
+  };
+
   // --- EFFECTS: FETCH DATA ON SECTION CHANGE ---
   useEffect(() => {
     // Log section change and what will be fetched
@@ -348,8 +389,19 @@ function AdminDashboard() {
       fetchAllSettledAuctions();
       fetchAllLiveAuctions();
     }
+    if (section === "earnings") fetchEarnings();
     if (section === "db-health") fetchDbHealth();
+    if (section === 'activity-logs') {
+      console.log('Fetching activity logs...');
+      fetchActivityLogs();
+    }
   }, [section]);
+
+  // Force fetch activity logs on mount for testing
+  useEffect(() => {
+    console.log('Component mounted, forcing activity logs fetch...');
+    fetchActivityLogs();
+  }, []);
 
   // --- MODAL FOR REJECTING AUCTION ---
   const openRejectModal = (type, id) => {
@@ -825,9 +877,170 @@ function AdminDashboard() {
         );
       case "earnings":
         return (
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Earnings</h2>
-            <div className="text-gray-400">Coming Soon</div>
+          <div className="h-full overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4">Platform Earnings</h2>
+            {earningsLoading ? (
+              <div className="text-gray-300">Loading earnings data...</div>
+            ) : earningsError ? (
+              <div className="text-red-400">{earningsError}</div>
+            ) : earningsData ? (
+              <div className="space-y-6 pb-6">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="rounded-xl p-6 border border-white/10 bg-gradient-to-br from-green-500/10 to-green-600/10">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-400 text-sm">Total Earnings</p>
+                        <p className="text-2xl font-bold text-green-400">
+                          ${earningsData.totalEarnings?.toFixed(2) || '0.00'}
+                        </p>
+                      </div>
+                      <div className="text-green-400 text-3xl">
+                        <i className="fa-solid fa-dollar-sign"></i>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-xl p-6 border border-white/10 bg-gradient-to-br from-blue-500/10 to-blue-600/10">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-400 text-sm">Last 30 Days</p>
+                        <p className="text-2xl font-bold text-blue-400">
+                          ${earningsData.recentEarnings?.toFixed(2) || '0.00'}
+                        </p>
+                      </div>
+                      <div className="text-blue-400 text-3xl">
+                        <i className="fa-solid fa-calendar"></i>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-xl p-6 border border-white/10 bg-gradient-to-br from-purple-500/10 to-purple-600/10">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-400 text-sm">Total Transactions</p>
+                        <p className="text-2xl font-bold text-purple-400">
+                          {earningsData.totalCount || 0}
+                        </p>
+                      </div>
+                      <div className="text-purple-400 text-3xl">
+                        <i className="fa-solid fa-receipt"></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Monthly Chart */}
+                {earningsData.monthlyData && earningsData.monthlyData.length > 0 && (
+                  <div className="rounded-xl p-6 border border-white/10">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <i className="fa-solid fa-chart-line"></i>
+                      Monthly Earnings Trend
+                    </h3>
+                    <div className="space-y-3">
+                      {earningsData.monthlyData.map((month, index) => (
+                        <div key={month.month} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-300 font-medium">
+                              {new Date(month.month + '-01').toLocaleDateString('en-US', { 
+                                year: 'numeric', 
+                                month: 'long' 
+                              })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-32 bg-gray-700 rounded-full h-2">
+                              <div 
+                                className="bg-green-500 h-2 rounded-full" 
+                                style={{ 
+                                  width: `${Math.min(100, (month.amount / Math.max(...earningsData.monthlyData.map(m => m.amount))) * 100)}%` 
+                                }}
+                              ></div>
+                            </div>
+                            <span className="text-green-400 font-semibold">
+                              ${month.amount.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Transactions */}
+                <div className="rounded-xl p-6 border border-white/10">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i className="fa-solid fa-list"></i>
+                    Recent Platform Fees
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="text-left p-3 text-gray-400 font-medium">Date</th>
+                          <th className="text-left p-3 text-gray-400 font-medium">User</th>
+                          <th className="text-left p-3 text-gray-400 font-medium">Auction</th>
+                          <th className="text-left p-3 text-gray-400 font-medium">Amount</th>
+                          <th className="text-left p-3 text-gray-400 font-medium">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {earningsData.earnings && earningsData.earnings.length > 0 ? (
+                          earningsData.earnings.slice(0, 10).map((earning, index) => (
+                            <tr key={index} className="border-b border-white/5">
+                              <td className="p-3 text-white">
+                                {new Date(earning.created_at).toLocaleDateString()}
+                              </td>
+                              <td className="p-3 text-white">
+                                {earning.user_email || `${earning.first_name || ''} ${earning.last_name || ''}`.trim() || 'Unknown'}
+                              </td>
+                              <td className="p-3 text-gray-300">
+                                {earning.description?.includes('auction') ? 
+                                  earning.description.replace('Platform fee from auction ', '').replace('Platform fee from live auction ', '') : 
+                                  'N/A'
+                                }
+                              </td>
+                              <td className="p-3 text-green-400 font-semibold">
+                                ${parseFloat(earning.amount).toFixed(2)}
+                              </td>
+                              <td className="p-3">
+                                <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                  earning.status === 'succeeded' 
+                                    ? 'bg-green-500/20 text-green-400' 
+                                    : 'bg-yellow-500/20 text-yellow-400'
+                                }`}>
+                                  {earning.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} className="text-center text-gray-400 p-8">
+                              No platform fees found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Refresh Button */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={fetchEarnings}
+                    disabled={earningsLoading}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition"
+                  >
+                    <i className="fa-solid fa-sync-alt"></i>
+                    {earningsLoading ? 'Refreshing...' : 'Refresh Data'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-gray-400">No earnings data available.</div>
+            )}
           </div>
         );
       case "db-health":
@@ -944,6 +1157,47 @@ function AdminDashboard() {
             )}
           </div>
         );
+      case "activity-logs":
+        return (
+          <div className="flex flex-col flex-1 h-full min-h-0">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Activity Logs</h2>
+              <div className="text-sm text-gray-400">
+                Showing {activityLogs.length} logs from the last 48 hours
+              </div>
+            </div>
+            <div className="flex-1 h-full min-h-0 overflow-auto">
+              <table className="w-full bg-transparent rounded-xl overflow-hidden">
+                <thead>
+                  <tr>
+                    <th className="w-1/6 text-left px-4 py-2 font-bold text-base">Date</th>
+                    <th className="w-1/6 text-left px-4 py-2 font-bold text-base">User</th>
+                    <th className="max-w-xs text-left px-4 py-2 font-bold text-base">Action</th>
+                    <th className="min-w-0 text-left px-4 py-2 font-bold text-base">Description</th>
+                  </tr>
+                </thead>
+                <tbody className="h-full min-h-0 text-left text-sm">
+                  {activityLogsLoading ? (
+                    <tr><td colSpan={4} className="text-center text-gray-300 p-8">Loading activity logs...</td></tr>
+                  ) : activityLogsError ? (
+                    <tr><td colSpan={4} className="text-center text-red-400 p-8">{activityLogsError}</td></tr>
+                  ) : activityLogs.length === 0 ? (
+                    <tr><td colSpan={4} className="text-center text-gray-400 p-8">No activity logs found</td></tr>
+                  ) : activityLogs.map((log, idx) => (
+                    <tr key={idx} className="border-b border-white/10">
+                      <td className="p-2 align-middle text-left text-white">{log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}</td>
+                      <td className="p-2 align-middle text-left text-white font-medium">{log.user || '-'}</td>
+                      <td className="p-2 align-middle text-left text-white max-w-xs truncate">
+                        <span className="px-2 py-1 bg-blue-600/20 text-blue-300 rounded text-xs font-medium">{log.action || '-'}</span>
+                      </td>
+                      <td className="p-2 align-middle text-left text-gray-300 min-w-0 break-words whitespace-pre-line">{log.description || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
       default:
         return null;
     }
@@ -975,6 +1229,7 @@ function AdminDashboard() {
                     else if (link.key === 'approve-users') navigate('/admin/approve-users');
                     else if (link.key === 'earnings') navigate('/admin/earnings');
                     else if (link.key === 'db-health') navigate('/admin/db-health');
+                    else if (link.key === 'activity-logs') navigate('/admin/activity-logs');
                   }}
                   className={`flex items-center gap-3 px-4 py-2 rounded-lg text-left transition font-semibold ${section === link.key ? 'bg-blue-900/60 text-blue-300' : 'hover:bg-blue-900/40 text-gray-200'}`}
                 >

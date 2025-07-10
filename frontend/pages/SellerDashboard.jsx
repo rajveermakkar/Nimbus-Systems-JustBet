@@ -91,6 +91,8 @@ function SellerDashboard() {
   const [walletBalance, setWalletBalance] = useState(null);
   const [walletTransactions, setWalletTransactions] = useState([]);
   const [walletLoading, setWalletLoading] = useState(false);
+  // Add state for seller earnings
+  const [sellerEarnings, setSellerEarnings] = useState(null);
 
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -98,7 +100,7 @@ function SellerDashboard() {
   const formatPrice = (price) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'CAD'
     }).format(price);
   };
 
@@ -230,6 +232,7 @@ function SellerDashboard() {
       fetchOrders();
     } else if (activeTab === 'settings') {
       fetchStripeStatus();
+      fetchSellerEarnings();
     }
   }, [activeTab]);
 
@@ -373,14 +376,29 @@ function SellerDashboard() {
     setPayoutSuccess('');
     try {
       await walletService.createStripePayout(Number(payoutAmount));
-      setPayoutSuccess('Payout requested!');
+      setPayoutSuccess('Payout requested successfully!');
       setPayoutAmount('');
-      fetchStripeStatus();
+      // Refresh seller earnings data
+      await fetchSellerEarnings();
+      // Show success toast
+      setToast({ show: true, message: 'Payout requested successfully! Your funds will be transferred to your bank account.', type: 'success' });
     } catch (err) {
       setPayoutError(err?.response?.data?.error || err.message || 'Failed to request payout');
+      // Show error toast
+      setToast({ show: true, message: err?.response?.data?.error || err.message || 'Failed to request payout', type: 'error' });
     }
     setPayoutLoading(false);
   }
+
+  // Fetch seller earnings
+  const fetchSellerEarnings = async () => {
+    try {
+      const data = await apiService.get('/api/wallet/seller-earnings');
+      setSellerEarnings(data.earnings);
+    } catch (err) {
+      setSellerEarnings(0);
+    }
+  };
 
   if (!user || !user.isApproved) {
   return (
@@ -493,7 +511,7 @@ function SellerDashboard() {
                       <div className="text-sm text-gray-300">Total Balance</div>
                     </div>
                     <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 text-center">
-                      <div className="text-2xl font-bold text-purple-400">{formatPrice(walletTransactions.filter(t => t.type === 'auction_income').reduce((sum, t) => sum + Math.abs(t.amount), 0))}</div>
+                      <div className="text-2xl font-bold text-purple-400">{analytics ? formatPrice(analytics.overall.totalRevenue) : '...'}</div>
                       <div className="text-sm text-gray-300">Total Earned</div>
                     </div>
                     <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 text-center">
@@ -586,12 +604,14 @@ function SellerDashboard() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {auctionResults.map((result) => {
+                    {auctionResults.map((result, idx) => {
                       const isSold = result.result_type === 'sold' || (result.status === 'closed' && result.winner_id);
                       const isNoBids = result.result_type === 'no_bids' || (!result.winner_id && !isSold);
+                      // Use a more unique key
+                      const key = `${result.type || result.auction_type || 'settled'}-${result.id || result.auction_id}-${idx}`;
                       return (
                         <div 
-                          key={`${result.type || result.auction_type || 'settled'}-${result.id || result.auction_id}`}
+                          key={key}
                           className="bg-white/5 rounded-lg p-4 hover:bg-white/10 transition-colors relative"
                         >
                           {/* Auction Type Badge */}
@@ -675,8 +695,8 @@ function SellerDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {listings
                       .filter(listing => listing.status !== 'closed')
-                      .map((listing) => (
-                        <div key={listing.id} className="bg-white/5 rounded-lg p-4 border border-white/20">
+                      .map((listing, idx) => (
+                        <div key={`${listing.auction_type || 'listing'}-${listing.id}-${idx}`} className="bg-white/5 rounded-lg p-4 border border-white/20">
                           <h3 className="font-semibold text-lg mb-2">{listing.title}</h3>
                           <img 
                             src={listing.image_url} 
@@ -711,7 +731,7 @@ function SellerDashboard() {
                           </div>
                           <div className="flex gap-2">
                             <Button
-                              onClick={() => navigate(listing.auction_type === 'live' ? `/live-auctions/${listing.id}` : `/auctions/${listing.id}`)}
+                              onClick={() => navigate(`/auction/${listing.auction_type}/${listing.id}`)}
                               className="flex-1 text-sm"
                             >
                               View Auction
@@ -789,8 +809,8 @@ function SellerDashboard() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredOrders.map(order => (
-                      <div key={order.id} className="bg-white/5 rounded-lg p-4 border border-white/20 hover:bg-white/10 transition-colors">
+                    {filteredOrders.map((order, idx) => (
+                      <div key={`order-${order.id}-${idx}`} className="bg-white/5 rounded-lg p-4 border border-white/20 hover:bg-white/10 transition-colors">
                         {/* Order Header */}
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -931,7 +951,7 @@ function SellerDashboard() {
                       <>
                         <div className="mb-4 text-center">
                           <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mb-2 ${
-                            stripeStatus.payouts_enabled ? 'bg-green-900/30 text-green-400 border border-green-500/30' :
+                            stripeStatus.payouts_enabled ? 'bg-purple-900/30 text-purple-400 border border-purple-500/30' :
                             stripeStatus.details_submitted ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/30' :
                             'bg-red-900/30 text-red-400 border border-red-500/30'
                           }`}>
@@ -972,6 +992,11 @@ function SellerDashboard() {
                         {stripeStatus.payouts_enabled && (
                           <div className="mt-8">
                             <h3 className="text-lg font-semibold mb-2 text-green-400">Request Payout</h3>
+                            {/* Funds Available to Withdraw */}
+                            <div className="mb-4 text-center">
+                              <span className="block text-md text-gray-200 font-semibold mb-1">Funds Available to Withdraw:</span>
+                              <span className="text-2xl font-bold text-green-300">{walletLoading || sellerEarnings === null ? '...' : formatPrice(sellerEarnings)}</span>
+                            </div>
                             <form
                               onSubmit={e => {
                                 e.preventDefault();
@@ -988,15 +1013,24 @@ function SellerDashboard() {
                                 onChange={e => setPayoutAmount(e.target.value)}
                                 className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-400"
                               />
-                              <button
+                              <Button
                                 type="submit"
-                                className="bg-gradient-to-r from-green-500 to-blue-400 text-white font-bold py-2 px-6 rounded-lg shadow hover:from-green-600 hover:to-blue-500 transition-all disabled:opacity-60"
-                                disabled={payoutLoading || !payoutAmount}
+                                variant="primary"
+                                size="lg"
+                                className="w-full"
+                                disabled={payoutLoading || !payoutAmount || Number(sellerEarnings) <= 0}
                               >
                                 {payoutLoading ? 'Processing...' : 'Request Payout'}
-                              </button>
-                              {payoutError && <div className="text-red-400 text-sm mt-1">{payoutError}</div>}
-                              {payoutSuccess && <div className="text-green-400 text-sm mt-1">{payoutSuccess}</div>}
+                              </Button>
+                              {/* Improved error/success display */}
+                              {payoutError && (
+                                <div className="text-red-400 text-sm mt-1">
+                                  {payoutError.includes('PaymentIntent') || payoutError.includes('stripe')
+                                    ? 'Failed to create payout. Please check your Stripe account and try again.'
+                                    : payoutError}
+                                </div>
+                              )}
+                              {payoutSuccess && <div className="text-purple-400 text-sm mt-1">{payoutSuccess}</div>}
                             </form>
                           </div>
                         )}

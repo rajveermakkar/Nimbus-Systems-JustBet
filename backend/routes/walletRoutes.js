@@ -31,4 +31,6 @@ router.post('/stripe-connect/onboarding', authenticateToken, walletController.st
 router.get('/stripe-connect/status', authenticateToken, walletController.getOnboardingStatus);
 router.post('/stripe-connect/payout', authenticateToken, walletController.createPayout);
 
+router.get('/seller-earnings', authenticateToken, walletController.getSellerEarningsBalance);
+
 module.exports = router; 

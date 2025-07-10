@@ -60,6 +60,15 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
   // Get the auction
   const auction = await LiveAuction.findById(auctionId);
   if (!auction || auction.status === 'closed') return;
+  
+  // Check if result already exists for this auction
+  const existingResult = await LiveAuctionResult.findByAuctionId(auctionId);
+  if (existingResult) {
+    // Always update status to closed, even if result exists
+    await LiveAuction.updateAuction(auctionId, { status: 'closed' });
+    return;
+  }
+  
   // Get all bids
   const bids = await LiveAuctionBid.findByAuctionId(auctionId);
   if (!bids.length) {
@@ -92,11 +101,11 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
       created_at: highestBid.created_at
     },
     reservePrice: auction.reserve_price,
-    reserveMet: !auction.reserve_price || highestBid.amount >= auction.reserve_price
+    reserveMet: !auction.reserve_price || Number(highestBid.amount) >= Number(auction.reserve_price)
   });
 
   // Check reserve price
-  if (auction.reserve_price && highestBid.amount < auction.reserve_price) {
+  if (auction.reserve_price && Number(highestBid.amount) < Number(auction.reserve_price)) {
     await LiveAuction.updateAuction(auctionId, { status: 'closed', current_highest_bidder_id: null });
     await LiveAuctionResult.create({
       auctionId,

@@ -61,6 +61,74 @@
 - **GET /api/admin/pending-sellers** — Get all pending seller approval requests.
 - **PATCH /api/admin/sellers/:userId/approve** — Approve or reject a seller request.
 - **GET /api/admin/stats** — Get comprehensive statistics (users, auctions, pending requests).
+- **GET /api/admin/earnings** — Get platform earnings and fee data. Returns: `{ earnings, totalEarnings, recentEarnings, monthlyData, totalCount }`
+
+**Earnings Response Format:**
+```json
+{
+  "earnings": [
+    {
+      "id": "...",
+      "wallet_id": "...",
+      "type": "platform_fee",
+      "amount": 25.50,
+      "description": "Platform fee from auction 123",
+      "reference_id": "123",
+      "status": "succeeded",
+      "created_at": "2024-01-15T10:30:00Z",
+      "user_email": "user@example.com",
+      "first_name": "John",
+      "last_name": "Doe",
+      "currency": "CAD"
+    }
+  ],
+  "totalEarnings": 1250.75,
+  "recentEarnings": 450.25,
+  "monthlyData": [
+    {
+      "month": "2024-01",
+      "amount": 450.25
+    }
+  ],
+  "totalCount": 25
+}
+```
+- **GET /api/admin/activity-logs** — Get aggregated activity logs from the last 48 hours. Returns: `{ logs: [...] }`
+
+**Activity Logs Response Format:**
+```json
+{
+  "logs": [
+    {
+      "timestamp": "2024-01-15T10:30:00Z",
+      "user": "john@example.com",
+      "action": "auction_created",
+      "description": "Created new settled auction: Vintage Watch"
+    }
+  ]
+}
+```
+
+### User Management
+- **GET /api/admin/users** — Get all users with pagination and filtering.
+- **PATCH /api/admin/users/:userId/role** — Change user role. Body: `{ role: "buyer" | "seller" | "admin" }`
+- **POST /api/admin/users/:userId/ban** — Ban a user. Body: `{ reason }`
+- **POST /api/admin/users/:userId/unban** — Unban a user.
+- **GET /api/admin/users/:userId/ban-history** — Get ban history for a user.
+
+**Ban/Unban Response Format:**
+```json
+{
+  "user": {
+    "id": "...",
+    "email": "user@example.com",
+    "is_banned": true,
+    "ban_reason": "Violation of terms of service",
+    "banned_at": "2024-01-15T10:30:00Z"
+  },
+  "token": "..." // Updated JWT token
+}
+```
 
 ### Settled Auctions
 - **GET /api/admin/auctions/settled/pending** — Get all pending settled auctions.
@@ -72,6 +140,9 @@
 - **GET /api/admin/auctions/live/pending** — Get all pending live auctions.
 - **PATCH /api/admin/auctions/live/:id/approve** — Approve a live auction.
 - **PATCH /api/admin/auctions/live/:id/reject** — Reject a live auction. Body: `{ rejectionReason }`
+
+### Database Health
+- **GET /api/admin/db-health** — Get database health metrics and performance data.
 
 ---
 

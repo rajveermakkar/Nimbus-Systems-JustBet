@@ -465,13 +465,13 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
     setLoading(true);
     setPreparingPayment(true);
     try {
-      // For new cards, we'll ask if they want to save it during the payment flow
-      console.log('[handleAddNewCard] Creating deposit intent for new card');
+      // For new cards, we'll save it during the payment flow
+      console.log('[handleAddNewCard] Creating deposit intent for new card with saveCard=true');
       
       // Always use platform account for consistency
       console.log('[handleAddNewCard] Always using platform account');
       
-      const resp = await walletService.createDepositIntent(Number(amount), false);
+      const resp = await walletService.createDepositIntent(Number(amount), true); // Set saveCard to true
       console.log('[handleAddNewCard] DepositIntent response:', resp);
       setClientSecret(resp.clientSecret);
       

@@ -50,6 +50,22 @@ const adminController = {
         businessAddress: user.business_address,
         businessPhone: user.business_phone
       };
+      
+      // If approving seller, ensure they have a wallet
+      if (approved) {
+        const Wallet = require('../models/Wallet');
+        let wallet = await Wallet.getWalletByUserId(userId);
+        if (!wallet) {
+          try {
+            console.log(`Creating wallet for approved seller ${userId}`);
+            wallet = await Wallet.createWallet(userId);
+          } catch (walletErr) {
+            console.error('Failed to create wallet for approved seller:', walletErr);
+            return res.status(500).json({ error: 'Failed to create seller wallet during approval. Please try again.' });
+          }
+        }
+      }
+      
       const updatedUser = await User.updateRoleAndApproval(userId, 'seller', approved, businessDetails);
       const token = generateToken(req.user);
 
@@ -442,6 +458,193 @@ const adminController = {
       res.json({ banHistory: history });
     } catch (error) {
       res.status(500).json({ error: error.message || 'Error fetching ban history' });
+    }
+  },
+
+  // AGGREGATED ACTIVITY LOGS FOR ADMIN (last 48 hours)
+  async getActivityLogs(req, res) {
+    try {
+      const Bid = require('../models/Bid');
+      const LiveAuctionBid = require('../models/LiveAuctionBid');
+      const Transaction = require('../models/Transaction');
+      const User = require('../models/User');
+      const SettledAuction = require('../models/SettledAuction');
+      const LiveAuction = require('../models/LiveAuction');
+      const SettledAuctionResult = require('../models/SettledAuctionResult');
+      const LiveAuctionResult = require('../models/LiveAuctionResult');
+
+      // Calculate 48 hours ago
+      const now = new Date();
+      const since = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+      const within48h = (date) => date && new Date(date) >= since;
+
+      // Helper function to get user names in batch
+      const getUserNamesBatch = async (userIds) => {
+        const uniqueIds = [...new Set(userIds.filter(id => id))];
+        if (uniqueIds.length === 0) return {};
+        
+        const users = await User.getAll ? await User.getAll() : [];
+        const userMap = {};
+        users.forEach(user => {
+          userMap[user.id] = `${user.first_name} ${user.last_name}`;
+        });
+        
+        const result = {};
+        uniqueIds.forEach(id => {
+          result[id] = userMap[id] || `User ${id}`;
+        });
+        return result;
+      };
+
+      // Users (registrations in last 48h)
+      const users = await User.getAll ? await User.getAll() : [];
+      const userLogs = users.filter(u => within48h(u.created_at)).map(user => ({
+        timestamp: user.created_at,
+        user: `${user.first_name} ${user.last_name}`,
+        action: 'USER_REGISTERED',
+        description: `User registered: ${user.email}`,
+        relatedId: user.id,
+        type: 'user',
+      }));
+
+      // Settled Auctions (created in last 48h)
+      const settledAuctions = await SettledAuction.findByStatus ? await SettledAuction.findByStatus('approved') : [];
+      const settledAuctionLogs = settledAuctions.filter(a => within48h(a.created_at)).map(auction => ({
+        timestamp: auction.created_at,
+        user: auction.seller_id,
+        action: 'SETTLED_AUCTION_CREATED',
+        description: `Settled auction created: ${auction.title}`,
+        relatedId: auction.id,
+        type: 'settled_auction',
+      }));
+
+      // Live Auctions (created in last 48h)
+      const liveAuctions = await LiveAuction.findByStatus ? await LiveAuction.findByStatus('approved') : [];
+      const liveAuctionLogs = liveAuctions.filter(a => within48h(a.created_at)).map(auction => ({
+        timestamp: auction.created_at,
+        user: auction.seller_id,
+        action: 'LIVE_AUCTION_CREATED',
+        description: `Live auction created: ${auction.title}`,
+        relatedId: auction.id,
+        type: 'live_auction',
+      }));
+
+      // Settled Auction Results (in last 48h)
+      const settledResults = await SettledAuctionResult.findAllWithDetails ? await SettledAuctionResult.findAllWithDetails() : [];
+      const settledResultLogs = settledResults.filter(r => within48h(r.created_at)).map(result => ({
+        timestamp: result.created_at,
+        user: result.winner_id,
+        action: 'SETTLED_AUCTION_RESULT',
+        description: result.status === 'won'
+          ? `Auction won by ${result.winner_first_name || ''} ${result.winner_last_name || ''} for $${result.final_bid}`
+          : `Auction result: ${result.status}`,
+        relatedId: result.auction_id,
+        type: 'settled_auction_result',
+      }));
+
+      // Live Auction Results (in last 48h)
+      const liveResults = await LiveAuctionResult.findAllWithDetails ? await LiveAuctionResult.findAllWithDetails() : [];
+      const liveResultLogs = liveResults.filter(r => within48h(r.created_at)).map(result => ({
+        timestamp: result.created_at,
+        user: result.winner_id,
+        action: 'LIVE_AUCTION_RESULT',
+        description: result.status === 'won'
+          ? `Live auction won by ${result.winner_first_name || ''} ${result.winner_last_name || ''} for $${result.final_bid}`
+          : `Live auction result: ${result.status}`,
+        relatedId: result.auction_id,
+        type: 'live_auction_result',
+      }));
+
+      // Aggregate all logs
+      let logs = [
+        ...userLogs,
+        ...settledAuctionLogs,
+        ...liveAuctionLogs,
+        ...settledResultLogs,
+        ...liveResultLogs,
+      ];
+      logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      // Get all unique user IDs for batch lookup
+      const userIds = logs.map(log => log.user).filter(id => id && id !== 'System' && id !== 'No Winner');
+      const userNamesMap = await getUserNamesBatch(userIds);
+
+      // Replace user IDs with names
+      logs = logs.map(log => ({
+        ...log,
+        user: log.user === 'System' || log.user === 'No Winner' ? log.user : (userNamesMap[log.user] || log.user)
+      }));
+
+      res.json({ logs: logs.slice(0, 100) });
+    } catch (error) {
+      console.error('Error fetching activity logs:', error);
+      res.status(500).json({ error: 'Error fetching activity logs' });
+    }
+  },
+
+  // Get platform earnings/fees
+  async getPlatformEarnings(req, res) {
+    try {
+      const { pool } = require('../db/init');
+      
+      // Get all platform fee transactions
+      const earningsQuery = `
+        SELECT 
+          wt.*,
+          u.email as user_email,
+          u.first_name,
+          u.last_name,
+          w.currency
+        FROM wallet_transactions wt
+        JOIN wallets w ON wt.wallet_id = w.id
+        JOIN users u ON w.user_id = u.id
+        WHERE wt.type = 'platform_fee'
+        ORDER BY wt.created_at DESC
+      `;
+      
+      const earningsResult = await pool.query(earningsQuery);
+      const earnings = earningsResult.rows;
+      
+      // Calculate totals
+      const totalEarnings = earnings.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+      
+      // Group by month for chart data
+      const monthlyEarnings = {};
+      earnings.forEach(tx => {
+        const date = new Date(tx.created_at);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthlyEarnings[monthKey]) {
+          monthlyEarnings[monthKey] = 0;
+        }
+        monthlyEarnings[monthKey] += parseFloat(tx.amount);
+      });
+      
+      // Convert to array for frontend
+      const monthlyData = Object.entries(monthlyEarnings).map(([month, amount]) => ({
+        month,
+        amount: parseFloat(amount.toFixed(2))
+      })).sort((a, b) => a.month.localeCompare(b.month));
+      
+      // Get recent earnings (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const recentEarnings = earnings.filter(tx => 
+        new Date(tx.created_at) >= thirtyDaysAgo
+      );
+      
+      const recentTotal = recentEarnings.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+      
+      res.json({
+        earnings,
+        totalEarnings: parseFloat(totalEarnings.toFixed(2)),
+        recentEarnings: parseFloat(recentTotal.toFixed(2)),
+        monthlyData,
+        totalCount: earnings.length
+      });
+    } catch (error) {
+      console.error('Error fetching platform earnings:', error);
+      res.status(500).json({ error: 'Error fetching platform earnings' });
     }
   }
 };
