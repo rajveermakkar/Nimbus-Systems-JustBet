@@ -84,62 +84,39 @@ function EditListing({ showToast: _showToast }) {
       setFetching(true);
       const token = localStorage.getItem("justbetToken");
       const apiUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
-      // Always use seller endpoints for both auction types
       let res, data;
       if (auctionTypeFromURL === 'settled') {
+        // Only fetch settled
         res = await fetch(`${apiUrl}/api/seller/auctions/settled/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` },
           credentials: "include"
         });
         if (res.ok) {
           data = await res.json();
-          // Some endpoints wrap in .auction, some don't
           const auctionData = data.auction || data;
           setAuctionType("settled");
           populateForm(auctionData, "settled");
           return;
+        } else {
+          throw new Error('Settled auction not found');
         }
-        // fallback: try live auction endpoint
+      } else if (auctionTypeFromURL === 'live') {
+        // Only fetch live
         res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` },
           credentials: "include"
         });
         if (res.ok) {
           data = await res.json();
-          if (data.max_participants) {
-            setAuctionType("live");
-            populateForm(data, "live");
-            return;
-          }
+          setAuctionType("live");
+          populateForm(data, "live");
+          return;
+        } else {
+          throw new Error('Live auction not found');
         }
       } else {
-        // Try live auction first
-        res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-          credentials: "include"
-        });
-        if (res.ok) {
-          data = await res.json();
-          if (data.max_participants) {
-            setAuctionType("live");
-            populateForm(data, "live");
-            return;
-          }
-        }
-        // fallback: try settled auction endpoint
-        res = await fetch(`${apiUrl}/api/seller/auctions/settled/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-          credentials: "include"
-        });
-        if (res.ok) {
-          data = await res.json();
-          const auctionData = data.auction || data;
-          setAuctionType("settled");
-          populateForm(auctionData, "settled");
-          return;
-        }
+        throw new Error('Auction type not specified in URL.');
       }
-      throw new Error('Auction not found');
     } catch (err) {
       setError('Failed to load auction. Please try again.');
       showToast('Failed to load auction. Please try again.', "error");
@@ -673,7 +650,7 @@ function EditListing({ showToast: _showToast }) {
                     placeholderText="Select end date and time"
                     minDate={startTime ? new Date(startTime.getTime() + 60 * 1000) : undefined}
                     minTime={startTime ? new Date(startTime.getTime() + 60 * 1000) : undefined}
-                    maxTime={DEV_MODE ? undefined : new Date(new Date().setHours(23, 59, 0, 0))}
+                    maxTime={startTime ? new Date(new Date(startTime).setHours(23, 59, 0, 0)) : undefined}
                     filterTime={(time) => {
                       if (!startTime) return true;
                       const minTime = new Date(startTime.getTime() + 60 * 1000);
