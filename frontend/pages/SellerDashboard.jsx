@@ -972,8 +972,10 @@ function SellerDashboard() {
                         {/* Onboarding Button */}
                         {!stripeStatus.payouts_enabled && (
                           <div className="text-center mb-6">
-                            <button
-                              className="bg-gradient-to-r from-purple-500 to-green-400 text-white font-bold py-2 px-6 rounded-lg shadow hover:from-purple-600 hover:to-green-500 transition-all disabled:opacity-60"
+                            <Button
+                              variant="primary"
+                              size="default"
+                              style={{ minWidth: 220, fontSize: 18, borderRadius: 10, fontWeight: 600 }}
                               onClick={async () => {
                                 if (onboardingUrl) {
                                   window.open(onboardingUrl, '_blank', 'noopener');
@@ -985,7 +987,7 @@ function SellerDashboard() {
                               disabled={onboardingLoading}
                             >
                               {onboardingLoading ? 'Loading...' : 'Start/Continue Stripe Onboarding'}
-                            </button>
+                            </Button>
                           </div>
                         )}
                         {/* Payout Form */}
@@ -1048,6 +1050,13 @@ function SellerDashboard() {
                               >
                                 {payoutLoading ? 'Processing...' : 'Request Payout'}
                               </Button>
+                              <div className="flex items-center justify-center mt-2">
+                                <Tooltip text={
+                                  'When you withdraw money, you may see several smaller transactions instead of one big one. This is normal and just means your withdrawal is being completed in parts. The total will always match what you requested to withdraw.'
+                                }>
+                                  <span className="text-xs text-gray-400 underline cursor-pointer ml-2">Why multiple transactions?</span>
+                                </Tooltip>
+                              </div>
                               {/* Improved error/success display */}
                               {payoutError && (
                                 <div className="text-red-400 text-sm mt-1">
