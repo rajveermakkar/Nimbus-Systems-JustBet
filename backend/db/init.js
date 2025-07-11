@@ -930,6 +930,19 @@ const initDatabase = async () => {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
+      // Add unique constraint for deposits on (type, reference_id)
+      await pool.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.table_constraints
+            WHERE constraint_name = 'wallet_transactions_type_reference_id_unique'
+          ) THEN
+            ALTER TABLE wallet_transactions
+            ADD CONSTRAINT wallet_transactions_type_reference_id_unique UNIQUE (type, reference_id);
+          END IF;
+        END$$;
+      `);
       console.log('Created wallet_transactions table');
     } else {
       // Always check and update reference_id column to TEXT if needed
@@ -980,10 +993,28 @@ const initDatabase = async () => {
           user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           auction_id UUID NOT NULL,
           amount NUMERIC(12,2) NOT NULL,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, auction_id)
         );
       `);
       console.log('Created wallet_blocks table');
+    } else {
+      // Ensure UNIQUE(user_id, auction_id) exists
+      const uniqueCheck = await pool.query(`
+        SELECT COUNT(*) FROM information_schema.table_constraints
+        WHERE table_name = 'wallet_blocks' AND constraint_type = 'UNIQUE';
+      `);
+      if (parseInt(uniqueCheck.rows[0].count) === 0) {
+        try {
+          await pool.query(`ALTER TABLE wallet_blocks ADD CONSTRAINT wallet_blocks_user_auction_unique UNIQUE (user_id, auction_id);`);
+          console.log('Added UNIQUE constraint to wallet_blocks (user_id, auction_id)');
+        } catch (err) {
+          if (!err.message.includes('already exists')) {
+            console.error('Error adding UNIQUE constraint to wallet_blocks:', err);
+            throw err;
+          }
+        }
+      }
     }
 
     console.log('Database initialization complete!');
