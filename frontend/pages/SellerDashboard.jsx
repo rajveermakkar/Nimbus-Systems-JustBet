@@ -1000,6 +1000,21 @@ function SellerDashboard() {
                             <form
                               onSubmit={e => {
                                 e.preventDefault();
+                                const amount = Number(payoutAmount);
+                                const available = Number(sellerEarnings || 0);
+                                
+                                if (!payoutAmount || amount <= 0) {
+                                  setPayoutError('Please enter a valid amount');
+                                  setToast({ show: true, message: 'Please enter a valid amount', type: 'error' });
+                                  return;
+                                }
+                                
+                                if (amount > available) {
+                                  setPayoutError(`Amount exceeds available balance (${formatPrice(available)})`);
+                                  setToast({ show: true, message: `Amount exceeds available balance (${formatPrice(available)})`, type: 'error' });
+                                  return;
+                                }
+                                
                                 handlePayout();
                               }}
                               className="flex flex-col gap-3"
@@ -1011,14 +1026,25 @@ function SellerDashboard() {
                                 placeholder="Amount to withdraw (CAD)"
                                 value={payoutAmount}
                                 onChange={e => setPayoutAmount(e.target.value)}
-                                className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-400"
+                                className={`bg-white/10 border rounded px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-400 ${
+                                  payoutAmount && Number(payoutAmount) > Number(sellerEarnings || 0)
+                                    ? 'border-red-400 focus:ring-red-400'
+                                    : 'border-white/20 focus:ring-green-400'
+                                }`}
                               />
+                              <div className="h-6 flex items-center justify-center">
+                                {payoutAmount && Number(payoutAmount) > Number(sellerEarnings || 0) && (
+                                  <div className="text-red-400 text-sm text-center">
+                                    Amount exceeds available balance ({formatPrice(sellerEarnings || 0)})
+                                  </div>
+                                )}
+                              </div>
                               <Button
                                 type="submit"
                                 variant="primary"
                                 size="lg"
                                 className="w-full"
-                                disabled={payoutLoading || !payoutAmount || Number(sellerEarnings) <= 0}
+                                disabled={payoutLoading || !payoutAmount || Number(payoutAmount) <= 0 || Number(payoutAmount) > Number(sellerEarnings || 0)}
                               >
                                 {payoutLoading ? 'Processing...' : 'Request Payout'}
                               </Button>
