@@ -216,8 +216,7 @@ async function fulfillAllRequirementsManually(accountId) {
 async function createRefund(paymentIntentId, amount, currency = 'cad') {
   return await stripe.refunds.create({
     payment_intent: paymentIntentId,
-    amount: Math.round(amount * 100), // Convert to cents
-    currency
+    amount: Math.round(amount * 100) // Convert to cents
   });
 }
 
