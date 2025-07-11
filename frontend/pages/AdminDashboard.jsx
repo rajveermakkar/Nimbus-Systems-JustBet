@@ -770,7 +770,7 @@ function AdminDashboard() {
             <div className="flex items-center justify-between mb-2">
               <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
               <div className="flex items-center gap-4">
-                <span className="text-gray-400 text-sm">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              <span className="text-gray-400 text-sm">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</span>
                 <button
                   onClick={fetchStats}
                   disabled={statsLoading}
@@ -1278,7 +1278,7 @@ function AdminDashboard() {
                                 handleAdminPayout();
                               }}
                               className="max-w-md mx-auto"
-                            >
+                  >
                               <div className="flex flex-col gap-3">
                                 <input
                                   type="number"
@@ -1449,8 +1449,8 @@ function AdminDashboard() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold">Activity Logs</h2>
               <div className="flex items-center gap-4">
-                <div className="text-sm text-gray-400">
-                  Showing {activityLogs.length} logs from the last 48 hours
+              <div className="text-sm text-gray-400">
+                Showing {activityLogs.length} logs from the last 48 hours
                 </div>
                 <button
                   onClick={fetchActivityLogs}

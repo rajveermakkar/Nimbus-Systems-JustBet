@@ -1060,7 +1060,7 @@ function AddCardStepper({ open, onClose, onSuccess }) {
 }
 
 // Withdraw Stepper Modal
-function WithdrawStepper({ open, onClose, onSuccess, onAddCard }) {
+function WithdrawStepper({ open, onClose, onSuccess, onAddCard, balance }) {
   const [step, setStep] = useState(0); // 0: Amount, 1: Confirm, 2: Success
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState('');
@@ -1779,6 +1779,7 @@ function Wallet() {
         onClose={() => setShowWithdraw(false)}
         onSuccess={fetchWallet}
         onAddCard={() => setShowAddCard(true)}
+        balance={balance} // Pass balance as a prop
       />
 
       {/* ConfirmModal for removing card */}
