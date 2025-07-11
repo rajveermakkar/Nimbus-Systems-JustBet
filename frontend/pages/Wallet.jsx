@@ -1060,7 +1060,7 @@ function AddCardStepper({ open, onClose, onSuccess }) {
 }
 
 // Withdraw Stepper Modal
-function WithdrawStepper({ open, onClose, onSuccess, onAddCard }) {
+function WithdrawStepper({ open, onClose, onSuccess, onAddCard, balance }) {
   const [step, setStep] = useState(0); // 0: Amount, 1: Confirm, 2: Success
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState('');
@@ -1469,7 +1469,9 @@ function Wallet() {
   }
 
   // After fetching transactions and balance:
-  const txsWithBalance = computeRunningBalances([...transactions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)), balance);
+  const txsWithBalance = currentPage === 1
+    ? computeRunningBalances([...transactions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)), balance)
+    : transactions;
 
   // Pagination controls
   const totalPages = Math.ceil(totalCount / pageSize);
@@ -1741,10 +1743,12 @@ function Wallet() {
                           <div style={{ fontSize: 13, color: getStatusColor(tx.status), fontWeight: 600, marginTop: 2, textTransform: 'capitalize' }}>
                             {tx.status}
                           </div>
-                          {/* Running balance (optional, can comment out if not needed) */}
-                          <div style={{ fontSize: 12, color: '#b3b3c9', marginTop: 2 }}>
-                            Balance: {formatBalance(tx.runningBalance)}
-                          </div>
+                          {/* Running balance: only show on first page */}
+                          {currentPage === 1 && tx.runningBalance !== undefined && (
+                            <div style={{ fontSize: 12, color: '#b3b3c9', marginTop: 2 }}>
+                              Balance: {formatBalance(tx.runningBalance)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1779,6 +1783,7 @@ function Wallet() {
         onClose={() => setShowWithdraw(false)}
         onSuccess={fetchWallet}
         onAddCard={() => setShowAddCard(true)}
+        balance={balance} // Pass balance as a prop
       />
 
       {/* ConfirmModal for removing card */}
@@ -1842,6 +1847,28 @@ function Wallet() {
           )}
         </div>
       )}
+
+      {/* General Withdrawal Info Note for All Users */}
+      <div style={{
+        marginTop: 18,
+        padding: '16px 20px',
+        background: 'rgba(35, 43, 74, 0.18)',
+        borderRadius: 14,
+        border: '1.5px solid rgba(255,255,255,0.06)',
+        color: '#b3b3c9',
+        fontSize: 14,
+        lineHeight: 1.5,
+        textAlign: 'center',
+        maxWidth: 600,
+        margin: '18px auto 0 auto'
+      }}>
+        <div style={{ fontWeight: 600, color: '#fff', marginBottom: 6, fontSize: 15 }}>
+          ℹ️ About Withdrawals
+        </div>
+        <div>
+          When you withdraw money, you may see several smaller transactions instead of one big one. This is normal and just means your withdrawal is being completed in parts. The total will always match what you requested to withdraw.
+        </div>
+      </div>
     </div>
   );
 }

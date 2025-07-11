@@ -216,9 +216,28 @@ async function fulfillAllRequirementsManually(accountId) {
 async function createRefund(paymentIntentId, amount, currency = 'cad') {
   return await stripe.refunds.create({
     payment_intent: paymentIntentId,
-    amount: Math.round(amount * 100), // Convert to cents
-    currency
+    amount: Math.round(amount * 100) // Convert to cents
   });
+}
+
+// Get refundable amount (in dollars) for a PaymentIntent
+async function getRefundableAmount(paymentIntentId) {
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['charges'] });
+  console.log('[DEBUG] Stripe PaymentIntent:', JSON.stringify(paymentIntent, null, 2));
+  let charge = null;
+  if (paymentIntent.charges && Array.isArray(paymentIntent.charges.data) && paymentIntent.charges.data.length > 0) {
+    charge = paymentIntent.charges.data[0];
+    console.log('[DEBUG] Stripe Charge (from charges.data):', JSON.stringify(charge, null, 2));
+  } else if (paymentIntent.latest_charge) {
+    // Fallback: fetch the charge directly
+    charge = await stripe.charges.retrieve(paymentIntent.latest_charge);
+    console.log('[DEBUG] Stripe Charge (from latest_charge):', JSON.stringify(charge, null, 2));
+  } else {
+    console.log('[DEBUG] No charges found for PaymentIntent:', paymentIntentId);
+    return 0;
+  }
+  if (!charge) return 0;
+  return (charge.amount - charge.amount_refunded) / 100; // dollars
 }
 
 // Admin-specific Stripe methods
@@ -259,6 +278,7 @@ module.exports = {
   fulfillAllTestRequirements,
   fulfillAllRequirementsManually,
   createRefund,
+  getRefundableAmount,
   // Admin methods
   getAccount,
   createAccountLink,

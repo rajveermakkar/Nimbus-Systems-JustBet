@@ -20,13 +20,20 @@ async function getWalletByUserId(userId) {
 
 // Update wallet balance (add or subtract)
 async function updateBalance(userId, amount) {
+  // Check current balance
+  const wallet = await getWalletByUserId(userId);
+  if (!wallet) throw new Error('Wallet not found');
+  const newBalance = Number(wallet.balance) + Number(amount);
+  if (newBalance < 0) {
+    throw new Error('Insufficient funds: wallet balance cannot go negative');
+  }
   const query = `
     UPDATE wallets
-    SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP
+    SET balance = $1, updated_at = CURRENT_TIMESTAMP
     WHERE user_id = $2
     RETURNING *
   `;
-  const result = await queryWithRetry(query, [amount, userId]);
+  const result = await queryWithRetry(query, [newBalance, userId]);
   return result.rows[0];
 }
 

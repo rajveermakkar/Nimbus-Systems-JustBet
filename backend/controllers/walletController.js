@@ -9,7 +9,7 @@ const emailService = require('../services/emailService');
 const { queryWithRetry } = require('../db/init');
 
 
-// Get seller earnings (sum of auction_income minus withdrawals)
+// Get seller earnings (sum of auction_income minus payouts)
 async function getSellerEarnings(userId) {
   const { pool } = require('../db/init');
   // Get seller's wallet id
@@ -22,13 +22,13 @@ async function getSellerEarnings(userId) {
     [walletId]
   );
   const totalIncome = parseFloat(incomeResult.rows[0]?.total_income || 0);
-  // Sum withdrawals
-  const withdrawalResult = await pool.query(
-    `SELECT COALESCE(SUM(ABS(amount)), 0) as total_withdrawals FROM wallet_transactions WHERE wallet_id = $1 AND type = 'withdrawal' AND status = 'succeeded'`,
+  // Sum payouts (not refunds)
+  const payoutResult = await pool.query(
+    `SELECT COALESCE(SUM(ABS(amount)), 0) as total_payouts FROM wallet_transactions WHERE wallet_id = $1 AND type = 'payout' AND status = 'succeeded'`,
     [walletId]
   );
-  const totalWithdrawals = parseFloat(withdrawalResult.rows[0]?.total_withdrawals || 0);
-  return totalIncome - totalWithdrawals;
+  const totalPayouts = parseFloat(payoutResult.rows[0]?.total_payouts || 0);
+  return totalIncome - totalPayouts;
 }
 
 // Get buyer unspent deposits (deposits minus spent on auctions)
@@ -180,10 +180,11 @@ async function createWithdrawalIntent(req, res) {
       return res.status(403).json({ error: 'Direct API access not allowed' });
     }
     const userId = req.user.id;
-    const { amount } = req.body;
+    let { amount } = req.body;
     if (!amount || isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
     }
+    amount = Number(amount);
     const user = await User.findById(userId);
     const wallet = await Wallet.getWalletByUserId(userId);
     if (!wallet) {
@@ -195,7 +196,6 @@ async function createWithdrawalIntent(req, res) {
 
     // Check if user has a connected account (seller)
     const hasConnectedAccount = user.role === 'seller' && user.stripe_account_id;
-    
     if (hasConnectedAccount) {
       // Seller: Check if they have earned funds available for payout
       // For now, we'll assume all withdrawals are refunds unless explicitly earned
@@ -203,38 +203,64 @@ async function createWithdrawalIntent(req, res) {
       console.log('[createWithdrawalIntent] Seller withdrawal - using refund method for deposited funds');
     }
 
-    // Always use refund method for wallet withdrawals (deposited funds)
-    // Find the most recent successful deposit transaction
+    // Multi-deposit/partial refund logic
+    // 1. Get all successful deposits (oldest first)
     const transactions = await Transaction.getTransactionsByUserId(userId);
-    const depositTx = transactions.find(t => t.type === 'deposit' && t.status === 'succeeded' && t.reference_id);
-    
-    if (!depositTx || !depositTx.reference_id) {
-      return res.status(400).json({ error: 'No deposit found to refund.' });
+    const deposits = transactions
+      .filter(t => t.type === 'deposit' && t.status === 'succeeded' && t.reference_id)
+      .reverse(); // oldest first
+
+    // Debug: log refundable info for each deposit
+    let debugTotalRefundable = 0;
+    for (const deposit of deposits) {
+      const refundable = await stripeService.getRefundableAmount(deposit.reference_id);
+      debugTotalRefundable += refundable;
+      console.log(`[DEBUG] Deposit ${deposit.reference_id}: original=${deposit.amount}, refundable_from_stripe=${refundable}`);
     }
-    
-    // Issue refund
-    const refund = await stripeService.createRefund(depositTx.reference_id, amount, wallet.currency || 'cad');
-    if (refund.status === 'succeeded') {
-      await Wallet.updateBalance(userId, -amount);
-      await Transaction.createTransaction({
-        walletId: wallet.id,
-        type: 'withdrawal',
-        amount: -amount,
-        description: 'Wallet withdrawal (refund)',
-        referenceId: refund.id,
-        status: 'succeeded'
-      });
-      if (user.email) {
-        try {
-          await emailService.sendWithdrawalNotification(user.email, amount, wallet.currency || 'CAD');
-        } catch (emailErr) {
-          console.error('Failed to send withdrawal email:', emailErr);
-        }
+    console.log(`[DEBUG] Total refundable from Stripe: ${debugTotalRefundable}, requested: ${amount}`);
+
+    let amountToRefund = amount;
+    let totalRefunded = 0;
+    let refundResults = [];
+    for (const deposit of deposits) {
+      if (amountToRefund <= 0) break;
+      // Get actual refundable amount from Stripe
+      const refundable = await stripeService.getRefundableAmount(deposit.reference_id);
+      if (refundable <= 0) continue;
+      // Refund as much as possible from this deposit
+      const refundThis = Math.min(refundable, amountToRefund);
+      // Issue refund via Stripe
+      const refund = await stripeService.createRefund(deposit.reference_id, refundThis, wallet.currency || 'cad');
+      if (refund.status === 'succeeded') {
+        await Wallet.updateBalance(userId, -refundThis);
+        await Transaction.createTransaction({
+          walletId: wallet.id,
+          type: 'withdrawal',
+          amount: -refundThis,
+          description: `Wallet withdrawal (refund for deposit ${deposit.reference_id})`,
+          referenceId: refund.id,
+          status: 'succeeded'
+        });
+        refundResults.push({ depositId: deposit.reference_id, refundId: refund.id, amount: refundThis });
+        totalRefunded += refundThis;
+        amountToRefund -= refundThis;
+      } else {
+        // If refund failed, stop and return error
+        return res.status(500).json({ error: 'Refund failed for a deposit.' });
       }
-      return res.json({ message: 'Withdrawal processed and refunded', amount });
-    } else {
-      return res.status(500).json({ error: 'Refund failed' });
     }
+    if (totalRefunded < amount) {
+      return res.status(400).json({ error: 'Not enough refundable deposits to cover withdrawal amount.' });
+    }
+    // Send notification for total withdrawal
+    if (user.email) {
+      try {
+        await emailService.sendWithdrawalNotification(user.email, amount, wallet.currency || 'CAD');
+      } catch (emailErr) {
+        console.error('Failed to send withdrawal email:', emailErr);
+      }
+    }
+    return res.json({ message: 'Withdrawal processed and refunded', amount: totalRefunded, refunds: refundResults });
   } catch (err) {
     console.error('Withdrawal error:', err);
     res.status(500).json({ error: 'Failed to process withdrawal' });
@@ -301,7 +327,7 @@ async function createSellerEarningsWithdrawal(req, res) {
     // Record payout transaction (include both transfer and payout IDs)
     await Transaction.createTransaction({
       walletId: wallet.id,
-      type: 'withdrawal',
+      type: 'payout',
       amount: -amount,
       description: 'Seller earnings withdrawal (manual transfer + payout)',
       referenceId: `${transfer.id}|${payout.id}`,
@@ -656,7 +682,7 @@ async function createPayout(req, res) {
       // Seller: seller earnings
       earnings = await getSellerEarnings(userId);
       availableBalance = earnings;
-      txType = 'withdrawal';
+      txType = 'payout';
       txDescription = 'Seller earnings withdrawal (manual transfer + payout)';
     } else {
       return res.status(403).json({ error: 'Only sellers or admins can request payout' });
@@ -699,6 +725,8 @@ async function createPayout(req, res) {
       referenceId: `${transfer.id}|${payout.id}`,
       status: 'succeeded'
     });
+    // Deduct from wallet balance
+    await Wallet.updateBalance(userId, -amount);
 
     res.json({ success: true, transferId: transfer.id, payoutId: payout.id });
   } catch (err) {

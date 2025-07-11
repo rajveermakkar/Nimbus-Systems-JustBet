@@ -22,7 +22,7 @@ async function createLiveAuction(req, res) {
       } catch (walletErr) {
         console.error('Failed to create wallet for seller:', walletErr);
         return res.status(500).json({ error: 'Failed to create seller wallet. Please try again.' });
-      }
+    }
     }
     
     const { title, description, imageUrl, startTime, endTime, startingPrice, reservePrice, minBidIncrement, maxParticipants } = req.body;
