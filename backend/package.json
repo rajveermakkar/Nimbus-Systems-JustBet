@@ -8,7 +8,11 @@
     "dev": "nodemon server.js",
     "test": "jest --setupFilesAfterEnv ./tests/setup.js --detectOpenHandles --forceExit",
     "test:watch": "jest --watch --setupFilesAfterEnv ./tests/setup.js",
-    "test:coverage": "jest --coverage --setupFilesAfterEnv ./tests/setup.js"
+    "test:coverage": "jest --coverage --setupFilesAfterEnv ./tests/setup.js",
+    "test:payment": "jest tests/payment.test.js --setupFilesAfterEnv ./tests/setup.js --detectOpenHandles --forceExit --verbose",
+    "test:payment:watch": "jest tests/payment.test.js --setupFilesAfterEnv ./tests/setup.js --watch",
+    "test:payment:coverage": "jest tests/payment.test.js --setupFilesAfterEnv ./tests/setup.js --coverage",
+    "test:payment:runner": "node scripts/run-payment-tests.js"
   },
   "keywords": [],
   "author": "",
