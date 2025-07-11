@@ -49,6 +49,11 @@ router.get('/activity-logs', adminController.getActivityLogs);
 // Get platform earnings/fees
 router.get('/earnings', adminController.getPlatformEarnings);
 
+// Test route to verify admin routes are working
+router.get('/test-stripe', (req, res) => {
+  res.json({ message: 'Admin Stripe routes are working' });
+});
+
 // PATCH user role
 router.patch('/users/:userId/role', adminController.changeUserRole);
 

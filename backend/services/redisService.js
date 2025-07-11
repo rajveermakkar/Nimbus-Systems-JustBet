@@ -34,58 +34,84 @@ redis.on('close', () => {
 
 // Helper functions for auction caching
 const auctionCache = {
-  // Get cached data
+  // Get cached data with timing
   async get(key) {
+    const startTime = Date.now();
     try {
       const cached = await redis.get(key);
-      return cached ? JSON.parse(cached) : null;
+      const duration = Date.now() - startTime;
+      if (cached) {
+        console.log(`[REDIS] ${key} - CACHE HIT (${duration}ms)`);
+        return JSON.parse(cached);
+      } else {
+        console.log(`[REDIS] ${key} - CACHE MISS (${duration}ms)`);
+        return null;
+      }
     } catch (error) {
-      console.error('Redis get error:', error);
+      const duration = Date.now() - startTime;
+      console.error(`[REDIS] ${key} - ERROR (${duration}ms):`, error);
       return null;
     }
   },
 
-  // Set cached data with TTL
+  // Set cached data with TTL and timing
   async set(key, data, ttl = 30) {
+    const startTime = Date.now();
     try {
       await redis.setex(key, ttl, JSON.stringify(data));
+      const duration = Date.now() - startTime;
+      console.log(`[REDIS] ${key} - CACHE SET (${duration}ms)`);
       return true;
     } catch (error) {
-      console.error('Redis set error:', error);
+      const duration = Date.now() - startTime;
+      console.error(`[REDIS] ${key} - SET ERROR (${duration}ms):`, error);
       return false;
     }
   },
 
-  // Delete cache key
+  // Delete cache key with timing
   async del(key) {
+    const startTime = Date.now();
     try {
       await redis.del(key);
+      const duration = Date.now() - startTime;
+      console.log(`[REDIS] ${key} - CACHE DEL (${duration}ms)`);
       return true;
     } catch (error) {
-      console.error('Redis del error:', error);
+      const duration = Date.now() - startTime;
+      console.error(`[REDIS] ${key} - DEL ERROR (${duration}ms):`, error);
       return false;
     }
   },
 
-  // Delete multiple keys
+  // Delete multiple keys with timing
   async delMultiple(keys) {
+    const startTime = Date.now();
     try {
       if (keys.length > 0) {
         await redis.del(...keys);
       }
+      const duration = Date.now() - startTime;
+      console.log(`[REDIS] Multiple keys - CACHE DEL (${duration}ms)`);
       return true;
     } catch (error) {
-      console.error('Redis delMultiple error:', error);
+      const duration = Date.now() - startTime;
+      console.error(`[REDIS] Multiple keys - DEL ERROR (${duration}ms):`, error);
       return false;
     }
   },
 
-  // Get TTL for a key
+  // Get TTL for a key with timing
   async getTTL(key) {
+    const startTime = Date.now();
     try {
-      return await redis.ttl(key);
+      const ttl = await redis.ttl(key);
+      const duration = Date.now() - startTime;
+      console.log(`[REDIS] ${key} - TTL CHECK (${duration}ms)`);
+      return ttl;
     } catch (error) {
-      console.error('Redis TTL error:', error);
+      const duration = Date.now() - startTime;
+      console.error(`[REDIS] ${key} - TTL ERROR (${duration}ms):`, error);
       return -1;
     }
   },

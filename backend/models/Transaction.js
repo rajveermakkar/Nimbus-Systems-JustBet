@@ -54,10 +54,42 @@ async function getTransactionCountByUserId(userId) {
   return parseInt(result.rows[0].count, 10);
 }
 
+// Get total platform fees
+async function getTotalPlatformFees() {
+  const query = `
+    SELECT COALESCE(SUM(amount), 0) as total
+    FROM wallet_transactions wt
+    JOIN wallets w ON wt.wallet_id = w.id
+    WHERE wt.type = 'platform_fee'
+  `;
+  const result = await queryWithRetry(query);
+  return parseFloat(result.rows[0].total);
+}
+
+// Create transaction directly (for admin payouts)
+async function create({ user_id, type, amount, description, status = 'succeeded', reference_id = null }) {
+  // Get user's wallet
+  const Wallet = require('./Wallet');
+  const wallet = await Wallet.getWalletByUserId(user_id);
+  if (!wallet) {
+    throw new Error('User wallet not found');
+  }
+  
+  const query = `
+    INSERT INTO wallet_transactions (wallet_id, type, amount, description, reference_id, status)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING *
+  `;
+  const result = await queryWithRetry(query, [wallet.id, type, amount, description, reference_id, status]);
+  return result.rows[0];
+}
+
 module.exports = {
   createTransaction,
   getTransactionsByWalletId,
   getTransactionsByUserId,
   getTransactionsByUserIdPaginated,
-  getTransactionCountByUserId
+  getTransactionCountByUserId,
+  getTotalPlatformFees,
+  create
 }; 

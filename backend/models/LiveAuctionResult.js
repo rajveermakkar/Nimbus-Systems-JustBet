@@ -11,6 +11,7 @@ const LiveAuctionResult = {
     const query = `
       INSERT INTO live_auction_results (auction_id, winner_id, final_bid, reserve_met, status)
       VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (auction_id) DO NOTHING
       RETURNING *
     `;
     const result = await pool.query(query, [auctionId, winnerId, finalBid, reserveMet, status]);
@@ -57,30 +58,42 @@ const LiveAuctionResult = {
 
 // Finalize a live auction (process winner, funds, etc.)
 LiveAuctionResult.finalizeAuction = async function(auctionId) {
+  console.log(`[FINALIZE] Starting finalizeAuction for auctionId=${auctionId}`);
+  
   // Get the auction
   const auction = await LiveAuction.findById(auctionId);
-  if (!auction || auction.status === 'closed') return;
+  if (!auction || auction.status === 'closed') {
+    console.log(`[FINALIZE] Auction ${auctionId} not found or already closed, skipping.`);
+    return;
+  }
   
-  // Check if result already exists for this auction
+  // Check if result already exists for this auction (double-check)
   const existingResult = await LiveAuctionResult.findByAuctionId(auctionId);
   if (existingResult) {
+    console.log(`[FINALIZE] Result already exists for auctionId=${auctionId}, skipping processing.`);
     // Always update status to closed, even if result exists
     await LiveAuction.updateAuction(auctionId, { status: 'closed' });
     return;
   }
   
+  console.log(`[FINALIZE] Proceeding with auction finalization for auctionId=${auctionId}`);
+  
   // Get all bids
   const bids = await LiveAuctionBid.findByAuctionId(auctionId);
   if (!bids.length) {
     // No bids placed
+    console.log(`[FINALIZE] No bids found for auctionId=${auctionId}, creating no_bids result.`);
     await LiveAuction.updateAuction(auctionId, { status: 'closed', current_highest_bidder_id: null });
-    await LiveAuctionResult.create({
+    const result = await LiveAuctionResult.create({
       auctionId,
       winnerId: null,
       finalBid: null,
       reserveMet: false,
       status: 'no_bids'
     });
+    if (!result) {
+      console.log(`[FINALIZE] Duplicate result creation prevented for auctionId=${auctionId} (no_bids)`);
+    }
     return;
   }
   
@@ -106,25 +119,34 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
 
   // Check reserve price
   if (auction.reserve_price && Number(highestBid.amount) < Number(auction.reserve_price)) {
+    console.log(`[FINALIZE] Reserve price not met for auctionId=${auctionId}, creating reserve_not_met result.`);
     await LiveAuction.updateAuction(auctionId, { status: 'closed', current_highest_bidder_id: null });
-    await LiveAuctionResult.create({
+    const result = await LiveAuctionResult.create({
       auctionId,
       winnerId: null,
       finalBid: highestBid.amount,
       reserveMet: false,
       status: 'reserve_not_met'
     });
+    if (!result) {
+      console.log(`[FINALIZE] Duplicate result creation prevented for auctionId=${auctionId} (reserve_not_met)`);
+    }
     return;
   }
   // Set winner
+  console.log(`[FINALIZE] Creating winning result for auctionId=${auctionId}, winner=${highestBid.user_id}`);
   await LiveAuction.updateAuction(auctionId, { status: 'closed', current_highest_bidder_id: highestBid.user_id });
-  await LiveAuctionResult.create({
+  const result = await LiveAuctionResult.create({
     auctionId,
     winnerId: highestBid.user_id,
     finalBid: highestBid.amount,
     reserveMet: true,
     status: 'won'
   });
+  if (!result) {
+    console.log(`[FINALIZE] Duplicate result creation prevented for auctionId=${auctionId} (won)`);
+    return; // Don't process wallet operations if result creation was prevented
+  }
   // --- WALLET BLOCK/FUND LOGIC ---
   // 1. Release wallet blocks for all non-winning bidders
   for (const bid of bids) {

@@ -7,7 +7,7 @@ import Button from '../src/components/Button';
 import { AnimatePresence, motion } from 'framer-motion';
 import { UserContext } from '../src/context/UserContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash, faArrowDown, faArrowUp, faCreditCard, faTrophy, faUndo, faUniversity, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faTrash, faArrowDown, faArrowUp, faCreditCard, faTrophy, faUndo, faUniversity, faQuestionCircle, faMoneyBillWave } from '@fortawesome/free-solid-svg-icons';
 import ConfirmModal from '../src/components/ConfirmModal';
 import LoadingSpinner from '../src/components/LoadingSpinner';
 
@@ -565,7 +565,7 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
         window.fetchPaymentMethods();
       }
       setTimeout(() => {
-        onClose();
+        onSuccess(Number(amount)); // Pass the deposit amount
       }, 1200);
     } catch (err) {
       setConfirmError(err.message || 'Failed to process payment');
@@ -601,7 +601,7 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
         window.fetchPaymentMethods();
       }
       setTimeout(() => {
-        onClose();
+        onSuccess(Number(amount)); // Pass the deposit amount
       }, 1200);
     } catch (err) {
       setConfirmError(err.message || 'Failed to process payment');
@@ -1095,6 +1095,11 @@ function WithdrawStepper({ open, onClose, onSuccess, onAddCard }) {
       setAmountError('Enter a valid amount');
       return;
     }
+    // Check if withdrawal amount exceeds available balance
+    if (Number(amount) > Number(balance)) {
+      setAmountError(`Cannot withdraw more than your available balance of ${formatBalance(balance)}`);
+      return;
+    }
     setStep(1);
   }
 
@@ -1107,6 +1112,30 @@ function WithdrawStepper({ open, onClose, onSuccess, onAddCard }) {
       setSuccessMsg('Withdrawal request submitted!');
       setTimeout(() => {
         onClose();
+        // Update balance and add withdrawal transaction
+        walletService.getBalance()
+          .then(bal => {
+            setBalance(bal.balance);
+            const newTransaction = {
+              id: `temp-withdrawal-${Date.now()}`,
+              type: 'withdrawal',
+              amount: -parseFloat(amount), // Negative for withdrawal
+              description: 'Wallet Withdrawal',
+              status: 'pending',
+              created_at: new Date().toISOString(),
+              reference_id: `withdrawal-${Date.now()}`
+            };
+            setTransactions(prev => [newTransaction, ...prev]);
+            // Update monthly summary
+            setMonthlySummary(prev => ({
+              ...prev,
+              totalWithdrawn: prev.totalWithdrawn + parseFloat(amount),
+              transactionCount: prev.transactionCount + 1
+            }));
+          })
+          .catch(err => {
+            console.error('Failed to update balance after withdrawal:', err);
+          });
         onSuccess && onSuccess();
       }, 1200);
     } catch (err) {
@@ -1193,6 +1222,8 @@ function getTxIconAndColor(tx) {
     return { icon: faArrowDown, color: '#6fffbe', bg: 'rgba(111,255,190,0.12)' };
   } else if (tx.type === 'withdrawal') {
     return { icon: faArrowUp, color: '#ff6b6b', bg: 'rgba(255,107,107,0.12)' };
+  } else if (tx.type === 'platform_fee') {
+    return { icon: faMoneyBillWave, color: '#10b981', bg: 'rgba(16,185,129,0.12)' };
   } else if (tx.description?.toLowerCase().includes('payment')) {
     return { icon: faCreditCard, color: '#ffd166', bg: 'rgba(255,209,102,0.12)' };
   } else if (tx.description?.toLowerCase().includes('auction win')) {
@@ -1260,6 +1291,7 @@ function Wallet() {
   const [totalCount, setTotalCount] = useState(0);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [monthlySummary, setMonthlySummary] = useState({ totalAdded: 0, totalWithdrawn: 0, totalSpent: 0, transactionCount: 0 });
+  const [lastDepositAmount, setLastDepositAmount] = useState(0);
 
   // Lock background scroll when any modal is open
   useEffect(() => {
@@ -1284,7 +1316,14 @@ function Wallet() {
     const interval = setInterval(() => {
       // Only poll if wallet exists and user is on the wallet page
       if (balance !== null && !loading) {
-        fetchWallet();
+        // Update balance only, don't refetch all transactions
+        walletService.getBalance()
+          .then(bal => {
+            setBalance(bal.balance);
+          })
+          .catch(err => {
+            console.error('Failed to update balance during polling:', err);
+          });
       }
     }, 30000); // 30 seconds
 
@@ -1367,11 +1406,42 @@ function Wallet() {
   const totalWithdrawn = thisMonthTxs.filter(tx => tx.type === 'withdrawal' && tx.amount < 0).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
 
   // Only fetchWallet after AddFundsStepper closes, not during payment
-  function handleAddFundsModalClose() {
+  function handleAddFundsModalClose(depositAmount = 0) {
     setShowDeposit(false);
-    setShowDeposit(false);
-  setIsUpdating(true);
-  fetchWallet().finally(() => setIsUpdating(false)); // Wait for modal animation to finish
+    setLastDepositAmount(depositAmount);
+    // Update balance only, don't refetch all transactions
+    setIsUpdating(true);
+    walletService.getBalance()
+      .then(bal => {
+        setBalance(bal.balance);
+        // Only add transaction if there was an actual deposit
+        if (depositAmount > 0) {
+          const newTransaction = {
+            id: `temp-deposit-${Date.now()}`,
+            type: 'deposit',
+            amount: parseFloat(depositAmount),
+            description: 'Wallet Deposit',
+            status: 'succeeded',
+            created_at: new Date().toISOString(),
+            reference_id: `deposit-${Date.now()}`
+          };
+          setTransactions(prev => [newTransaction, ...prev]);
+          // Update monthly summary
+          setMonthlySummary(prev => ({
+            ...prev,
+            totalAdded: prev.totalAdded + parseFloat(depositAmount),
+            transactionCount: prev.transactionCount + 1
+          }));
+        }
+      })
+      .catch(err => {
+        console.error('Failed to update balance:', err);
+        // If balance update fails, still close modal but don't update transactions
+      })
+      .finally(() => {
+        setIsUpdating(false);
+        setLastDepositAmount(0); // Reset after use
+      });
   }
 
   // Add card modal logic
@@ -1687,7 +1757,13 @@ function Wallet() {
       )}
 
       {/* Deposit Modal */}
-      <AddFundsStepper open={showDeposit} onClose={handleAddFundsModalClose} onSuccess={fetchWallet} userEmail={user?.email} paymentMethods={paymentMethods} />
+      <AddFundsStepper 
+        open={showDeposit} 
+        onClose={() => handleAddFundsModalClose(0)} 
+        onSuccess={(amount) => handleAddFundsModalClose(amount)} 
+        userEmail={user?.email} 
+        paymentMethods={paymentMethods} 
+      />
 
       {/* Add Card Modal */}
       <LocalErrorBoundary>
@@ -1733,7 +1809,40 @@ function Wallet() {
           </Button>
         </div>
       )}
-      {loadingTransactions && <LoadingSpinner message="Loading transactions..." />}    </div>
+      {loadingTransactions && <LoadingSpinner message="Loading transactions..." />}
+      
+      {/* Withdrawal Information Note - Only show for sellers and admins */}
+      {(user?.role === 'seller' || user?.role === 'admin') && (
+        <div style={{
+          marginTop: 32,
+          padding: '20px 24px',
+          background: 'rgba(35, 43, 74, 0.25)',
+          borderRadius: 16,
+          border: '1.5px solid rgba(255,255,255,0.08)',
+          color: '#b3b3c9',
+          fontSize: 14,
+          lineHeight: 1.5,
+          textAlign: 'center',
+          maxWidth: 600,
+          margin: '32px auto 0 auto'
+        }}>
+          <div style={{ fontWeight: 600, color: '#fff', marginBottom: 8, fontSize: 16 }}>
+            💡 Important Note
+          </div>
+          {user?.role === 'seller' ? (
+            <div>
+              <strong>Seller Earnings:</strong> Funds deposited for buying can only be withdrawn from this wallet. 
+             <br/> To withdraw your seller earnings, please use your <strong>Seller Dashboard</strong>.
+            </div>
+          ) : (
+            <div>
+              <strong>Admin Earnings:</strong> Funds deposited for buying can only be withdrawn from this wallet. 
+              <br/> To withdraw platform fee earnings, please use your <strong>Admin Dashboard</strong>.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
