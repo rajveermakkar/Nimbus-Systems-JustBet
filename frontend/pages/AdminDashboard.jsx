@@ -8,6 +8,7 @@ import AuctionDetailsPanel from '../src/components/auctions/AuctionDetailsPanel'
 import LoadingSpinner from '../src/components/LoadingSpinner';
 import ConfirmModal from '../src/components/ConfirmModal';
 import apiService from '../src/services/apiService';
+import Button from '../src/components/Button';
 
 function AdminDashboard() {
   const { user, setUser } = useContext(UserContext);
@@ -101,6 +102,17 @@ function AdminDashboard() {
   const [earningsLoading, setEarningsLoading] = useState(false);
   const [earningsError, setEarningsError] = useState(null);
 
+  // Add admin Stripe onboarding state
+  const [adminStripeStatus, setAdminStripeStatus] = useState(null);
+  const [adminStripeStatusLoading, setAdminStripeStatusLoading] = useState(false);
+  const [adminStripeStatusError, setAdminStripeStatusError] = useState('');
+  const [adminOnboardingUrl, setAdminOnboardingUrl] = useState('');
+  const [adminOnboardingLoading, setAdminOnboardingLoading] = useState(false);
+  const [adminPayoutAmount, setAdminPayoutAmount] = useState('');
+  const [adminPayoutLoading, setAdminPayoutLoading] = useState(false);
+  const [adminPayoutError, setAdminPayoutError] = useState('');
+  const [adminPayoutSuccess, setAdminPayoutSuccess] = useState('');
+
   // --- MODAL FOR APPROVING AUCTION ---
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [approveTarget, setApproveTarget] = useState(null); // {type, id}
@@ -127,7 +139,7 @@ function AdminDashboard() {
 
   // --- API HELPERS ---
   const api = axios.create({
-    baseURL: import.meta.env.VITE_BACKEND_URL + "/api",
+    baseURL: (import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000') + "/api",
     withCredentials: true
   });
 
@@ -375,6 +387,52 @@ function AdminDashboard() {
     }
   };
 
+  // Admin Stripe Connect functions
+  const fetchAdminStripeStatus = async () => {
+    setAdminStripeStatusLoading(true);
+    setAdminStripeStatusError('');
+    try {
+      const res = await api.get("/wallet/stripe-connect/status");
+      setAdminStripeStatus(res.data);
+    } catch (err) {
+      setAdminStripeStatusError(err?.response?.data?.error || err.message || 'Failed to fetch admin payout status');
+      setAdminStripeStatus(null);
+    }
+    setAdminStripeStatusLoading(false);
+  };
+
+  const handleAdminStartOnboarding = async () => {
+    setAdminOnboardingLoading(true);
+    setAdminStripeStatusError('');
+    try {
+      const res = await api.post("/wallet/stripe-connect/onboarding");
+      setAdminOnboardingUrl(res.data.url);
+      // Auto-redirect to Stripe onboarding
+      window.location.href = res.data.url;
+    } catch (err) {
+      setAdminStripeStatusError(err?.response?.data?.error || err.message || 'Failed to start admin onboarding');
+    }
+    setAdminOnboardingLoading(false);
+  };
+
+  const handleAdminPayout = async () => {
+    setAdminPayoutLoading(true);
+    setAdminPayoutError('');
+    setAdminPayoutSuccess('');
+    try {
+      await api.post("/wallet/stripe-connect/payout", { amount: Number(adminPayoutAmount) });
+      setAdminPayoutSuccess('Admin payout requested successfully!');
+      setAdminPayoutAmount('');
+      // Refresh earnings data
+      await fetchEarnings();
+      showToast('Admin payout requested successfully! Your platform fees will be transferred to your bank account.', 'success');
+    } catch (err) {
+      setAdminPayoutError(err?.response?.data?.error || err.message || 'Failed to request admin payout');
+      showToast(err?.response?.data?.error || err.message || 'Failed to request admin payout', 'error');
+    }
+    setAdminPayoutLoading(false);
+  };
+
   // --- EFFECTS: FETCH DATA ON SECTION CHANGE ---
   useEffect(() => {
     // Log section change and what will be fetched
@@ -389,7 +447,10 @@ function AdminDashboard() {
       fetchAllSettledAuctions();
       fetchAllLiveAuctions();
     }
-    if (section === "earnings") fetchEarnings();
+    if (section === "earnings") {
+      fetchEarnings();
+      fetchAdminStripeStatus();
+    }
     if (section === "db-health") fetchDbHealth();
     if (section === 'activity-logs') {
       console.log('Fetching activity logs...');
@@ -402,6 +463,29 @@ function AdminDashboard() {
     console.log('Component mounted, forcing activity logs fetch...');
     fetchActivityLogs();
   }, []);
+
+  // Auto-polling for earnings data
+  useEffect(() => {
+    if (section === 'earnings') {
+      // Initial fetch
+      fetchEarnings();
+      fetchAdminStripeStatus();
+      
+      // Set up polling every 30 seconds
+      const earningsInterval = setInterval(() => {
+        fetchEarnings();
+      }, 30000);
+      
+      const stripeInterval = setInterval(() => {
+        fetchAdminStripeStatus();
+      }, 30000);
+      
+      return () => {
+        clearInterval(earningsInterval);
+        clearInterval(stripeInterval);
+      };
+    }
+  }, [section]);
 
   // --- MODAL FOR REJECTING AUCTION ---
   const openRejectModal = (type, id) => {
@@ -685,7 +769,17 @@ function AdminDashboard() {
             {/* Header */}
             <div className="flex items-center justify-between mb-2">
               <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
-              <span className="text-gray-400 text-sm">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              <div className="flex items-center gap-4">
+                <span className="text-gray-400 text-sm">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                <button
+                  onClick={fetchStats}
+                  disabled={statsLoading}
+                  className="text-gray-400 hover:text-white transition-colors p-1"
+                  title="Refresh dashboard stats"
+                >
+                  <i className={`fa-solid fa-sync-alt ${statsLoading ? 'animate-spin' : ''}`}></i>
+                </button>
+              </div>
             </div>
             {/* Stats Row */}
             {statsLoading ? <div className="text-gray-300">Loading stats...</div> : statsError ? <div className="text-red-400">{statsError}</div> : statsData && (
@@ -755,6 +849,17 @@ function AdminDashboard() {
       case "manage-users":
         return (
           <div className="flex flex-col flex-1 h-full min-h-0">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Manage Users</h2>
+              <button
+                onClick={fetchAllUsers}
+                disabled={allUsersLoading}
+                className="text-gray-400 hover:text-white transition-colors p-1"
+                title="Refresh users data"
+              >
+                <i className={`fa-solid fa-sync-alt ${allUsersLoading ? 'animate-spin' : ''}`}></i>
+              </button>
+            </div>
             <div className="flex-1 h-full min-h-0 overflow-auto">
               <table className="table-fixed w-full bg-transparent rounded-xl overflow-hidden">
                 <thead>
@@ -786,6 +891,17 @@ function AdminDashboard() {
       case "approve-users":
         return (
           <div className="flex flex-col flex-1 h-full min-h-0">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Approve Users</h2>
+              <button
+                onClick={fetchPendingSellers}
+                disabled={pendingSellersLoading}
+                className="text-gray-400 hover:text-white transition-colors p-1"
+                title="Refresh pending sellers data"
+              >
+                <i className={`fa-solid fa-sync-alt ${pendingSellersLoading ? 'animate-spin' : ''}`}></i>
+              </button>
+            </div>
             <div className="flex-1 h-full min-h-0 overflow-auto">
               <table className="table-fixed w-full bg-transparent rounded-xl overflow-hidden">
                 <thead>
@@ -824,6 +940,17 @@ function AdminDashboard() {
         ]);
         return (
           <div className="flex flex-col flex-1 h-full min-h-0">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Manage Auctions</h2>
+              <button
+                onClick={() => { fetchAllSettledAuctions(); fetchAllLiveAuctions(); }}
+                disabled={allSettledLoading || allLiveLoading}
+                className="text-gray-400 hover:text-white transition-colors p-1"
+                title="Refresh auctions data"
+              >
+                <i className={`fa-solid fa-sync-alt ${allSettledLoading || allLiveLoading ? 'animate-spin' : ''}`}></i>
+              </button>
+            </div>
             <div className="flex-1 h-full min-h-0 overflow-auto">
               <div className="mb-4 flex items-center gap-2">
                 <label className="text-gray-300">Filter:</label>
@@ -878,7 +1005,17 @@ function AdminDashboard() {
       case "earnings":
         return (
           <div className="h-full overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">Platform Earnings</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Platform Earnings</h2>
+              <button
+                onClick={fetchEarnings}
+                disabled={earningsLoading}
+                className="text-gray-400 hover:text-white transition-colors p-1"
+                title="Refresh earnings data"
+              >
+                <i className={`fa-solid fa-sync-alt ${earningsLoading ? 'animate-spin' : ''}`}></i>
+              </button>
+            </div>
             {earningsLoading ? (
               <div className="text-gray-300">Loading earnings data...</div>
             ) : earningsError ? (
@@ -886,7 +1023,7 @@ function AdminDashboard() {
             ) : earningsData ? (
               <div className="space-y-6 pb-6">
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="rounded-xl p-6 border border-white/10 bg-gradient-to-br from-green-500/10 to-green-600/10">
                     <div className="flex items-center justify-between">
                       <div>
@@ -897,6 +1034,20 @@ function AdminDashboard() {
                       </div>
                       <div className="text-green-400 text-3xl">
                         <i className="fa-solid fa-dollar-sign"></i>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-xl p-6 border border-white/10 bg-gradient-to-br from-blue-500/10 to-blue-600/10">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-400 text-sm">Available to Withdraw</p>
+                        <p className="text-2xl font-bold text-blue-400">
+                          ${earningsData.availableBalance?.toFixed(2) || '0.00'}
+                        </p>
+                      </div>
+                      <div className="text-blue-400 text-3xl">
+                        <i className="fa-solid fa-wallet"></i>
                       </div>
                     </div>
                   </div>
@@ -1026,16 +1177,153 @@ function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Refresh Button */}
-                <div className="flex justify-center">
-                  <button
-                    onClick={fetchEarnings}
-                    disabled={earningsLoading}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition"
-                  >
-                    <i className="fa-solid fa-sync-alt"></i>
-                    {earningsLoading ? 'Refreshing...' : 'Refresh Data'}
-                  </button>
+                {/* Admin Stripe Connect Section */}
+                <div className="rounded-xl p-6 border border-white/10 mt-8">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i className="fa-solid fa-university"></i>
+                    Admin Payout Management
+                  </h3>
+                  
+                  {/* Admin Stripe Connect Onboarding Status */}
+                  {adminStripeStatusLoading ? (
+                    <div className="text-center py-4">Checking admin onboarding status...</div>
+                  ) : (
+                    (!adminStripeStatus || (adminStripeStatusError && /no connected account|not found|404/i.test(adminStripeStatusError))) ? (
+                      <div className="text-center py-8">
+                        <div className="text-4xl mb-3">🔗</div>
+                        <div className="text-lg font-semibold mb-2 text-red-400">No admin Stripe account connected</div>
+                        <div className="text-gray-300 mb-4">To receive platform fee payouts, you must connect your Stripe account as admin. Click below to create or connect your account.</div>
+                        <Button
+                          variant="primary"
+                          size="default"
+                          onClick={handleAdminStartOnboarding}
+                          disabled={adminOnboardingLoading}
+                          className="flex items-center gap-2"
+                        >
+                          {adminOnboardingLoading ? 'Loading...' : 'Create/Connect Admin Stripe Account'}
+                        </Button>
+                        {adminStripeStatusError && !/no connected account|not found|404/i.test(adminStripeStatusError) && (
+                          <div className="text-red-400 text-sm mt-4">{adminStripeStatusError}</div>
+                        )}
+                      </div>
+                    ) : adminStripeStatusError ? (
+                      <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-4 text-center text-red-400">{adminStripeStatusError}</div>
+                    ) : (
+                      <>
+                        <div className="mb-4 text-center">
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mb-2 ${
+                            adminStripeStatus.payouts_enabled ? 'bg-purple-900/30 text-purple-400 border border-purple-500/30' :
+                            adminStripeStatus.details_submitted ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/30' :
+                            'bg-red-900/30 text-red-400 border border-red-500/30'
+                          }`}>
+                            {adminStripeStatus.payouts_enabled ? 'Ready for Payouts' :
+                              adminStripeStatus.details_submitted ? 'Pending Verification' :
+                              'Onboarding Required'}
+                          </span>
+                          <div className="text-gray-300 mt-2">
+                            {adminStripeStatus.payouts_enabled ? (
+                              <>Your admin Stripe account is fully onboarded and ready to receive platform fee payouts.</>
+                            ) : adminStripeStatus.details_submitted ? (
+                              <>Your admin onboarding is submitted and pending verification by Stripe. You will be notified when payouts are enabled.</>
+                            ) : (
+                              <>You must complete admin onboarding to receive platform fee payouts. Click below to start or continue onboarding.</>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Admin Onboarding Button */}
+                        {!adminStripeStatus.payouts_enabled && (
+                          <div className="text-center mb-6">
+                            <Button
+                              variant="primary"
+                              size="default"
+                              onClick={handleAdminStartOnboarding}
+                              disabled={adminOnboardingLoading}
+                              className="flex items-center gap-2"
+                            >
+                              {adminOnboardingLoading ? 'Loading...' : 'Start/Continue Admin Stripe Onboarding'}
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {/* Admin Payout Form */}
+                        {adminStripeStatus.payouts_enabled && (
+                          <div className="mt-8">
+                            <h4 className="text-lg font-semibold mb-2 text-green-400">Request Platform Fee Payout</h4>
+                            {/* Platform Fees Available to Withdraw */}
+                            <div className="mb-4 text-center">
+                              <span className="block text-md text-gray-200 font-semibold mb-1">Platform Fees Available to Withdraw:</span>
+                              <span className="text-2xl font-bold text-green-300">
+                                ${earningsData?.availableBalance?.toFixed(2) || '0.00'}
+                              </span>
+                            </div>
+                            <form
+                              onSubmit={e => {
+                                e.preventDefault();
+                                const amount = Number(adminPayoutAmount);
+                                const available = Number(earningsData?.availableBalance || 0);
+                                
+                                if (!adminPayoutAmount || amount <= 0) {
+                                  setAdminPayoutError('Please enter a valid amount');
+                                  showToast('Please enter a valid amount', 'error');
+                                  return;
+                                }
+                                
+                                if (amount > available) {
+                                  setAdminPayoutError(`Amount exceeds available balance ($${available.toFixed(2)})`);
+                                  showToast(`Amount exceeds available balance ($${available.toFixed(2)})`, 'error');
+                                  return;
+                                }
+                                
+                                handleAdminPayout();
+                              }}
+                              className="max-w-md mx-auto"
+                            >
+                              <div className="flex flex-col gap-3">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  step="0.01"
+                                  placeholder="Amount to withdraw (CAD)"
+                                  value={adminPayoutAmount}
+                                  onChange={e => setAdminPayoutAmount(e.target.value)}
+                                  className={`bg-white/10 border rounded px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-400 ${
+                                    adminPayoutAmount && Number(adminPayoutAmount) > Number(earningsData?.availableBalance || 0)
+                                      ? 'border-red-400 focus:ring-red-400'
+                                      : 'border-white/20 focus:ring-green-400'
+                                  }`}
+                                />
+                                <div className="h-6 flex items-center justify-center">
+                                  {adminPayoutAmount && Number(adminPayoutAmount) > Number(earningsData?.availableBalance || 0) && (
+                                    <div className="text-red-400 text-sm text-center">
+                                      Amount exceeds available balance (${earningsData?.availableBalance?.toFixed(2) || '0.00'})
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  type="submit"
+                                  variant="primary"
+                                  size="default"
+                                  disabled={adminPayoutLoading || !adminPayoutAmount || Number(adminPayoutAmount) <= 0 || Number(adminPayoutAmount) > Number(earningsData?.availableBalance || 0)}
+                                >
+                                  {adminPayoutLoading ? 'Processing...' : 'Request Platform Fee Payout'}
+                                </Button>
+                                {/* Error/Success display */}
+                                {adminPayoutError && (
+                                  <div className="text-red-400 text-sm mt-1">
+                                    {adminPayoutError.includes('PaymentIntent') || adminPayoutError.includes('stripe')
+                                      ? 'Failed to create admin payout. Please check your Stripe account and try again.'
+                                      : adminPayoutError}
+                                  </div>
+                                )}
+                                {adminPayoutSuccess && <div className="text-green-400 text-sm mt-1">{adminPayoutSuccess}</div>}
+                              </div>
+                            </form>
+                          </div>
+                        )}
+                      </>
+                    )
+                  )}
                 </div>
               </div>
             ) : (
@@ -1046,7 +1334,17 @@ function AdminDashboard() {
       case "db-health":
         return (
           <div className="h-full overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">Database Health Monitor</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold"> Health Monitor</h2>
+              <button
+                onClick={fetchDbHealth}
+                disabled={dbHealthLoading}
+                className="text-gray-400 hover:text-white transition-colors p-1"
+                title="Refresh database health data"
+              >
+                <i className={`fa-solid fa-sync-alt ${dbHealthLoading ? 'animate-spin' : ''}`}></i>
+              </button>
+            </div>
             {dbHealthLoading ? (
               <div className="text-gray-300">Loading database health data...</div>
             ) : dbHealthError ? (
@@ -1139,18 +1437,6 @@ function AdminDashboard() {
                     </div>
                   </div>
                 )}
-
-                {/* Refresh Button */}
-                <div className="flex justify-center">
-                  <button
-                    onClick={fetchDbHealth}
-                    disabled={dbHealthLoading}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition"
-                  >
-                    <i className="fa-solid fa-sync-alt"></i>
-                    {dbHealthLoading ? 'Refreshing...' : 'Refresh Data'}
-                  </button>
-                </div>
               </div>
             ) : (
               <div className="text-gray-400">No database health data available.</div>
@@ -1162,8 +1448,18 @@ function AdminDashboard() {
           <div className="flex flex-col flex-1 h-full min-h-0">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold">Activity Logs</h2>
-              <div className="text-sm text-gray-400">
-                Showing {activityLogs.length} logs from the last 48 hours
+              <div className="flex items-center gap-4">
+                <div className="text-sm text-gray-400">
+                  Showing {activityLogs.length} logs from the last 48 hours
+                </div>
+                <button
+                  onClick={fetchActivityLogs}
+                  disabled={activityLogsLoading}
+                  className="text-gray-400 hover:text-white transition-colors p-1"
+                  title="Refresh activity logs"
+                >
+                  <i className={`fa-solid fa-sync-alt ${activityLogsLoading ? 'animate-spin' : ''}`}></i>
+                </button>
               </div>
             </div>
             <div className="flex-1 h-full min-h-0 overflow-auto">
@@ -1331,6 +1627,16 @@ function AdminDashboard() {
           confirmText="Reject"
           cancelText="Cancel"
           confirmColor="red"
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={handleToastClose}
+          duration={toast.duration}
         />
       )}
     </div>

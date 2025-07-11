@@ -4,6 +4,9 @@ const LiveAuction = require('../models/LiveAuction');
 const SettledAuction = require('../models/SettledAuction');
 const { auctionCache } = require('../services/redisService');
 const stripeService = require('../services/stripeService');
+const Wallet = require('../models/Wallet');
+const Transaction = require('../models/Transaction');
+const { queryWithRetry } = require('../db/init');
 
 // Use 120s TTL for admin dashboard cache
 const ADMIN_CACHE_TTL = 120;
@@ -168,7 +171,6 @@ const adminController = {
     const cacheKey = 'admin:stats';
     const cached = await auctionCache.get(cacheKey);
     if (cached) {
-      console.log('[REDIS] Admin stats - CACHE HIT');
       return res.json(cached);
     }
     try {
@@ -242,7 +244,6 @@ const adminController = {
     const cacheKey = 'admin:users:all';
     const cached = await auctionCache.get(cacheKey);
     if (cached) {
-      console.log('[REDIS] Admin users - CACHE HIT');
       return res.json(cached);
     }
     try {
@@ -261,7 +262,6 @@ const adminController = {
     const cacheKey = 'admin:auctions:settled';
     const cached = await auctionCache.get(cacheKey);
     if (cached) {
-      console.log('[REDIS] Admin settled auctions - CACHE HIT');
       return res.json(cached);
     }
     try {
@@ -300,7 +300,6 @@ const adminController = {
     const cacheKey = 'admin:auctions:live';
     const cached = await auctionCache.get(cacheKey);
     if (cached) {
-      console.log('[REDIS] Admin live auctions - CACHE HIT');
       return res.json(cached);
     }
     try {
@@ -598,7 +597,7 @@ const adminController = {
         FROM wallet_transactions wt
         JOIN wallets w ON wt.wallet_id = w.id
         JOIN users u ON w.user_id = u.id
-        WHERE wt.type = 'platform_fee'
+        WHERE wt.type = 'platform_fee' AND wt.status = 'succeeded'
         ORDER BY wt.created_at DESC
       `;
       
@@ -607,6 +606,12 @@ const adminController = {
       
       // Calculate totals
       const totalEarnings = earnings.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+      
+      // Get admin withdrawals to calculate available balance
+      const withdrawalsQuery = `SELECT COALESCE(SUM(ABS(amount)), 0) as total_withdrawals FROM wallet_transactions WHERE type = 'admin_withdrawal' AND status = 'succeeded'`;
+      const withdrawalsResult = await pool.query(withdrawalsQuery);
+      const totalWithdrawals = parseFloat(withdrawalsResult.rows[0]?.total_withdrawals || 0);
+      const availableBalance = totalEarnings - totalWithdrawals;
       
       // Group by month for chart data
       const monthlyEarnings = {};
@@ -638,6 +643,7 @@ const adminController = {
       res.json({
         earnings,
         totalEarnings: parseFloat(totalEarnings.toFixed(2)),
+        availableBalance: parseFloat(availableBalance.toFixed(2)),
         recentEarnings: parseFloat(recentTotal.toFixed(2)),
         monthlyData,
         totalCount: earnings.length

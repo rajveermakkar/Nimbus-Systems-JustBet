@@ -588,7 +588,7 @@ async function startOnboarding(req, res) {
     const userId = req.user.id;
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    if (user.role !== 'seller') return res.status(403).json({ error: 'Only sellers can onboard for payouts' });
+    if (user.role !== 'seller' && user.role !== 'admin') return res.status(403).json({ error: 'Only sellers or admins can onboard for payouts' });
     let accountId = user.stripe_account_id;
     if (!accountId) {
       // Create new connected account
@@ -599,8 +599,8 @@ async function startOnboarding(req, res) {
     }
     // Generate onboarding link
     const frontendBase = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : 'http://localhost:3000';
-    const refreshUrl = `${frontendBase}/wallet`;
-    const returnUrl = `${frontendBase}/wallet`;
+    const refreshUrl = user.role === 'admin' ? `${frontendBase}/admin` : `${frontendBase}/wallet`;
+    const returnUrl = user.role === 'admin' ? `${frontendBase}/admin/earnings` : `${frontendBase}/wallet`;
     const url = await stripeService.generateOnboardingLink(accountId, refreshUrl, returnUrl);
     res.json({ url });
   } catch (err) {
@@ -635,45 +635,67 @@ async function createPayout(req, res) {
     if (!status.charges_enabled || !status.payouts_enabled) {
       return res.status(400).json({ error: 'Account not fully onboarded for payouts' });
     }
-    // Check wallet balance (seller earnings)
-    const earnings = await getSellerEarnings(userId);
-    if (earnings < amount) return res.status(400).json({ error: 'Insufficient earnings for payout' });
+    let availableBalance = 0;
+    let txType = 'withdrawal';
+    let txDescription = '';
+    let earnings = 0;
+    if (user.role === 'admin') {
+      // Admin: platform earnings minus admin withdrawals
+      const { pool } = require('../db/init');
+      const earningsQuery = `SELECT COALESCE(SUM(amount), 0) as total_earnings FROM wallet_transactions WHERE type = 'platform_fee' AND status = 'succeeded'`;
+      const earningsResult = await pool.query(earningsQuery);
+      const totalEarnings = parseFloat(earningsResult.rows[0]?.total_earnings || 0);
+      const withdrawalsQuery = `SELECT COALESCE(SUM(ABS(amount)), 0) as total_withdrawals FROM wallet_transactions WHERE type = 'admin_withdrawal' AND status = 'succeeded'`;
+      const withdrawalsResult = await pool.query(withdrawalsQuery);
+      const totalWithdrawals = parseFloat(withdrawalsResult.rows[0]?.total_withdrawals || 0);
+      availableBalance = totalEarnings - totalWithdrawals;
+      txType = 'admin_withdrawal';
+      txDescription = 'Admin platform fees withdrawal (manual transfer + payout)';
+      earnings = availableBalance;
+    } else if (user.role === 'seller') {
+      // Seller: seller earnings
+      earnings = await getSellerEarnings(userId);
+      availableBalance = earnings;
+      txType = 'withdrawal';
+      txDescription = 'Seller earnings withdrawal (manual transfer + payout)';
+    } else {
+      return res.status(403).json({ error: 'Only sellers or admins can request payout' });
+    }
+    if (availableBalance < amount) return res.status(400).json({ error: 'Insufficient earnings for payout' });
 
-    // --- Manual transfer from platform to seller's connected account ---
+    // --- Manual transfer from platform to connected account ---
     let transfer;
     try {
       transfer = await stripe.transfers.create({
         amount: Math.round(amount * 100),
         currency: 'cad',
         destination: user.stripe_account_id,
-        description: 'Seller earnings withdrawal (manual transfer)'
+        description: txDescription
       });
     } catch (transferErr) {
       console.error('Stripe transfer to connected account failed:', transferErr);
-      return res.status(500).json({ error: 'Failed to transfer funds to seller account. Please try again later.' });
+      return res.status(500).json({ error: 'Failed to transfer funds to connected account. Please try again later.' });
     }
 
-    // --- Now create payout from connected account to seller's bank ---
+    // --- Now create payout from connected account to bank ---
     let payout;
     try {
       payout = await stripeService.createPayout(user.stripe_account_id, amount, 'cad');
     } catch (payoutErr) {
       console.error('Stripe payout from connected account failed:', payoutErr);
-      return res.status(500).json({ error: 'Failed to create payout from seller account. Please try again later.' });
+      return res.status(500).json({ error: 'Failed to create payout from connected account. Please try again later.' });
     }
 
     // Record payout transaction (include both transfer and payout IDs)
-    // Get the user's wallet
     const wallet = await Wallet.getWalletByUserId(userId);
     if (!wallet) {
       return res.status(404).json({ error: 'Wallet not found' });
     }
-    
     await Transaction.createTransaction({
       walletId: wallet.id,
-      type: 'withdrawal',
+      type: txType,
       amount: -amount,
-      description: 'Seller earnings withdrawal (manual transfer + payout)',
+      description: txDescription,
       referenceId: `${transfer.id}|${payout.id}`,
       status: 'succeeded'
     });
