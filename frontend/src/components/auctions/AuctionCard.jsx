@@ -68,33 +68,43 @@ function AuctionCard({ auction, actionLabel }) {
   const [countdownStatus, setCountdownStatus] = useState(null);
   const [loadingCountdown, setLoadingCountdown] = useState(true);
 
+  // Placeholder countdown state
+  const [placeholderSeconds, setPlaceholderSeconds] = useState(() => auction.id && auction.id.startsWith('placeholder') ? Math.floor(Math.random() * 30 * 60) + 60 : null);
+
   useEffect(() => {
-    let isMounted = true;
-    async function fetchCountdown() {
-      setLoadingCountdown(true);
-      try {
-        const type = auction.type || 'settled';
-        const data = await auctionService.getAuctionCountdown(type, auction.id);
-        if (isMounted) {
-          setCountdown(data.countdown);
-          setCountdownStatus(data.status);
+    if (auction.id && auction.id.startsWith('placeholder')) {
+      if (placeholderSeconds === null) return;
+      if (placeholderSeconds <= 0) return;
+      const interval = setInterval(() => setPlaceholderSeconds(s => s - 1), 1000);
+      return () => clearInterval(interval);
+    } else {
+      let isMounted = true;
+      async function fetchCountdown() {
+        setLoadingCountdown(true);
+        try {
+          const type = auction.type || 'settled';
+          const data = await auctionService.getAuctionCountdown(type, auction.id);
+          if (isMounted) {
+            setCountdown(data.countdown);
+            setCountdownStatus(data.status);
+          }
+        } catch (e) {
+          if (isMounted) {
+            setCountdown(null);
+            setCountdownStatus(null);
+          }
+        } finally {
+          if (isMounted) setLoadingCountdown(false);
         }
-      } catch (e) {
-        if (isMounted) {
-          setCountdown(null);
-          setCountdownStatus(null);
-        }
-      } finally {
-        if (isMounted) setLoadingCountdown(false);
       }
+      fetchCountdown();
+      const interval = setInterval(fetchCountdown, 1000);
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
     }
-    fetchCountdown();
-    const interval = setInterval(fetchCountdown, 1000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [auction.id, auction.type]);
+  }, [auction.id, auction.type, placeholderSeconds]);
 
   // Helper to format seconds as HH:MM:SS
   const formatSeconds = (secs) => {
@@ -133,9 +143,16 @@ function AuctionCard({ auction, actionLabel }) {
         <div className="mb-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-gray-400 px-2">
           <span className="text-left">Current Bid:</span>
           <span className="text-green-400 font-bold text-left">{formatPrice(currentBid)}</span>
-          <span className="text-left">{countdownStatus === 'pre' ? 'Starting In:' : countdownStatus === 'ongoing' ? 'Remaining Time:' : 'Time Left:'}</span>
+          <span className="text-left">{auction.id && auction.id.startsWith('placeholder') ? 'Starting In:' : countdownStatus === 'pre' ? 'Starting In:' : countdownStatus === 'ongoing' ? 'Remaining Time:' : 'Time Left:'}</span>
           <span className="text-white font-semibold text-left">
-            {formatSeconds(countdown)}
+            {auction.id && auction.id.startsWith('placeholder')
+              ? (() => {
+                  if (placeholderSeconds == null) return '--:--';
+                  const m = Math.floor(placeholderSeconds / 60).toString().padStart(2, '0');
+                  const s = (placeholderSeconds % 60).toString().padStart(2, '0');
+                  return `${m}:${s}`;
+                })()
+              : formatSeconds(countdown)}
           </span>
           <span className="text-left">Seller:</span>
           <span className="font-semibold text-white text-left">
@@ -146,7 +163,23 @@ function AuctionCard({ auction, actionLabel }) {
           {auction.category && <><span className="text-left">Category:</span><span className="text-white text-left">{auction.category}</span></>}
         </div>
         <div className="mt-auto flex flex-col gap-2">
-          {actionLabel && (
+          {auction.id && auction.id.startsWith('placeholder') ? (
+            <Button
+              variant="secondary"
+              className="w-full opacity-80 cursor-not-allowed"
+              disabled
+            >
+              <span>Starting In:</span>
+              <span className="ml-2 font-mono tabular-nums">
+                {(() => {
+                  if (placeholderSeconds == null) return '--:--';
+                  const m = Math.floor(placeholderSeconds / 60).toString().padStart(2, '0');
+                  const s = (placeholderSeconds % 60).toString().padStart(2, '0');
+                  return `${m}:${s}`;
+                })()}
+              </span>
+            </Button>
+          ) : actionLabel && (
             <div className="mt-4 flex flex-col gap-2">
               {countdownStatus === 'pre' ? (
                 <Button
