@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import formImage from "./assets/auction_online.jpg";
 import AuthCard from "../src/components/AuthCard";
 import { UserContext } from "../src/context/UserContext";
+import Button from "../src/components/Button";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -30,6 +31,7 @@ function Login({ showToast }) {
   const { setUser, user } = useContext(UserContext);
   const hasRedirected = useRef(false);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // On mount, check if user wanted to remember their email
   useEffect(() => {
@@ -189,13 +191,24 @@ function Login({ showToast }) {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
       />
-      <input
-        type="password"
-        className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.password ? "border-red-500" : ""}`}
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+      <div className="relative">
+        <input
+          type={showPassword ? "text" : "password"}
+          className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.password ? "border-red-500" : ""}`}
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-300 hover:text-[#efe6dd] focus:outline-none"
+          onClick={() => setShowPassword((v) => !v)}
+          aria-label={showPassword ? "Hide password" : "Show password"}
+        >
+          <i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
+        </button>
+      </div>
       <div className="flex items-center justify-between text-sm mt-2">
         <label className="flex items-center font-medium leading-tight gap-1">
           <input
@@ -208,18 +221,20 @@ function Login({ showToast }) {
         </label>
         <Link
           to="/forgot-password"
-          className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
+          className="font-semibold transition text-purple-300 hover:text-[#efe6dd] no-underline"
         >
           Forgot password?
         </Link>
       </div>
-      <button
+      <Button
         type="submit"
-        className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
+        variant="primary"
+        size="lg"
+        className="w-full py-2 mt-2"
         disabled={loading}
       >
         {loading ? "Signing In..." : "Sign In"}
-      </button>
+      </Button>
     </form>
   );
 
@@ -228,7 +243,7 @@ function Login({ showToast }) {
       <span className="text-white">Don't have an account?</span>{' '}
       <Link
         to="/register"
-        className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
+        className="font-semibold transition text-purple-300 hover:text-[#efe6dd] no-underline"
       >
         Sign up
       </Link>
@@ -244,6 +259,7 @@ function Login({ showToast }) {
           subtitle="Sign in to your account"
           error={errors.form}
           footer={footer}
+          bgClassName="bg-black/30"
         >
           {errors.form === "Please verify your email first" && (
             <div className="text-center mb-2">
@@ -253,7 +269,7 @@ function Login({ showToast }) {
           {form}
         </AuthCard>
       ) : (
-        <div className="w-full max-w-3xl my-4 mx-1 bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex scale-90">
+        <div className="w-full max-w-3xl my-4 mx-1 bg-black/30 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex scale-90">
           {/* Left side image */}
           <div className="w-1/2 flex items-center justify-center bg-gradient-to-b from-[#23235b] to-[#63e] p-6">
             <img

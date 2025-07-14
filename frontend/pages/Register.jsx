@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import AuthCard from "../src/components/AuthCard";
 import registerImage from "./assets/register.png";
 import { UserContext } from "../src/context/UserContext";
+import Button from "../src/components/Button";
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 function useIsMobile() {
@@ -29,6 +30,9 @@ function Register({ showToast }) {
   const isMobile = useIsMobile();
   const { user } = useContext(UserContext);
   const hasRedirected = useRef(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -75,6 +79,7 @@ function Register({ showToast }) {
     if (!validate()) return;
 
     try {
+      setLoading(true);
       const response = await fetch(`${backendUrl}/api/auth/register`, {
         method: "POST",
         headers: {
@@ -99,6 +104,8 @@ function Register({ showToast }) {
       }
     } catch (error) {
       setErrors({ form: "Network error. Please try again." });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -156,32 +163,54 @@ function Register({ showToast }) {
       </div>
       <div>
         <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="password">Password</label>
-        <input
-          type="password"
-          name="password"
-          id="password"
-          className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
-          placeholder="Password"
-          value={form.password}
-          onChange={handleChange}
-          autoComplete="new-password"
-        />
+        <div className="relative">
+          <input
+            type={showPassword ? "text" : "password"}
+            name="password"
+            id="password"
+            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
+            placeholder="Password"
+            value={form.password}
+            onChange={handleChange}
+            autoComplete="new-password"
+          />
+          <button
+            type="button"
+            tabIndex={-1}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-300 hover:text-[#8B5FBF] focus:outline-none"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            <i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
+          </button>
+        </div>
         {errors.password && (
           <p className="text-xs text-red-400 mt-1">{errors.password}</p>
         )}
       </div>
       <div>
         <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="confirmPassword">Confirm Password</label>
-        <input
-          type="password"
-          name="confirmPassword"
-          id="confirmPassword"
-          className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
-          placeholder="Confirm password"
-          value={form.confirmPassword}
-          onChange={handleChange}
-          autoComplete="new-password"
-        />
+        <div className="relative">
+          <input
+            type={showConfirmPassword ? "text" : "password"}
+            name="confirmPassword"
+            id="confirmPassword"
+            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
+            placeholder="Confirm password"
+            value={form.confirmPassword}
+            onChange={handleChange}
+            autoComplete="new-password"
+          />
+          <button
+            type="button"
+            tabIndex={-1}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-300 hover:text-[#8B5FBF] focus:outline-none"
+            onClick={() => setShowConfirmPassword((v) => !v)}
+            aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+          >
+            <i className={`fas ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
+          </button>
+        </div>
         {errors.confirmPassword && (
           <p className="text-xs text-red-400 mt-1">{errors.confirmPassword}</p>
         )}
@@ -189,12 +218,15 @@ function Register({ showToast }) {
       {errors.form && (
         <p className="text-sm text-red-400 text-center">{errors.form}</p>
       )}
-      <button
+      <Button
         type="submit"
-        className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
+        variant="primary"
+        size="lg"
+        className="w-full py-2 mt-2"
+        disabled={loading}
       >
         Register
-      </button>
+      </Button>
     </form>
   );
 
@@ -203,7 +235,7 @@ function Register({ showToast }) {
       <span className="text-white">Already have an account?</span>{' '}
       <Link
         to="/login"
-        className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
+        className="font-semibold transition text-purple-300 hover:text-[#efe6dd] no-underline"
       >
         Sign in
       </Link>
@@ -219,11 +251,12 @@ function Register({ showToast }) {
           subtitle="Join our community!"
           error={errors.form}
           footer={footer}
+          bgClassName="bg-black/30"
         >
           {formFields}
         </AuthCard>
       ) : (
-        <div className="w-full max-w-3xl my-1 mx-1 bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex scale-90 animate-fade-in">
+        <div className="w-full max-w-4xl my-1 mx-1 bg-black/30 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex scale-90 animate-fade-in">
           {/* Left side image */}
           <div className="w-1/2 flex items-center justify-center bg-gradient-to-b from-[#23235b] to-[#63e] p-6">
             <img
@@ -296,32 +329,54 @@ function Register({ showToast }) {
                 </div>
                 <div>
                   <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="password">Password</label>
-                  <input
-                    type="password"
-                    name="password"
-                    id="password"
-                    className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
-                    placeholder="Password"
-                    value={form.password}
-                    onChange={handleChange}
-                    autoComplete="new-password"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      id="password"
+                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
+                      placeholder="Password"
+                      value={form.password}
+                      onChange={handleChange}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-300 hover:text-[#efe6dd] focus:outline-none"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      <i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
+                    </button>
+                  </div>
                   {errors.password && (
                     <p className="text-xs text-red-400 mt-1">{errors.password}</p>
                   )}
                 </div>
                 <div>
                   <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="confirmPassword">Confirm Password</label>
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    id="confirmPassword"
-                    className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
-                    placeholder="Confirm password"
-                    value={form.confirmPassword}
-                    onChange={handleChange}
-                    autoComplete="new-password"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      id="confirmPassword"
+                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
+                      placeholder="Confirm password"
+                      value={form.confirmPassword}
+                      onChange={handleChange}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-300 hover:text-[#efe6dd] focus:outline-none"
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      <i className={`fas ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
+                    </button>
+                  </div>
                   {errors.confirmPassword && (
                     <p className="text-xs text-red-400 mt-1">{errors.confirmPassword}</p>
                   )}
@@ -329,12 +384,15 @@ function Register({ showToast }) {
                 {errors.form && (
                   <p className="text-sm text-red-400 text-center">{errors.form}</p>
                 )}
-                <button
+                <Button
                   type="submit"
-                  className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
+                  variant="primary"
+                  size="lg"
+                  className="w-full py-2 mt-2"
+                  disabled={loading}
                 >
                   Register
-                </button>
+                </Button>
               </form>
             </AuthCard>
           </div>

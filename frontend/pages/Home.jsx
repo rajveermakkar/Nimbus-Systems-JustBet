@@ -237,15 +237,6 @@ export default function Home() {
           </div>
         )}
       </section>
-      {/* Footer */}
-      <footer className="w-full py-6 flex flex-col items-center gap-2 text-white/70 text-sm mt-auto">
-        <span>Ready to start bidding?</span>
-        <div className="flex gap-4">
-          <Link to="/register" className="underline hover:text-white">Create an account</Link>
-          <Link to="/login" className="underline hover:text-white">Login</Link>
-      </div>
-        <span className="mt-2">&copy; {new Date().getFullYear()} JustBet. All rights reserved.</span>
-      </footer>
     </div>
   );
 } 
