@@ -67,6 +67,20 @@ function Navbar() {
             <i className="fa-solid fa-gavel"></i>
             Auctions
           </Link>
+          <Link
+            to="/about"
+            className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+          >
+            <i className="fa-solid fa-users"></i>
+            About
+          </Link>
+          <Link
+            to="/contact"
+            className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+          >
+            <i className="fa-solid fa-envelope"></i>
+            Contact
+          </Link>
           {user && (
             <>
               <Link
