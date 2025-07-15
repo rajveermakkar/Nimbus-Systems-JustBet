@@ -252,6 +252,7 @@ function Register({ showToast }) {
           error={errors.form}
           footer={footer}
           bgClassName="bg-black/30"
+          className="max-w-full p-8 mb-10"
         >
           {formFields}
         </AuthCard>

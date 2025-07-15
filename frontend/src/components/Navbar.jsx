@@ -62,25 +62,53 @@ function Navbar() {
     }, 500);
   }
 
+  // Prevent background scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
+  // At the top of the file, add this effect to ensure html/body have height: 100% for overlay to work
+  useEffect(() => {
+    // This part is good for ensuring the root elements can handle full height scrolling if needed.
+    // However, the mobile menu itself needs to be positioned correctly relative to the document.
+    document.documentElement.style.height = '100%';
+    document.body.style.height = '100%';
+    return () => {
+      document.documentElement.style.height = '';
+      document.body.style.height = '';
+    };
+  }, []);
+
   return (
     <>
       <style>{dropdownStyle}</style>
       <nav
-        className={`w-full sticky top-0 z-50 transition-colors duration-300 ${scrolled ? "bg-[#181c2f]/80 backdrop-blur-md" : "bg-gradient-to-r from-[#000000] to-[#2A2A72]"} py-2 transition-opacity duration-300`}
+        className={`w-full sticky top-0 z-50 transition-colors duration-300 ${scrolled ? "bg-[#181c2f]/80 backdrop-blur-md" : "bg-gradient-to-r from-[#000000] to-[#2A2A72]"} py-4 sm:py-2 transition-opacity duration-300`}
       >
-        <div className="max-w-5xl mx-auto flex items-center justify-between px-2">
+        <div className="max-w-5xl mx-auto flex items-center justify-between px-2 relative">
+          {/* Logo (left) */}
           <Link to="/" className="flex items-center gap-1 select-none">
             <i className="fa-solid fa-gavel text-base text-white"></i>
             <span className="text-base font-bold text-white tracking-wide">JustBet</span>
           </Link>
-          {/* Hamburger for mobile */}
-          <button
-            className="md:hidden flex items-center justify-center text-white text-2xl p-2 focus:outline-none"
-            onClick={() => setMobileMenuOpen((open) => !open)}
-            aria-label="Open menu"
-          >
-            <i className={`fas ${mobileMenuOpen ? 'fa-times' : 'fa-bars'}`}></i>
-          </button>
+          {/* Hamburger (right, only on mobile, absolutely positioned) */}
+          {!mobileMenuOpen && (
+            <button
+              className="md:hidden absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-white text-2xl p-2 focus:outline-none"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <i className="fas fa-bars"></i>
+            </button>
+          )}
+          {/* Desktop nav links */}
           <div className="hidden md:flex items-center gap-3">
             <Link
               to="/auctions"
@@ -195,53 +223,80 @@ function Navbar() {
               </>
             )}
           </div>
-         {/* Mobile menu overlay */}
-         {mobileMenuOpen && (
-           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-start pt-24 px-6 animate-dropdown-fade md:hidden">
-             <button
-               className="absolute top-6 right-6 text-white text-3xl focus:outline-none"
-               onClick={() => setMobileMenuOpen(false)}
-               aria-label="Close menu"
-             >
-               <i className="fas fa-times"></i>
-             </button>
-             <div className="flex flex-col gap-6 w-full max-w-xs">
-               <Link to="/auctions" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-gavel mr-2"></i>Auctions</Link>
-               <Link to="/about" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-users mr-2"></i>About</Link>
-               <Link to="/contact" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-envelope mr-2"></i>Contact</Link>
-               {user && (
-                 <>
-                   {/* Dashboard logic based on role */}
-                   {user.role === "seller" ? (
-                     <Link to="/seller/dashboard" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-tachometer-alt mr-2"></i>Dashboard</Link>
-                   ) : (
-                     <Link to={user.role === "admin" ? "/admin/dashboard" : "/dashboard"} className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-tachometer-alt mr-2"></i>Dashboard</Link>
-                   )}
-                   {/* Wallet always */}
-                   <Link to="/wallet" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-wallet mr-2"></i>Wallet</Link>
-                   {/* My Profile always */}
-                   <button onClick={() => { window.location.href = '/profile'; setMobileMenuOpen(false); }} className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10"><i className="fa-regular fa-user mr-2"></i>My Profile</button>
-                   {/* Buyer Dashboard for sellers only */}
-                   {user.role === "seller" && (
-                     <Link to="/dashboard" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-user mr-2"></i>Buyer Dashboard</Link>
-                   )}
-                   {/* Logout */}
-                   <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="text-red-400 text-lg font-semibold py-2 w-full text-left border-b border-white/10"><i className="fa-solid fa-sign-out-alt mr-2"></i>Logout</button>
-                 </>
-               )}
-               {!user && (
-                 <>
-                   <Link to="/login" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-sign-in-alt mr-2"></i>Login</Link>
-                   <Link to="/register" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-user-plus mr-2"></i>Get Started</Link>
-                 </>
-               )}
-             </div>
-           </div>
-         )}
         </div>
       </nav>
+      {/* Mobile menu overlay and menu - moved outside inner navbar container */}
+      {/* Overlay */}
+      <div
+        className={`md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-md transition-opacity duration-300 ${
+          mobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setMobileMenuOpen(false)}
+      />
+      {/* Menu */}
+      <div
+        className={`md:hidden fixed inset-0 w-full h-full z-50 bg-black/60 backdrop-blur-md flex flex-col items-center justify-start pt-12 px-6 transition-transform duration-300 ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        } overflow-y-auto`}
+      >
+        {/* Close button at top right */}
+        <button
+          className="absolute top-6 right-6 text-white text-3xl focus:outline-none transition-transform duration-300 transform hover:scale-110 hover:rotate-90"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-label="Close menu"
+        >
+          <i className="fas fa-times"></i>
+        </button>
+        {/* Logo centered at top */}
+        <div className="w-full flex flex-col items-center mb-4">
+          <div className="flex items-center gap-3 justify-center">
+            <i className="fa-solid fa-gavel text-3xl text-white"></i>
+            <span className="text-2xl font-extrabold text-white tracking-wide">JustBet</span>
+          </div>
+          {/* User info centered below logo, with divider below */}
+          {user && (
+            <div className="flex flex-col items-center gap-2 mt-4 mb-2">
+              <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name || user.firstName || 'A')}+${encodeURIComponent(user.last_name || user.lastName || 'D')}&background=2a2a72&color=fff`} alt="avatar" className="w-10 h-10 rounded-full border-2 border-white/30" />
+              <span className="font-bold text-white text-lg leading-tight">{user.first_name || user.firstName} {user.last_name || user.lastName}</span>
+              <span className="text-xs text-gray-300">{user.email}</span>
+            </div>
+          )}
+          <hr className="w-full border-t border-white/20 mt-2" />
+        </div>
+        <div className="flex flex-col gap-6 w-full max-w-xs">
+          <Link to="/auctions" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-gavel mr-2"></i>Auctions</Link>
+          <Link to="/about" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-users mr-2"></i>About</Link>
+          <Link to="/contact" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-envelope mr-2"></i>Contact</Link>
+          {user && (
+            <>
+              {/* Dashboard logic based on role */}
+              {user.role === "seller" ? (
+                <Link to="/seller/dashboard" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-tachometer-alt mr-2"></i>Dashboard</Link>
+              ) : (
+                <Link to={user.role === "admin" ? "/admin/dashboard" : "/dashboard"} className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-tachometer-alt mr-2"></i>Dashboard</Link>
+              )}
+              {/* Wallet always */}
+              <Link to="/wallet" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-wallet mr-2"></i>Wallet</Link>
+              {/* My Profile always */}
+              <button onClick={() => { window.location.href = '/profile'; setMobileMenuOpen(false); }} className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10"><i className="fa-regular fa-user mr-2"></i>My Profile</button>
+              {/* Buyer Dashboard for sellers only */}
+              {user.role === "seller" && (
+                <Link to="/dashboard" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-user mr-2"></i>Buyer Dashboard</Link>
+              )}
+              {/* Logout */}
+              <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="text-red-400 text-lg font-semibold py-2 w-full text-left border-b border-white/10"><i className="fa-solid fa-sign-out-alt mr-2"></i>Logout</button>
+            </>
+          )}
+          {!user && (
+            <>
+              <Link to="/login" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-sign-in-alt mr-2"></i>Login</Link>
+              <Link to="/register" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-user-plus mr-2"></i>Get Started</Link>
+            </>
+          )}
+        </div>
+      </div>
     </>
   );
 }
 
-export default Navbar; 
+export default Navbar;

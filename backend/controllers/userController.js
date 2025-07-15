@@ -18,8 +18,6 @@ const errorResponse = (res, status, message) => res.status(status).json({ error:
 // SESSION CONFIGURATION
 // How long a user session (JWT) lasts, in minutes
 const SESSION_DURATION_MINUTES = 60; // 1 hour
-// How long before expiry to show the warning modal (frontend only)
-const SESSION_WARNING_MINUTES = 10; // 10 minutes before expiry
 // How long the refresh token lasts, in minutes
 const REFRESH_TOKEN_DURATION_MINUTES = 1440; // 1 day
 

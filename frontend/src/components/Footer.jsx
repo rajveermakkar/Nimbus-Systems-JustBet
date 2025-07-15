@@ -32,11 +32,12 @@ export default function Footer() {
         {/* Top Row: Logo left, links right */}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10 w-full">
           {/* Logo/Brand */}
-          <div className="flex-shrink-0 flex items-center md:items-start mb-8 md:mb-0">
+          <div className="flex-shrink-0 flex items-center justify-center md:justify-start md:items-start mb-8 md:mb-0 w-full md:w-auto">
+            <i className="fa-solid fa-gavel text-2xl md:text-3xl text-[#adbdff] mr-2"></i>
             <span className="text-3xl md:text-4xl font-extrabold text-[#adbdff] tracking-wide select-none">JustBet</span>
           </div>
-          {/* Footer Links: horizontal on desktop, stacked on mobile */}
-          <div className="flex flex-col sm:flex-row gap-8 w-full md:justify-end">
+          {/* Footer Links: horizontal on desktop, two columns on mobile */}
+          <div className="grid grid-cols-2 gap-6 sm:flex sm:flex-row sm:gap-8 w-full md:justify-end">
             {/* Explore */}
             <div className="min-w-[140px]">
               <div className="font-semibold text-[#adbdff] mb-2">Explore</div>
@@ -69,29 +70,6 @@ export default function Footer() {
               <ul className="space-y-1">
                 <li><a href="/contact" className="hover:underline text-gray-200">Write us at Contact</a></li>
                 <li><a href="mailto:support@justbet.com" className="hover:underline text-gray-200">support@justbet.com</a></li>
-              </ul>
-            </div>
-            {/* FAQ Dropdown */}
-            <div className="min-w-[160px]">
-              <div className="font-semibold text-[#adbdff] mb-2">FAQ</div>
-              <ul className="space-y-1">
-                {faqs.map((faq, idx) => (
-                  <li key={faq.question}>
-                    <button
-                      className="w-full text-left text-gray-200 hover:underline focus:outline-none flex items-center justify-between"
-                      onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                      aria-expanded={openFaq === idx}
-                    >
-                      <span>{faq.question}</span>
-                      <span className={`ml-2 transition-transform ${openFaq === idx ? 'rotate-90' : ''}`}>&#9654;</span>
-                    </button>
-                    {openFaq === idx && (
-                      <div className="mt-1 text-xs text-gray-300 bg-black/40 rounded-lg p-3 border border-purple-400/30 shadow-lg animate-dropdown-fade">
-                        {faq.answer}
-                      </div>
-                    )}
-                  </li>
-                ))}
               </ul>
             </div>
           </div>
