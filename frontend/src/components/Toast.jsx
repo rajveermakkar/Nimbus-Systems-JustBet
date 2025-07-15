@@ -10,7 +10,7 @@ function Toast({ message, type = 'info', onClose, duration = 3000, actionLabel, 
     return () => clearTimeout(timer);
   }, [duration, onClose]);
 
-  let bgColor = 'bg-purple-500/30'; // glass purple for info/success
+  let bgColor = 'bg-purple-400/30'; // glass purple for info/success
   let textColor = 'text-white';
   let icon = (
     <svg className="w-5 h-5 text-purple-200" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -19,7 +19,7 @@ function Toast({ message, type = 'info', onClose, duration = 3000, actionLabel, 
     </svg>
   );
   if (type === 'success') {
-    bgColor = 'bg-purple-500/30';
+    bgColor = 'bg-purple-400/30';
     textColor = 'text-white';
     icon = (
       <svg className="w-5 h-5 text-purple-200" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -40,7 +40,7 @@ function Toast({ message, type = 'info', onClose, duration = 3000, actionLabel, 
 
   return (
     <div
-      className={`fixed top-10 right-6 z-50 max-w-md w-full shadow-2xl rounded-2xl ${bgColor} flex items-center px-4 py-3 animate-toast-pop backdrop-blur-md`}
+      className={`fixed top-10 left-1/2 -translate-x-1/2 sm:left-auto sm:right-4 sm:translate-x-0 z-50 max-w-md w-full shadow-2xl rounded-2xl ${bgColor} flex items-center px-4 py-3 animate-toast-pop backdrop-blur-md`}
       style={{ transition: 'transform 0.2s cubic-bezier(.4,2,.6,1), opacity 0.2s', transform: 'translateY(0)', opacity: 1 }}
       role="alert"
     >

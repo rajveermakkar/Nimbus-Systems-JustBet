@@ -35,7 +35,7 @@ function UserDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white flex flex-col items-center justify-center py-10">
       {/* Welcome Card */}
-      <div className="w-full max-w-3xl mx-auto mb-6">
+      <div className="w-[95%] mx-auto md:w-full md:mx-auto max-w-3xl mb-6">
         <div className="rounded-xl bg-white/10 shadow-lg p-6 flex flex-col gap-2 items-start">
           <h2 className="text-xl font-semibold mb-1 text-left">Buyer Dashboard</h2>
           <p className="text-gray-200 text-sm mb-0 text-left">Welcome back, {user?.firstName} {user?.lastName}!</p>
@@ -45,7 +45,7 @@ function UserDashboard() {
 
       {/* Become a Seller Card */}
       {user?.role === "buyer" && (
-        <div className="w-full max-w-3xl mx-auto mb-6">
+        <div className="w-[95%] mx-auto md:w-full md:mx-auto max-w-3xl mb-6">
           <div className="rounded-xl bg-white/10 shadow-lg p-6 flex flex-col items-start gap-2">
             <h3 className="text-base font-semibold mb-1 text-left">Want to start selling?</h3>
             <p className="text-gray-300 text-xs mb-2 text-left">Join our community of verified sellers and start earning today. Apply for seller status to unlock advanced features.</p>
@@ -67,10 +67,10 @@ function UserDashboard() {
         {cards.map((card) => (
           <div
             key={card.title}
-            className="rounded-xl bg-white/10 shadow-lg p-5 flex flex-col items-start cursor-pointer hover:bg-white/20 transition min-h-[120px]"
+            className="rounded-xl bg-white/10 shadow-xl md:shadow-lg p-5 flex flex-col w-[95%] mx-auto md:w-auto md:mx-0 cursor-pointer hover:bg-white/20 transition min-h-[120px] items-center md:items-start"
             onClick={card.onClick}
           >
-            <div className={`w-10 h-10 flex items-center justify-center rounded-full mb-3 ${card.bg}`}>
+            <div className={`w-10 h-10 flex mb-3 rounded-full ${card.bg} items-center justify-center mx-auto md:mx-0`}>
               <i className={`${card.icon} text-lg text-white`}></i>
             </div>
             <h4 className="text-base font-semibold mb-1 text-left">{card.title}</h4>

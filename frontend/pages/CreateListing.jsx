@@ -334,6 +334,18 @@ function CreateListing() {
                 </button>
               </div>
             </div>
+            {/* Platform Fee Note */}
+            <div className="mb-4">
+              {auctionType === "live" ? (
+                <div className="text-xs text-yellow-300 bg-yellow-900/20 rounded px-3 py-2">
+                  Note: A <span className="font-bold">10% platform fee</span> will be deducted from the final sale amount for live auctions.
+                </div>
+              ) : (
+                <div className="text-xs text-blue-200 bg-blue-900/20 rounded px-3 py-2">
+                  Note: A <span className="font-bold">5% platform fee</span> will be deducted from the final sale amount for settled auctions.
+                </div>
+              )}
+            </div>
             
             <div className="flex gap-4 mb-4">
               <div className="flex-1">

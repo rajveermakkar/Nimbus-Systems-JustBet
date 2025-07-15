@@ -18,6 +18,7 @@ import SellerRequestForm from '../pages/SellerRequestForm';
 import { UserContext } from './context/UserContext';
 import SessionExpiryModal from './components/SessionExpiryModal';
 import axios from 'axios';
+import apiService from './services/apiService';
 
 // Import auction components
 import AuctionPage from '../pages/AuctionPage';
@@ -36,6 +37,8 @@ import NotFound from '../pages/NotFound';
 import UserProfile from '../pages/UserProfile';
 import WinningPage from '../pages/WinningPage';
 import Wallet from '../pages/Wallet.jsx';
+import AboutUs from '../pages/AboutUs';
+import ContactUs from '../pages/ContactUs';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -170,13 +173,13 @@ function AppRoutes() {
   const handleExtendSession = async () => {
     console.log('[Session] Extend Session clicked');
     try {
-      const res = await axios.post(`${BACKEND_URL}/api/auth/refresh-token`, {}, { withCredentials: true });
-      if (res.data && res.data.token) {
-        const payload = parseJwt(res.data.token);
+      const res = await apiService.post('/api/auth/refresh-token', {});
+      if (res && res.token) {
+        const payload = parseJwt(res.token);
         if (payload && payload.exp) {
           console.log('[Session] Session extended! New token exp:', new Date(payload.exp * 1000).toLocaleString());
         }
-        setUser({ ...user, token: res.data.token });
+        setUser({ ...user, token: res.token });
         setShowSessionModal(false);
         setShowExtendToast(false);
         setToastCountdown(0);
@@ -313,6 +316,8 @@ function AppRoutes() {
             <Wallet />
           </ProtectedRoute>
         } />
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/contact" element={<ContactUs />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

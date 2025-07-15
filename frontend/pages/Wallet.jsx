@@ -1486,8 +1486,11 @@ function Wallet() {
     }
   }
 
+  // Responsive helper
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
   return (
-    <div style={{ maxWidth: 1000, margin: '40px auto', padding: 24 }}>
+    <div style={{ maxWidth: 1000, margin: isMobile ? '16px auto' : '40px auto', padding: isMobile ? 8 : 24 }}>
       {loading ? (
         <div>Loading...</div>
       ) : error ? (
@@ -1539,22 +1542,27 @@ function Wallet() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 32 }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: isMobile ? 0 : 32,
+        }}>
           {/* Left: Balance and actions */}
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, width: isMobile ? '100%' : undefined }}>
             {/* Available Balance Card */}
             <div style={{
               background: 'rgba(35, 43, 74, 0.45)',
               borderRadius: 18,
-              padding: '28px 24px 24px 24px',
-              marginBottom: 24,
+              padding: isMobile ? '18px 10px 16px 10px' : '28px 24px 24px 24px',
+              marginBottom: isMobile ? 16 : 24,
               boxShadow: '0 4px 18px 0 rgba(31,38,135,0.18)',
               border: '1.5px solid rgba(255,255,255,0.08)',
-              minWidth: 260,
-              maxWidth: 340,
+              minWidth: isMobile ? undefined : 260,
+              maxWidth: isMobile ? '100%' : 340,
               marginLeft: 'auto',
               marginRight: 'auto',
               textAlign: 'center',
+              width: '100%',
             }}>
               <div style={{ fontSize: 18, color: '#fff', fontWeight: 500, marginBottom: 6 }}>Available Balance</div>
               <div style={{ fontSize: 36, fontWeight: 700, color: '#6fffbe', letterSpacing: 1, marginBottom: 18, textShadow: '0 2px 8px #6fffbe, 0 1px 2px #fff' }}>
@@ -1585,12 +1593,13 @@ function Wallet() {
               style={{
                 background: 'rgba(35, 43, 74, 0.32)',
                 borderRadius: 14,
-                padding: '18px 24px 14px 24px',
-                marginBottom: 18,
+                padding: isMobile ? '12px 10px 10px 10px' : '18px 24px 14px 24px',
+                marginBottom: isMobile ? 12 : 18,
                 boxShadow: '0 2px 10px 0 rgba(31,38,135,0.10)',
                 border: '1.5px solid rgba(255,255,255,0.06)',
-                width: 320,
-                margin: '0 auto',
+                width: '100%',
+                maxWidth: isMobile ? '100%' : 320,
+                margin: isMobile ? '0 auto' : '0 auto',
                 textAlign: 'left',
               }}
             >
@@ -1614,7 +1623,7 @@ function Wallet() {
                 </div>
               </div>
             </div>
-            <div style={{ ...cardStyle, marginTop: 24 }}>
+            <div style={{ ...cardStyle, marginTop: isMobile ? 12 : 24, width: '100%' }}>
               <div style={{ fontWeight: 600, marginBottom: 8 }}>Payment Methods</div>
               {pmLoading ? (
                 <div>Loading cards...</div>
@@ -1685,8 +1694,8 @@ function Wallet() {
             </div>
           </div>
           {/* Right: Transaction history */}
-          <div style={{ flex: 2 }}>
-            <div style={{ ...cardStyle, minHeight: 400 }}>
+          <div style={{ flex: 2, width: isMobile ? '100%' : undefined, marginTop: isMobile ? 18 : 0 }}>
+            <div style={{ ...cardStyle, minHeight: 400, width: '100%', overflowX: isMobile ? 'auto' : 'visible' }}>
               <div style={{ fontWeight: 600, fontSize: 20, marginBottom: 16 }}>Transaction History</div>
               {txsWithBalance.length === 0 ? (
                 <div>No transactions yet.</div>
@@ -1698,15 +1707,17 @@ function Wallet() {
                     return (
                       <div key={tx.id} style={{
                         display: 'flex',
-                        alignItems: 'center',
+                        flexDirection: isMobile ? 'column' : 'row',
+                        alignItems: isMobile ? 'flex-start' : 'center',
                         justifyContent: 'space-between',
                         background: 'rgba(35,43,74,0.32)',
                         borderRadius: 16,
-                        padding: '16px 20px',
+                        padding: isMobile ? '12px 10px' : '16px 20px',
                         marginBottom: 14,
                         boxShadow: '0 2px 8px 0 rgba(31,38,135,0.08)',
                         border: '1.5px solid rgba(255,255,255,0.06)',
-                        gap: 18,
+                        gap: isMobile ? 8 : 18,
+                        width: '100%',
                       }}>
                         {/* Icon */}
                         <div style={{
@@ -1720,11 +1731,12 @@ function Wallet() {
                           fontSize: 22,
                           color,
                           flexShrink: 0,
+                          marginBottom: isMobile ? 8 : 0,
                         }}>
                           <FontAwesomeIcon icon={icon} />
                         </div>
                         {/* Main info */}
-                        <div style={{ flex: 1, marginLeft: 12 }}>
+                        <div style={{ flex: 1, marginLeft: isMobile ? 0 : 12, width: '100%' }}>
                           <div style={{ fontWeight: 600, fontSize: 17, color: '#fff', marginBottom: 2 }}>
                             {tx.type === 'withdrawal' ? 'Wallet Withdrawal' : tx.type === 'deposit' ? 'Wallet Deposit' : tx.description}
                           </div>
@@ -1736,7 +1748,7 @@ function Wallet() {
                           </div>
                         </div>
                         {/* Amount */}
-                        <div style={{ textAlign: 'right', minWidth: 110 }}>
+                        <div style={{ textAlign: isMobile ? 'left' : 'right', minWidth: isMobile ? undefined : 110, width: isMobile ? '100%' : undefined, marginTop: isMobile ? 8 : 0 }}>
                           <div style={{ fontWeight: 700, fontSize: 18, color: isPositive ? '#6fffbe' : '#ff6b6b' }}>
                             {isPositive ? '+' : ''}{formatBalance(tx.amount)}
                           </div>

@@ -2,5 +2,5 @@
 
 body, #root {
     min-height: 100vh;
-    background-image: linear-gradient(to bottom right in oklab, #000 0%, #2a2a72 60%, #6363ee 100%);
+    background-image: linear-gradient(to right in oklab, #000 0%, #2a2a72 90%);
   }
