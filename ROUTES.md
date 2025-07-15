@@ -264,3 +264,40 @@
 - `max_participants` is only required for live auctions.
 - Approval is handled by setting `status` to `approved` for both auction types.
 
+---
+
+## Newly Added/Missing Routes (auto-generated)
+
+### Authentication
+- **GET /api/auth/bid-history** — Get the authenticated user's bid history.
+- **GET /api/auth/won-live-auction/:id** — Get details of a won live auction for the authenticated user.
+- **GET /api/auth/won-settled-auction/:id** — Get details of a won settled auction for the authenticated user.
+- **GET /api/auth/won-auction/:type/:id** — Get details of a won auction by type (live/settled) and ID.
+- **GET /api/auth/settled-auction-result/:id** — Get the result for a settled auction (winner announcement, authenticated).
+- **GET /api/auth/live-auction-result/:id** — Get the result for a live auction (winner announcement, authenticated).
+
+### Seller Endpoints
+- **DELETE /api/seller/auctions/settled/:id** — Delete a settled auction (seller only).
+- **DELETE /api/seller/auctions/live/:id** — Delete a live auction (seller only).
+- **POST /api/seller/earnings/withdraw** — Request withdrawal of seller earnings.
+
+### Admin Endpoints
+- **GET /api/admin/auctions/live/pending** — Get all pending live auctions (admin only).
+- **GET /api/admin/auctions/by-seller/:sellerId** — Get all auctions by a specific seller (admin only).
+- **GET /api/admin/test-stripe** — Test route to verify admin Stripe routes are working.
+- **PATCH /api/admin/users/:userId/role** — Change a user's role (admin only).
+- **POST /api/admin/users/:userId/ban** — Ban a user (admin only).
+- **POST /api/admin/users/:userId/unban** — Unban a user (admin only).
+- **GET /api/admin/users/:userId/ban-history** — Get a user's ban history (admin only).
+
+### Auctions
+- **POST /api/auctions/settled/:id/process** — Manually process a settled auction (admin only, protected).
+
+### Wallet & Payments
+- **GET /api/wallet/deposit-card** — Get the most recent deposit card for the authenticated user.
+- **GET /api/wallet/monthly-summary** — Get a monthly summary of wallet activity for the authenticated user.
+- **GET /api/wallet/seller-earnings** — Get the seller's earnings balance (seller only).
+
+### User Profile
+- **PATCH /api/user/profile** — Update the authenticated user's profile.
+

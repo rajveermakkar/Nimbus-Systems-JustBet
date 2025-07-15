@@ -34,7 +34,7 @@ const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin: [process.env.FRONTEND_URL, 'http://localhost:5173'],
+  origin: process.env.FRONTEND_URL|| 'http://localhost:5173',
   credentials: true 
 }));
 app.use(cookieParser());
@@ -810,22 +810,9 @@ const startServer = async () => {
         }
       }
     });
-
-    httpServer.listen(port, '0.0.0.0', () => {
-      const interfaces = os.networkInterfaces();
-      const addresses = [];
-      for (const name of Object.keys(interfaces)) {
-        for (const iface of interfaces[name]) {
-          if (iface.family === 'IPv4' && !iface.internal) {
-            addresses.push(iface.address);
-          }
-        }
-      }
-      console.log('Server running on:');
-      console.log(`  Local:   http://localhost:${port}`);
-      addresses.forEach(addr => {
-        console.log(`  Network: http://${addr}:${port}`);
-      });
+    
+    httpServer.listen(port, () => {
+      console.log(`Server running on port ${port}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

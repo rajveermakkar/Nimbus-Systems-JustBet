@@ -10,6 +10,77 @@ import ConfirmModal from '../src/components/ConfirmModal';
 import apiService from '../src/services/apiService';
 import Button from '../src/components/Button';
 
+function AdminRadialMenu({ navLinks, section, onNav, onLogout, open, onClose }) {
+  // Radial positions for 7 items (6 nav + logout)
+  const items = navLinks.filter(link => link.key !== "approve-auctions").concat({ key: 'logout', label: 'Log out', icon: 'fa-sign-out-alt', logout: true });
+  const radius = 300; // px, increased for more spacing
+  const arc = Math.PI * (85/180); // 85 degrees
+  const startAngle = -Math.PI / 2; // -90 degrees (pointing up)
+  return (
+    <>
+      {/* Overlay */}
+      {open && <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm md:hidden" onClick={onClose}></div>}
+      {/* Radial menu */}
+      <div className={`fixed z-[60] md:hidden transition-all duration-300 pointer-events-none`} style={{ right: 80, bottom: 44 }}>
+        <div className="relative w-0 h-0">
+          {items.map((item, i) => {
+            const angle = startAngle - (i * (arc / (items.length - 1)));
+            const x = open ? Math.cos(angle) * radius : 0;
+            const y = open ? Math.sin(angle) * radius : 0;
+            return (
+              <button
+                key={item.key}
+                className={`absolute flex flex-col items-center justify-center shadow-lg w-16 h-16 transition-all duration-300 ${open ? 'opacity-100 pointer-events-auto scale-100' : 'opacity-0 pointer-events-none scale-75'}`}
+                style={{
+                  transform: `translate(${x}px, ${y}px)`
+                }}
+                onClick={() => {
+                  if (item.logout) onLogout();
+                  else onNav(item.key);
+                  onClose();
+                }}
+                tabIndex={open ? 0 : -1}
+              >
+                <i className={`fa-solid ${item.icon} text-2xl mb-1 ${section === item.key ? 'text-purple-400' : 'text-white'}`}></i>
+                <span className={`block text-xs font-semibold mt-0.5 text-center leading-tight ${section === item.key ? 'text-purple-400' : 'text-white'}`}>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function AdminMobileNavbar({ navLinks, section, onNav, onLogout }) {
+  const [radialOpen, setRadialOpen] = useState(false);
+  return (
+    <>
+      {/* Floating radial menu trigger at bottom right */}
+      <button
+        className={`fixed z-[70] md:hidden bottom-6 right-6 text-white text-3xl p-4 rounded-full shadow-lg focus:outline-none transition  hover:bg-purple-500 bg-[#252567]`}
+        onClick={() => setRadialOpen(v => !v)}
+        aria-label={radialOpen ? 'Close admin menu' : 'Open admin menu'}
+        style={{ boxShadow: '0 4px 24px #0005' }}
+      >
+        <span className="relative block w-7 h-7">
+          {/* Gear icon */}
+          <span className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${radialOpen ? 'opacity-0 rotate-45 scale-90' : 'opacity-100 rotate-0 scale-100'}`}
+            style={{transitionProperty:'opacity, transform'}}>
+            <i className="fas fa-cog text-white z-[70]"></i>
+          </span>
+          {/* X icon */}
+          <span className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${radialOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}
+            style={{transitionProperty:'opacity, transform'}}>
+            <i className="fas fa-times text-white z-[70]"></i>
+          </span>
+        </span>
+      </button>
+      <AdminRadialMenu navLinks={navLinks} section={section} onNav={onNav} onLogout={onLogout} open={radialOpen} onClose={() => setRadialOpen(false)} />
+    </>
+  );
+}
+
 function AdminDashboard() {
   const { user, setUser } = useContext(UserContext);
   const mainRef = useRef(null);
@@ -768,7 +839,7 @@ function AdminDashboard() {
           <>
             {/* Header */}
             <div className="flex items-center justify-between mb-2">
-              <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-white">Admin Dashboard</h1>
               <div className="flex items-center gap-4">
               <span className="text-gray-400 text-sm">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</span>
                 <button
@@ -795,10 +866,10 @@ function AdminDashboard() {
                   <div className="text-xs text-gray-300 font-semibold">Total Auctions</div>
                 </div>
                 <div className="bg-[#23235b]/80 rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2">
-                  <i className="fa-solid fa-calendar-day text-2xl text-green-400"></i>
-                  <div className="text-2xl font-bold text-white">{auctionsToday}</div>
-                  <div className="text-xs text-gray-300 font-semibold">Auctions Today</div>
-            </div>
+                  <i className="fa-solid fa-dollar-sign text-2xl text-green-400"></i>
+                  <div className="text-2xl font-bold text-white">${earningsData?.totalEarnings?.toFixed(2) ?? '-'}</div>
+                  <div className="text-xs text-gray-300 font-semibold">Total Earnings</div>
+                </div>
                 <div className="bg-[#23235b]/80 rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2">
                   <i className="fa-solid fa-user-plus text-2xl text-yellow-400"></i>
                   <div className="text-2xl font-bold text-white">{statsData.users?.pendingSellerRequests ?? '-'}</div>
@@ -819,34 +890,93 @@ function AdminDashboard() {
                 <i className="fa-solid fa-user-cog text-xl mb-2"></i>
                 <div className="font-semibold text-sm">Manage Users</div>
               </div>
-              <div onClick={() => { navigate('/admin/manage-auctions'); setAuctionFilter('all'); }} className="rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2 cursor-pointer hover:scale-105 transition bg-purple-900/60 text-purple-300 backdrop-blur-md">
-                <i className="fa-solid fa-gavel text-xl mb-2"></i>
-                <div className="font-semibold text-sm">Manage Auctions</div>
-              </div>
               <div onClick={() => { navigate('/admin/manage-auctions'); setAuctionFilter('pending'); }} className="rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2 cursor-pointer hover:scale-105 transition bg-green-900/60 text-green-300 backdrop-blur-md">
                 <i className="fa-solid fa-check-circle text-xl mb-2"></i>
                 <div className="font-semibold text-sm">Approve Auctions</div>
               </div>
-                </div>
-            {/* Top Sellers Leaderboard */}
+              <div onClick={() => { navigate('/admin/earnings'); setTimeout(() => { const el = document.querySelector('#admin-payout-section'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 100); }} className="rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2 cursor-pointer hover:scale-105 transition bg-purple-900/60 text-purple-300 backdrop-blur-md">
+                <i className="fa-solid fa-wallet text-xl mb-2"></i>
+                <div className="font-semibold text-sm">Withdraw Earnings</div>
+              </div>
+              <div onClick={() => navigate('/admin/db-health')} className="rounded-2xl shadow border border-white/10 flex flex-col items-center justify-center py-4 px-4 gap-2 cursor-pointer hover:scale-105 transition bg-blue-900/60 text-blue-300 backdrop-blur-md">
+                <i className="fa-solid fa-database text-xl mb-2"></i>
+                <div className="font-semibold text-sm">View DB Health</div>
+              </div>
+            </div>
+            {/* Top Sellers Leaderboard --> Replaced with Recent Activity Feed */}
             <div className="bg-[#23235b]/80 rounded-2xl shadow border border-white/10 p-4 flex flex-col gap-2 mt-4">
-              <h2 className="text-lg font-bold text-white mb-2">Top Sellers (Most Closed/Approved Listings)</h2>
-              {topSellers.length === 0 ? (
-                <div className="text-gray-400">No sellers found.</div>
-              ) : (
-                <ol className="list-decimal ml-6">
-                  {topSellers.map((seller, idx) => (
-                    <li key={seller.email || seller.id} className="flex items-center gap-2 text-white">
-                      <span className="font-semibold">{seller.first_name} {seller.last_name}</span>
-                      <span className="text-xs text-gray-400">({seller.count} listings)</span>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-bold text-white">Recent Activity</h2>
+                <button
+                  className="text-xs text-purple-300 hover:underline font-semibold"
+                  onClick={() => navigate('/admin/activity-logs')}
+                >
+                  View All
+                </button>
+              </div>
+              {/* Table header for desktop only */}
+              <div className="hidden md:grid grid-cols-12 gap-2 px-2 pb-1 text-xs font-semibold text-gray-400">
+                <div className="col-span-1"> </div>
+                <div className="col-span-2">User</div>
+                <div className="col-span-2">Action</div>
+                <div className="col-span-5">Description</div>
+                <div className="col-span-2 text-right">Time</div>
+              </div>
+              {activityLogsLoading ? (
+                <div className="text-gray-300 py-4">Loading activity...</div>
+              ) : activityLogsError ? (
+                <div className="text-red-400 py-4">{activityLogsError}</div>
+              ) : (activityLogs && activityLogs.length > 0) ? (
+                <ul className="divide-y divide-white/10">
+                  {activityLogs.slice(0, 3).map((log, idx) => {
+                    let icon = 'fa-list-alt', color = 'text-blue-300';
+                    if (log.type === 'user') { icon = 'fa-user-plus'; color = 'text-yellow-300'; }
+                    else if (log.type === 'live_auction' || log.type === 'settled_auction') { icon = 'fa-gavel'; color = 'text-purple-300'; }
+                    else if (log.type === 'live_auction_result' || log.type === 'settled_auction_result') { icon = 'fa-trophy'; color = 'text-green-300'; }
+                    else if (log.type === 'transaction') { icon = 'fa-dollar-sign'; color = 'text-green-400'; }
+                    return (
+                      <li key={idx} className="py-2">
+                        {/* Desktop grid row */}
+                        <div className="hidden md:grid grid-cols-12 gap-2 items-center text-xs md:text-sm">
+                          <div className="col-span-1 flex justify-center">
+                            <span className={`w-7 h-7 rounded-full bg-[#181c2f] flex items-center justify-center ${color}`}>
+                              <i className={`fa-solid ${icon}`}></i>
+                            </span>
+                          </div>
+                          <div className="col-span-2 truncate font-semibold text-white">{log.user || '-'}</div>
+                          <div className="col-span-2">
+                            <span className="px-2 py-0.5 bg-blue-600/20 text-blue-300 rounded text-xs font-medium">{log.action || '-'}</span>
+                          </div>
+                          <div className="col-span-5 text-gray-300 break-words whitespace-pre-line">{log.description || '-'}</div>
+                          <div className="col-span-2 text-right text-gray-400">{log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}</div>
+                        </div>
+                        {/* Mobile stacked row */}
+                        <div className="block md:hidden flex flex-col gap-1 pl-1 py-2 border-l-2 border-purple-700/30">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className={`w-7 h-7 rounded-full bg-[#181c2f] flex items-center justify-center ${color}`}>
+                              <i className={`fa-solid ${icon}`}></i>
+                            </span>
+                            <span className="font-semibold text-white text-sm">{log.user || '-'}</span>
+                            <span className="px-2 py-0.5 bg-blue-600/20 text-blue-300 rounded text-xs font-medium">{log.action || '-'}</span>
+                          </div>
+                          <div className="text-gray-300 text-xs break-words whitespace-pre-line ml-9">{log.description || '-'}</div>
+                          <div className="text-xs text-gray-400 ml-9">{log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}</div>
+                        </div>
                     </li>
-                  ))}
-                </ol>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <div className="text-gray-400">No recent activity.</div>
               )}
             </div>
           </>
         );
       case "manage-users":
+        // Pagination logic
+        const USERS_PER_PAGE = 7;
+        const totalUserPages = Math.ceil(allUsers.length / USERS_PER_PAGE);
+        const paginatedUsers = allUsers.slice((userPage - 1) * USERS_PER_PAGE, userPage * USERS_PER_PAGE);
         return (
           <div className="flex flex-col flex-1 h-full min-h-0">
             <div className="flex items-center justify-between mb-4">
@@ -861,34 +991,74 @@ function AdminDashboard() {
               </button>
             </div>
             <div className="flex-1 h-full min-h-0 overflow-auto">
-              <table className="table-fixed w-full bg-transparent rounded-xl overflow-hidden">
-                <thead>
-                  <tr>
-                    <th className="w-1/4 text-left px-4 py-2 font-bold text-base">Name</th>
-                    <th className="w-1/3 text-left px-4 py-2 font-bold text-base">Email</th>
-                    <th className="w-1/6 text-center px-4 py-2 font-bold text-base">Role</th>
-                    <th className="w-24 text-center px-4 py-2 font-bold text-base">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="h-full min-h-0 text-left text-sm">
-                  {allUsers.length === 0 ? <tr><td colSpan={4} className="text-center text-gray-400 p-4">No users found</td></tr> : allUsers.map(user => (
-                    <tr key={user.id} className="border-b border-white/10">
-                      <td className="p-2 font-semibold text-white align-middle text-left">{user.first_name} {user.last_name}</td>
-                      <td className="p-2 align-middle text-left">{user.email}</td>
-                      <td className="p-2 align-middle text-center">{user.role}</td>
-                      <td className="p-2 align-middle text-center">
-                        <div className="flex justify-center">
-                          <button onClick={() => openUserDetails(user)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
-                        </div>
-                      </td>
+              {/* Desktop Table */}
+              <div className="hidden md:block">
+                <table className="md:table table-fixed w-full bg-transparent rounded-xl overflow-hidden">
+                  <thead>
+                    <tr>
+                      <th className="w-1/4 text-left px-4 py-2 font-bold text-base">Name</th>
+                      <th className="w-1/3 text-left px-4 py-2 font-bold text-base">Email</th>
+                      <th className="w-1/6 text-center px-4 py-2 font-bold text-base">Role</th>
+                      <th className="w-24 text-center px-4 py-2 font-bold text-base">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="text-left text-sm">
+                    {paginatedUsers.length === 0 ? <tr><td colSpan={4} className="text-center text-gray-400 p-4">No users found</td></tr> : paginatedUsers.map(user => (
+                      <tr key={user.id} className="border-b border-white/10">
+                        <td className="p-3 font-semibold text-white align-middle text-left">{user.first_name} {user.last_name}</td>
+                        <td className="p-3 align-middle text-left">{user.email}</td>
+                        <td className="p-3 align-middle text-center">{user.role}</td>
+                        <td className="p-3 align-middle text-center">
+                          <div className="flex justify-center">
+                            <button onClick={() => openUserDetails(user)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-4 py-2 rounded text-xs">View</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Mobile Card List */}
+              <div className="block md:hidden space-y-4">
+                {paginatedUsers.length === 0 ? (
+                  <div className="text-center text-gray-400 p-4">No users found</div>
+                ) : paginatedUsers.map(user => (
+                  <div key={user.id} className="rounded-xl border border-white/10 p-4 flex flex-col gap-2 shadow">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-white text-base">{user.first_name} {user.last_name}</span>
+                      <span className="px-2 py-0.5 bg-blue-600/20 text-blue-300 rounded text-xs font-medium ml-2">{user.role}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-300 text-sm break-all">{user.email}</span>
+                      <button onClick={() => openUserDetails(user)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Pagination Controls */}
+              {totalUserPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-6">
+                  <button
+                    className="px-3 py-1 rounded bg-white/10 text-white disabled:opacity-40"
+                    onClick={() => setUserPage(p => Math.max(1, p - 1))}
+                    disabled={userPage === 1}
+                  >Prev</button>
+                  <span className="text-white text-sm">Page {userPage} of {totalUserPages}</span>
+                  <button
+                    className="px-3 py-1 rounded bg-white/10 text-white disabled:opacity-40"
+                    onClick={() => setUserPage(p => Math.min(totalUserPages, p + 1))}
+                    disabled={userPage === totalUserPages}
+                  >Next</button>
+                </div>
+              )}
             </div>
           </div>
         );
       case "approve-users":
+        // Pagination logic
+        const SELLERS_PER_PAGE = 7;
+        const totalSellerPages = Math.ceil(pendingSellers.length / SELLERS_PER_PAGE);
+        const paginatedSellers = pendingSellers.slice((sellerPage - 1) * SELLERS_PER_PAGE, sellerPage * SELLERS_PER_PAGE);
         return (
           <div className="flex flex-col flex-1 h-full min-h-0">
             <div className="flex items-center justify-between mb-4">
@@ -903,41 +1073,84 @@ function AdminDashboard() {
               </button>
             </div>
             <div className="flex-1 h-full min-h-0 overflow-auto">
-              <table className="table-fixed w-full bg-transparent rounded-xl overflow-hidden">
-                <thead>
-                  <tr>
-                    <th className="w-1/4 text-left px-4 py-2 font-bold text-base">Name</th>
-                    <th className="w-1/3 text-left px-4 py-2 font-bold text-base">Email</th>
-                    <th className="w-1/6 text-left px-4 py-2 font-bold text-base">Business</th>
-                    <th className="w-32 text-center px-4 py-2 font-bold text-base">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="h-full min-h-0 text-left text-sm">
-                  {pendingSellers.length === 0 ? <tr><td colSpan={4} className="text-center text-gray-400 p-4">No pending sellers</td></tr> : pendingSellers.map(seller => (
-                    <tr key={seller.id} className="border-b border-white/10">
-                      <td className="p-2 text-left"><a href="#" onClick={e => { e.preventDefault(); openUserDetails(seller); }}>{seller.first_name} {seller.last_name}</a></td>
-                      <td className="p-2 text-left">{seller.email}</td>
-                      <td className="p-2 text-left">{seller.business_name}</td>
-                      <td className="p-2 text-center">
-                        <div className="flex gap-2 justify-center">
-                          <button onClick={() => openUserDetails(seller)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
-                          <button disabled={actionLoading} onClick={() => openSellerApproveModal(seller)} className="bg-[#38b000] text-white hover:bg-[#2d8a00] px-3 py-1 rounded text-xs">Approve</button>
-                          <button disabled={actionLoading} onClick={() => openSellerRejectModal(seller)} className="bg-[#db2955] hover:bg-[#b71c3a] text-white px-3 py-1 rounded text-xs">Reject</button>
-                        </div>
-                      </td>
+              {/* Desktop Table */}
+              <div className="hidden md:block">
+                <table className="md:table table-fixed w-full bg-transparent rounded-xl overflow-hidden">
+                  <thead>
+                    <tr>
+                      <th className="w-1/4 text-left px-4 py-2 font-bold text-base">Name</th>
+                      <th className="w-1/3 text-left px-4 py-2 font-bold text-base">Email</th>
+                      <th className="w-1/6 text-left px-4 py-2 font-bold text-base">Business</th>
+                      <th className="w-32 text-center px-4 py-2 font-bold text-base">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="text-left text-sm">
+                    {paginatedSellers.length === 0 ? <tr><td colSpan={4} className="text-center text-gray-400 p-4">No pending sellers</td></tr> : paginatedSellers.map(seller => (
+                      <tr key={seller.id} className="border-b border-white/10">
+                        <td className="p-3 text-left"><a href="#" onClick={e => { e.preventDefault(); openUserDetails(seller); }}>{seller.first_name} {seller.last_name}</a></td>
+                        <td className="p-3 text-left">{seller.email}</td>
+                        <td className="p-3 text-left">{seller.business_name}</td>
+                        <td className="p-3 text-center">
+                          <div className="flex gap-2 justify-center">
+                            <button onClick={() => openUserDetails(seller)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
+                            <button disabled={actionLoading} onClick={() => openSellerApproveModal(seller)} className="bg-[#38b000] text-white hover:bg-[#2d8a00] px-3 py-1 rounded text-xs">Approve</button>
+                            <button disabled={actionLoading} onClick={() => openSellerRejectModal(seller)} className="bg-[#db2955] hover:bg-[#b71c3a] text-white px-3 py-1 rounded text-xs">Reject</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Mobile Card List */}
+              <div className="block md:hidden space-y-4">
+                {paginatedSellers.length === 0 ? (
+                  <div className="text-center text-gray-400 p-4">No pending sellers</div>
+                ) : paginatedSellers.map(seller => (
+                  <div key={seller.id} className="rounded-xl border border-white/10 p-4 flex flex-col gap-2 shadow">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-white text-base">{seller.first_name} {seller.last_name}</span>
+                      <span className="px-2 py-0.5 bg-blue-600/20 text-blue-300 rounded text-xs font-medium ml-2">{seller.business_name}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-300 text-sm break-all">{seller.email}</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => openUserDetails(seller)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
+                        <button disabled={actionLoading} onClick={() => openSellerApproveModal(seller)} className="bg-[#38b000] text-white hover:bg-[#2d8a00] px-3 py-1 rounded text-xs">Approve</button>
+                        <button disabled={actionLoading} onClick={() => openSellerRejectModal(seller)} className="bg-[#db2955] hover:bg-[#b71c3a] text-white px-3 py-1 rounded text-xs">Reject</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Pagination Controls */}
+              {totalSellerPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-6">
+                  <button
+                    className="px-3 py-1 rounded bg-white/10 text-white disabled:opacity-40"
+                    onClick={() => setSellerPage(p => Math.max(1, p - 1))}
+                    disabled={sellerPage === 1}
+                  >Prev</button>
+                  <span className="text-white text-sm">Page {sellerPage} of {totalSellerPages}</span>
+                  <button
+                    className="px-3 py-1 rounded bg-white/10 text-white disabled:opacity-40"
+                    onClick={() => setSellerPage(p => Math.min(totalSellerPages, p + 1))}
+                    disabled={sellerPage === totalSellerPages}
+                  >Next</button>
+                </div>
+              )}
             </div>
             {actionError && <div className="text-red-400 mt-2">{actionError}</div>}
           </div>
         );
       case "manage-auctions":
+        const AUCTIONS_PER_PAGE = 7;
         const filteredAuctions = getFilteredAuctions([
           ...allSettledAuctions.map(a => ({ ...a, type: 'settled' })),
           ...allLiveAuctions.map(a => ({ ...a, type: 'live' }))
         ]);
+        const totalAuctionPages = Math.ceil(filteredAuctions.length / AUCTIONS_PER_PAGE);
+        const paginatedAuctions = filteredAuctions.slice((auctionPage - 1) * AUCTIONS_PER_PAGE, auctionPage * AUCTIONS_PER_PAGE);
         return (
           <div className="flex flex-col flex-1 h-full min-h-0">
             <div className="flex items-center justify-between mb-4">
@@ -952,6 +1165,7 @@ function AdminDashboard() {
               </button>
             </div>
             <div className="flex-1 h-full min-h-0 overflow-auto">
+              {/* Filter controls */}
               <div className="mb-4 flex items-center gap-2">
                 <label className="text-gray-300">Filter:</label>
                 <select value={auctionFilter} onChange={e => setAuctionFilter(e.target.value)} className="bg-[#23235b] text-white rounded px-2 py-1 border border-white/10">
@@ -962,43 +1176,93 @@ function AdminDashboard() {
                   <option value="pending">Pending</option>
                 </select>
               </div>
-              <table className="table-fixed w-full bg-transparent rounded-xl overflow-hidden text-sm">
-                <thead>
-                  <tr>
-                    <th className="w-1/9 text-left px-3 py-1 font-bold">Title</th>
-                    <th className="w-1/8 text-center px-3 py-1 font-bold ">Type</th>
-                    <th className="w-1/8 text-center px-3 py-1 font-bold">Status</th>
-                    <th className="w-26 text-center px-3 py-1 font-bold">Seller</th>
-
-                    <th className="w-1/8 text-center px-6 py-3 font-bold text-lg">Start</th>
-                    <th className="w-1/8 text-center px-6 py-3 font-bold text-lg">End</th>
-                    <th className="w-32 text-center px-6 py-3 font-bold text-lg">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="h-full min-h-0 text-sm">
-                  {filteredAuctions.length === 0 ? <tr><td colSpan={7} className="text-center text-gray-400 p-4">No auctions found</td></tr> : filteredAuctions.map(auction => (
-                    <tr key={auction.id} className="border-b border-white/10">
-                      <td className="p-2 font-semibold text-white align-middle text-left">{auction.title}</td>
-                      <td className="p-2 align-middle text-center">{auction.type === 'live' ? 'Live' : 'Settled'}</td>
-                      <td className="p-2 align-middle text-center">{auction.status || auction.auction_status}</td>
-                      <td className="p-2 align-middle text-center">{auction.seller?.first_name} {auction.seller?.last_name}</td>
-                      <td className="p-2">{new Date(auction.start_time).toLocaleString()}</td>
-                      <td className="p-2">{new Date(auction.end_time).toLocaleString()}</td>
-                      <td className="p-2">
-                        {(auction.status === 'pending' || auction.auction_status === 'pending') ? (
-                          <div className="flex gap-2 justify-center">
-                            <button onClick={() => openAuctionDetails(auction)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
-                            <button disabled={actionLoading} onClick={() => openApproveModal(auction.type, auction.id)} className="bg-[#38b000] text-white hover:bg-[#2d8a00] px-3 py-1 rounded text-xs">Approve</button>
-                            <button disabled={actionLoading} onClick={() => openRejectModal(auction.type, auction.id)} className="bg-[#db2955] hover:bg-[#b71c3a] text-white px-3 py-1 rounded text-xs">Reject</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => openAuctionDetails(auction)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
-                        )}
-                      </td>
+              {/* Desktop Table */}
+              <div className="hidden md:block">
+                <table className="min-w-full md:table-fixed w-full bg-transparent rounded-xl overflow-x-auto md:overflow-visible block md:table">
+                  <thead className="block md:table-header-group w-full">
+                    <tr className="block md:table-row">
+                      <th className="w-1/9 text-left px-3 py-1 font-bold">Title</th>
+                      <th className="w-1/8 text-center px-3 py-1 font-bold ">Type</th>
+                      <th className="w-1/8 text-center px-3 py-1 font-bold">Status</th>
+                      <th className="w-26 text-center px-3 py-1 font-bold">Seller</th>
+                      <th className="w-1/8 text-center px-6 py-3 font-bold text-lg">Start</th>
+                      <th className="w-1/8 text-center px-6 py-3 font-bold text-lg">End</th>
+                      <th className="w-32 text-center px-6 py-3 font-bold text-lg">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="block md:table-row-group w-full">
+                    {paginatedAuctions.length === 0 ? <tr><td colSpan={7} className="text-center text-gray-400 p-4">No auctions found</td></tr> : paginatedAuctions.map(auction => (
+                      <tr key={auction.id} className="block md:table-row border-b border-white/10">
+                        <td className="p-2 font-semibold text-white align-middle text-left">{auction.title}</td>
+                        <td className="p-2 align-middle text-center">{auction.type === 'live' ? 'Live' : 'Settled'}</td>
+                        <td className="p-2 align-middle text-center">{auction.status || auction.auction_status}</td>
+                        <td className="p-2 align-middle text-center">{auction.seller?.first_name} {auction.seller?.last_name}</td>
+                        <td className="p-2">{new Date(auction.start_time).toLocaleString()}</td>
+                        <td className="p-2">{new Date(auction.end_time).toLocaleString()}</td>
+                        <td className="p-2">
+                          {(auction.status === 'pending' || auction.auction_status === 'pending') ? (
+                            <div className="flex gap-2 justify-center">
+                              <button onClick={() => openAuctionDetails(auction)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
+                              <button disabled={actionLoading} onClick={() => openApproveModal(auction.type, auction.id)} className="bg-[#38b000] text-white hover:bg-[#2d8a00] px-3 py-1 rounded text-xs">Approve</button>
+                              <button disabled={actionLoading} onClick={() => openRejectModal(auction.type, auction.id)} className="bg-[#db2955] hover:bg-[#b71c3a] text-white px-3 py-1 rounded text-xs">Reject</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => openAuctionDetails(auction)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Mobile Card List */}
+              <div className="block md:hidden space-y-4">
+                {paginatedAuctions.length === 0 ? (
+                  <div className="text-center text-gray-400 p-4">No auctions found</div>
+                ) : paginatedAuctions.map(auction => (
+                  <div key={auction.id} className="rounded-xl border border-white/10 p-4 flex flex-col gap-2 shadow">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-white text-base">{auction.title}</span>
+                      <span className="px-2 py-0.5 bg-blue-600/20 text-blue-300 rounded text-xs font-medium ml-2">{auction.type === 'live' ? 'Live' : 'Settled'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-xs text-gray-300">
+                      <span>Status: <span className="font-semibold text-white">{auction.status || auction.auction_status}</span></span>
+                      <span>Seller: <span className="font-semibold text-white">{auction.seller?.first_name} {auction.seller?.last_name}</span></span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-xs text-gray-300">
+                      <span>Start: <span className="font-semibold text-white">{new Date(auction.start_time).toLocaleString()}</span></span>
+                      <span>End: <span className="font-semibold text-white">{new Date(auction.end_time).toLocaleString()}</span></span>
+                    </div>
+                    <div className="flex gap-2 mt-2 justify-end">
+                      {(auction.status === 'pending' || auction.auction_status === 'pending') ? (
+                        <>
+                          <button onClick={() => openAuctionDetails(auction)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
+                          <button disabled={actionLoading} onClick={() => openApproveModal(auction.type, auction.id)} className="bg-[#38b000] text-white hover:bg-[#2d8a00] px-3 py-1 rounded text-xs">Approve</button>
+                          <button disabled={actionLoading} onClick={() => openRejectModal(auction.type, auction.id)} className="bg-[#db2955] hover:bg-[#b71c3a] text-white px-3 py-1 rounded text-xs">Reject</button>
+                        </>
+                      ) : (
+                        <button onClick={() => openAuctionDetails(auction)} className="bg-[#0077b6] hover:bg-[#005f8a] text-white px-3 py-1 rounded text-xs">View</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Pagination Controls */}
+              {totalAuctionPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-6">
+                  <button
+                    className="px-3 py-1 rounded bg-white/10 text-white disabled:opacity-40"
+                    onClick={() => setAuctionPage(p => Math.max(1, p - 1))}
+                    disabled={auctionPage === 1}
+                  >Prev</button>
+                  <span className="text-white text-sm">Page {auctionPage} of {totalAuctionPages}</span>
+                  <button
+                    className="px-3 py-1 rounded bg-white/10 text-white disabled:opacity-40"
+                    onClick={() => setAuctionPage(p => Math.min(totalAuctionPages, p + 1))}
+                    disabled={auctionPage === totalAuctionPages}
+                  >Next</button>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -1168,7 +1432,7 @@ function AdminDashboard() {
                         ) : (
                           <tr>
                             <td colSpan={5} className="text-center text-gray-400 p-8">
-                              No platform fees found
+                              No Recent platform fees
                             </td>
                           </tr>
                         )}
@@ -1463,34 +1727,56 @@ function AdminDashboard() {
               </div>
             </div>
             <div className="flex-1 h-full min-h-0 overflow-auto">
-              <table className="w-full bg-transparent rounded-xl overflow-hidden">
-                <thead>
-                  <tr>
-                    <th className="w-1/6 text-left px-4 py-2 font-bold text-base">Date</th>
-                    <th className="w-1/6 text-left px-4 py-2 font-bold text-base">User</th>
-                    <th className="max-w-xs text-left px-4 py-2 font-bold text-base">Action</th>
-                    <th className="min-w-0 text-left px-4 py-2 font-bold text-base">Description</th>
-                  </tr>
-                </thead>
-                <tbody className="h-full min-h-0 text-left text-sm">
-                  {activityLogsLoading ? (
-                    <tr><td colSpan={4} className="text-center text-gray-300 p-8">Loading activity logs...</td></tr>
-                  ) : activityLogsError ? (
-                    <tr><td colSpan={4} className="text-center text-red-400 p-8">{activityLogsError}</td></tr>
-                  ) : activityLogs.length === 0 ? (
-                    <tr><td colSpan={4} className="text-center text-gray-400 p-8">No activity logs found</td></tr>
-                  ) : activityLogs.map((log, idx) => (
-                    <tr key={idx} className="border-b border-white/10">
-                      <td className="p-2 align-middle text-left text-white">{log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}</td>
-                      <td className="p-2 align-middle text-left text-white font-medium">{log.user || '-'}</td>
-                      <td className="p-2 align-middle text-left text-white max-w-xs truncate">
-                        <span className="px-2 py-1 bg-blue-600/20 text-blue-300 rounded text-xs font-medium">{log.action || '-'}</span>
-                      </td>
-                      <td className="p-2 align-middle text-left text-gray-300 min-w-0 break-words whitespace-pre-line">{log.description || '-'}</td>
+              {/* Desktop Table */}
+              <div className="hidden md:block">
+                <table className="w-full bg-transparent rounded-xl overflow-hidden">
+                  <thead>
+                    <tr>
+                      <th className="w-1/6 text-left px-4 py-2 font-bold text-base">Date</th>
+                      <th className="w-1/6 text-left px-4 py-2 font-bold text-base">User</th>
+                      <th className="max-w-xs text-left px-4 py-2 font-bold text-base">Action</th>
+                      <th className="min-w-0 text-left px-4 py-2 font-bold text-base">Description</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="h-full min-h-0 text-left text-sm">
+                    {activityLogsLoading ? (
+                      <tr><td colSpan={4} className="text-center text-gray-300 p-8">Loading activity logs...</td></tr>
+                    ) : activityLogsError ? (
+                      <tr><td colSpan={4} className="text-center text-red-400 p-8">{activityLogsError}</td></tr>
+                    ) : activityLogs.length === 0 ? (
+                      <tr><td colSpan={4} className="text-center text-gray-400 p-8">No activity logs found</td></tr>
+                    ) : activityLogs.map((log, idx) => (
+                      <tr key={idx} className="border-b border-white/10">
+                        <td className="p-2 align-middle text-left text-white">{log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}</td>
+                        <td className="p-2 align-middle text-left text-white font-medium">{log.user || '-'}</td>
+                        <td className="p-2 align-middle text-left text-white max-w-xs truncate">
+                          <span className="px-2 py-1 bg-blue-600/20 text-blue-300 rounded text-xs font-medium">{log.action || '-'}</span>
+                        </td>
+                        <td className="p-2 align-middle text-left text-gray-300 min-w-0 break-words whitespace-pre-line">{log.description || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Mobile Card List */}
+              <div className="block md:hidden space-y-4">
+                {activityLogsLoading ? (
+                  <div className="text-center text-gray-300 p-4">Loading activity logs...</div>
+                ) : activityLogsError ? (
+                  <div className="text-center text-red-400 p-4">{activityLogsError}</div>
+                ) : activityLogs.length === 0 ? (
+                  <div className="text-center text-gray-400 p-4">No activity logs found</div>
+                ) : activityLogs.map((log, idx) => (
+                  <div key={idx} className="rounded-xl border border-white/10 p-4 flex flex-col gap-2 shadow">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-white text-base">{log.user || '-'}</span>
+                      <span className="px-2 py-0.5 bg-blue-600/20 text-blue-300 rounded text-xs font-medium ml-2">{log.action || '-'}</span>
+                    </div>
+                    <div className="text-gray-300 text-sm break-words whitespace-pre-line">{log.description || '-'}</div>
+                    <div className="text-xs text-gray-400">{log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         );
@@ -1503,11 +1789,28 @@ function AdminDashboard() {
   const lastPathRef = useRef(location.pathname);
   const fromUserRef = useRef(null);
 
+  const handleMobileNav = (key) => {
+    if (key === 'dashboard') navigate('/admin/dashboard');
+    else if (key === 'manage-users') navigate('/admin/manage-users');
+    else if (key === 'manage-auctions') navigate('/admin/manage-auctions');
+    else if (key === 'approve-users') navigate('/admin/approve-users');
+    else if (key === 'earnings') navigate('/admin/earnings');
+    else if (key === 'db-health') navigate('/admin/db-health');
+    else if (key === 'activity-logs') navigate('/admin/activity-logs');
+  };
+
+  // Add after all other useState hooks at the top of AdminDashboard:
+  const [userPage, setUserPage] = useState(1);
+  const [auctionPage, setAuctionPage] = useState(1);
+  const [sellerPage, setSellerPage] = useState(1);
+
   return (
-    <div className={`w-full bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] flex items-center justify-center py-6 px-2 transition-opacity duration-300 ${isLoggingOut ? 'opacity-0' : 'opacity-100'}`}>
-      <div className="w-full max-w-7xl flex overflow-hidden rounded-2xl min-h-[92vh]" style={{height: mainHeight ? mainHeight : 'auto'}}>
-        {/* Sidebar */}
-        <aside className="w-64 min-h-full bg-[#181c2f]/80 backdrop-blur-md border-r border-white/10 flex flex-col py-8 px-6 text-white rounded-l-2xl" style={{height: mainHeight ? mainHeight : 'auto'}}>
+    <div className={`w-full bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] flex flex-col md:flex-row items-center md:items-start justify-center py-2 md:py-6 px-0 md:px-2 transition-opacity duration-300 ${isLoggingOut ? 'opacity-0' : 'opacity-100'} min-h-screen md:min-h-screen`}>
+      {/* Mobile Navbar and Drawer */}
+      <AdminMobileNavbar navLinks={navLinks} section={section} onNav={handleMobileNav} onLogout={handleLogout} />
+      <div className="w-full max-w-7xl flex flex-col md:flex-row overflow-hidden rounded-2xl min-h-[92vh] md:min-h-[92vh] h-full">
+        {/* Sidebar (hidden on mobile) */}
+        <aside className="hidden md:flex w-64 min-h-[92vh] md:min-h-[92vh] bg-[#181c2f]/80 backdrop-blur-md border-r border-white/10 flex-col py-8 px-6 text-white rounded-l-2xl">
           <div>
             <div className="flex flex-col items-center gap-2 mb-8 select-none">
               <img src={`https://ui-avatars.com/api/?name=${user?.firstName || 'A'}+${user?.lastName || 'D'}&background=2a2a72&color=fff`} alt="avatar" className="w-16 h-16 rounded-full border-2 border-white/30" />
@@ -1537,7 +1840,7 @@ function AdminDashboard() {
           <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-400 hover:bg-red-900/30 hover:text-red-300 transition"><i className="fa-solid fa-sign-out-alt"></i> Log out</button>
         </aside>
         {/* Main Content */}
-        <main ref={mainRef} className="flex-1 min-h-full bg-[#181c2f]/40 backdrop-blur-md rounded-r-2xl p-6 flex flex-col gap-4 text-white rounded-r-2xl">
+        <main ref={mainRef} className="flex-1 min-h-[92vh] md:min-h-[92vh] bg-[#181c2f]/40 backdrop-blur-md rounded-none md:rounded-r-2xl p-2 md:p-6 flex flex-col gap-4 text-white overflow-auto md:overflow-visible">
           {renderSection()}
         </main>
       </div>
