@@ -40,7 +40,7 @@ function Toast({ message, type = 'info', onClose, duration = 3000, actionLabel, 
 
   return (
     <div
-      className={`fixed top-10 right-6 z-50 max-w-md w-full shadow-2xl rounded-2xl ${bgColor} flex items-center px-4 py-3 animate-toast-pop backdrop-blur-md`}
+      className={`fixed top-10 left-1/2 right-auto transform -translate-x-1/2 sm:left-auto sm:right-6 sm:transform-none z-50 max-w-md w-full shadow-2xl rounded-2xl ${bgColor} flex items-center px-4 py-3 animate-toast-pop backdrop-blur-md`}
       style={{ transition: 'transform 0.2s cubic-bezier(.4,2,.6,1), opacity 0.2s', transform: 'translateY(0)', opacity: 1 }}
       role="alert"
     >

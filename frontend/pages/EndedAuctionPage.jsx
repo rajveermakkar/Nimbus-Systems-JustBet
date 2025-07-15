@@ -285,7 +285,16 @@ function EndedAuctionPage() {
           )}
           <h2 className="text-lg font-bold mb-1 text-center">{auction.title}</h2>
           <div className="mb-1 text-xs text-gray-300 text-center">
-            Seller: <span className="font-semibold text-white">{auction.business_name || `${auction.first_name} ${auction.last_name}` || auction.email || 'Unknown'}</span>
+            Seller: <span className="font-semibold text-white">
+              {auction.seller
+                ? (
+                    auction.seller.business_name
+                    || (auction.seller.first_name && auction.seller.last_name
+                        ? `${auction.seller.first_name} ${auction.seller.last_name}`
+                        : auction.seller.email || 'Unknown')
+                  )
+                : 'Unknown'}
+            </span>
           </div>
           <div className="text-sm text-gray-200 whitespace-pre-line text-center mt-2">
             {auction.description}

@@ -3,6 +3,7 @@ import Button from '../src/components/Button';
 import Toast from '../src/components/Toast';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../src/services/apiService';
+import LoadingSpinner from '../src/components/LoadingSpinner';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const STATUS_LABELS = {
@@ -16,7 +17,16 @@ function MyWinnings() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+  const [page, setPage] = useState(1); // For mobile pagination
   const navigate = useNavigate();
+
+  // Pagination settings
+  const CARDS_PER_PAGE = 3;
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const totalPages = isMobile ? Math.ceil(winnings.length / CARDS_PER_PAGE) : 1;
+  const paginatedWinnings = isMobile
+    ? winnings.slice((page - 1) * CARDS_PER_PAGE, page * CARDS_PER_PAGE)
+    : winnings;
 
   useEffect(() => {
     fetchWinningsAndOrders();
@@ -54,6 +64,10 @@ function MyWinnings() {
     }).format(price);
   };
 
+  if (loading) {
+    return <LoadingSpinner message="Loading your winnings..." />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white py-8">
       {toast.show && (
@@ -71,8 +85,9 @@ function MyWinnings() {
         ) : winnings.length === 0 ? (
           <div className="text-center py-8 text-gray-400">You have not won any auctions yet.</div>
         ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {winnings.map(win => {
+            {(isMobile ? paginatedWinnings : winnings).map(win => {
               const order = ordersByAuction[win.auction_id];
               let buttonLabel = 'Enter Shipping Details';
               if (order) {
@@ -85,7 +100,7 @@ function MyWinnings() {
               return (
                 <div
                   key={win.auction_id}
-                  className="backdrop-blur-md bg-white/10 rounded-2xl shadow-lg p-0 flex flex-col overflow-hidden hover:scale-[1.025] transition-transform duration-200 relative"
+                  className="backdrop-blur-md bg-white/10 rounded-2xl shadow-lg p-0 flex flex-col overflow-hidden hover:scale-[1.025] transition-transform duration-200 relative w-[90%] mx-auto md:w-auto md:mx-0"
                 >
                   {win.image_url && (
                     <div className="relative w-full h-48">
@@ -121,6 +136,27 @@ function MyWinnings() {
               );
             })}
           </div>
+          {/* Mobile Pagination Controls */}
+          {isMobile && totalPages > 1 && (
+            <div className="flex justify-center items-center gap-4 mt-6">
+              <button
+                className="px-4 py-2 rounded bg-white/10 text-white disabled:opacity-40"
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+              >
+                Previous
+              </button>
+              <span className="text-white/80 text-sm">Page {page} of {totalPages}</span>
+              <button
+                className="px-4 py-2 rounded bg-white/10 text-white disabled:opacity-40"
+                onClick={() => setPage(page + 1)}
+                disabled={page === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

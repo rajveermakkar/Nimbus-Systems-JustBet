@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect, useMemo } from "react";
+import React, { useContext, useState, useEffect, useMemo, useRef } from "react";
 import { UserContext } from "../src/context/UserContext";
 import Button from "../src/components/Button";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -93,6 +93,8 @@ function SellerDashboard() {
   const [walletLoading, setWalletLoading] = useState(false);
   // Add state for seller earnings
   const [sellerEarnings, setSellerEarnings] = useState(null);
+  const tabRefs = useRef([]);
+  const mobileTabRefs = useRef([]);
 
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -327,11 +329,15 @@ function SellerDashboard() {
   };
 
   // Update tab and URL when user clicks a tab
-  const handleTabChange = (tabId) => {
+  const handleTabChange = (tabId, idx, isMobile = false) => {
     setActiveTab(tabId);
     const params = new URLSearchParams(location.search);
     params.set('tab', tabId);
-    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+    navigate({ search: params.toString() });
+    // Only scroll into view for mobile
+    if (isMobile && mobileTabRefs.current[idx]) {
+      mobileTabRefs.current[idx].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
   };
 
   // Fetch Stripe Connect status on mount (if seller)
@@ -454,33 +460,61 @@ function SellerDashboard() {
           </div>
 
           {/* Tabs */}
-          <div className="flex justify-center mb-6">
-            <div className="bg-white/10 rounded-lg p-1 flex">
+          {/* Responsive mini-navbar for mobile/tablet, original for desktop */}
+          <div className="mb-6">
+            {/* Mobile/Tablet: horizontal scrollable mini-navbar */}
+            <div className="flex md:hidden gap-2 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4">
               {[
                 { id: 'overview', label: 'Overview', icon: 'fa-solid fa-chart-line' },
                 { id: 'results', label: 'Auction Results', icon: 'fa-solid fa-trophy' },
                 { id: 'listings', label: 'My Listings', icon: 'fa-solid fa-list' },
                 { id: 'orders', label: 'Manage Orders', icon: 'fa-solid fa-box' },
                 { id: 'settings', label: 'Seller Management', icon: 'fa-solid fa-user-cog' }
-              ].map((tab) => (
+              ].map((tab, idx) => (
                 <button
                   key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${
+                  ref={el => mobileTabRefs.current[idx] = el}
+                  onClick={() => handleTabChange(tab.id, idx, true)}
+                  className={`flex-shrink-0 px-3 py-2 rounded-lg flex flex-col items-center gap-1 text-s font-semibold transition-colors min-w-[80px] ${
                     activeTab === tab.id 
-                      ? 'bg-white/10 bg-purple-500/30 text-purple-300 border border-purple-400/40 shadow-[0_0_12px_#a78bfa66] backdrop-blur-md ' 
+                      ? 'bg-white/10 bg-purple-500/30 text-purple-300 border border-purple-400/40 shadow-[0_0_12px_#a78bfa66] backdrop-blur-md' 
                       : 'text-gray-300 hover:text-purple'
                   }`}
                 >
                   <i className={tab.icon}></i>
-                  {tab.label}
+                  <span>{tab.label}</span>
                 </button>
               ))}
+            </div>
+            {/* Desktop: original tab bar (no refs/scrollIntoView needed) */}
+            <div className="hidden md:flex justify-center">
+              <div className="bg-white/10 rounded-lg p-1 flex">
+                {[
+                  { id: 'overview', label: 'Overview', icon: 'fa-solid fa-chart-line' },
+                  { id: 'results', label: 'Auction Results', icon: 'fa-solid fa-trophy' },
+                  { id: 'listings', label: 'My Listings', icon: 'fa-solid fa-list' },
+                  { id: 'orders', label: 'Manage Orders', icon: 'fa-solid fa-box' },
+                  { id: 'settings', label: 'Seller Management', icon: 'fa-solid fa-user-cog' }
+                ].map((tab, idx) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id, idx, false)}
+                    className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${
+                      activeTab === tab.id 
+                        ? 'bg-white/10 bg-purple-500/30 text-purple-300 border border-purple-400/40 shadow-[0_0_12px_#a78bfa66] backdrop-blur-md ' 
+                        : 'text-gray-300 hover:text-purple'
+                    }`}
+                  >
+                    <i className={tab.icon}></i>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Content */}
-          <div className="bg-white/10 rounded-lg p-6">
+          <div className="bg-white/10 rounded-lg p-4 sm:p-6 border border-white/20 w-full">
             {loading && (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4"></div>
@@ -491,7 +525,7 @@ function SellerDashboard() {
             {error && (
               <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-6 text-center">
                 <p className="text-red-400">{error}</p>
-                <Button onClick={() => handleTabChange(activeTab)} className="mt-2">
+                <Button onClick={() => handleTabChange(activeTab, tabRefs.current.findIndex(el => el.textContent.includes(activeTab)))} className="mt-2">
                   Try Again
                 </Button>
               </div>
@@ -503,7 +537,7 @@ function SellerDashboard() {
                 <h2 className="text-2xl font-bold mb-4">📊 Analytics Overview</h2>
                 
                 {/* Wallet Overview */}
-                <div className="bg-white/5 rounded-lg p-6 border border-white/20 mb-6">
+                <div className="bg-white/5 rounded-lg p-6 mb-6">
                   <h3 className="text-lg font-semibold mb-4 text-green-400">💰 Seller Overview</h3>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 text-center">
@@ -932,7 +966,6 @@ function SellerDashboard() {
                         <Button
                           variant="primary"
                           size="default"
-                          style={{ minWidth: 220, fontSize: 18, borderRadius: 10, fontWeight: 600 }}
                           onClick={async () => {
                             await handleStartOnboarding();
                             if (onboardingUrl) window.open(onboardingUrl, '_blank', 'noopener');
@@ -975,7 +1008,6 @@ function SellerDashboard() {
                             <Button
                               variant="primary"
                               size="default"
-                              style={{ minWidth: 220, fontSize: 18, borderRadius: 10, fontWeight: 600 }}
                               onClick={async () => {
                                 if (onboardingUrl) {
                                   window.open(onboardingUrl, '_blank', 'noopener');

@@ -3,6 +3,7 @@ const { pool } = require('../db/init');
 const multer = require('multer');
 const { uploadImageToAzure } = require('../services/azureBlobService');
 const Wallet = require('../models/Wallet');
+const { scheduleAuctionProcessing } = require('../services/liveAuctionCron');
 
 // Create a new live auction
 async function createLiveAuction(req, res) {
@@ -50,6 +51,8 @@ async function createLiveAuction(req, res) {
       min_bid_increment: minBidIncrement !== undefined && minBidIncrement !== null && minBidIncrement !== '' ? Number(minBidIncrement) : 1,
       status: 'pending' // Default to pending for admin approval
     });
+    // Schedule the auction for auto-finalization
+    scheduleAuctionProcessing(auction.id, auction.endTime || auction.end_time);
     res.status(201).json({ auction });
   } catch (error) {
     console.error('Error creating live auction:', error);

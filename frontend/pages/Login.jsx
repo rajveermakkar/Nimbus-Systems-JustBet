@@ -186,7 +186,7 @@ function Login({ showToast }) {
     <form onSubmit={handleSubmit} noValidate className="space-y-4 w-full">
       <input
         type="email"
-        className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.email ? "border-red-500" : ""}`}
+        className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-purple-400 text-white placeholder-gray-400 focus:outline-none text-base ${errors.email ? "border-red-500" : ""}`}
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -194,7 +194,7 @@ function Login({ showToast }) {
       <div className="relative">
         <input
           type={showPassword ? "text" : "password"}
-          className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.password ? "border-red-500" : ""}`}
+          className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-purple-400 text-white placeholder-gray-400 focus:outline-none text-base ${errors.password ? "border-red-500" : ""}`}
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -215,7 +215,7 @@ function Login({ showToast }) {
             type="checkbox"
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
-            className="form-checkbox h-4 w-4 text-blue-500 align-middle"
+            className="form-checkbox h-4 w-4 text-purple-400 align-middle"
           />
           <span className="align-middle text-white">Remember me</span>
         </label>
@@ -260,6 +260,7 @@ function Login({ showToast }) {
           error={errors.form}
           footer={footer}
           bgClassName="bg-black/30"
+          className="max-w-full p-8 mb-28"
         >
           {errors.form === "Please verify your email first" && (
             <div className="text-center mb-2">

@@ -268,6 +268,9 @@ function WinningPage() {
     }
   }
 
+  // Detect mobile
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   if (loading) {
     return <LoadingSpinner message="Loading..." />;
   }
@@ -299,7 +302,7 @@ function WinningPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-start justify-start py-10 px-2 bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
+    <div className={isMobile ? "min-h-screen flex flex-col items-center justify-start py-10 px-2 bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white" : "min-h-screen flex flex-col items-start justify-start py-10 px-2 bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white"}>
       {toast.show && (
         <Toast
           message={toast.message}
@@ -310,32 +313,32 @@ function WinningPage() {
       )}
       <div className="w-full max-w-6xl mx-auto">
         {/* Green glassy Congratulations card */}
-        <div className="w-full flex justify-center">
+        <div className={isMobile ? "w-full flex justify-center items-center" : "w-full flex justify-center"}>
           <div className="bg-green-500/20 backdrop-blur rounded-xl shadow border border-green-300/30 py-2 px-4 mb-4 w-full max-w-xl mx-auto">
-            <h1 className="text-base md:text-lg font-extrabold text-center flex items-center justify-center gap-2">
+            <h1 className={isMobile ? "text-base md:text-lg font-extrabold text-center flex items-center justify-center gap-2" : "text-base md:text-lg font-extrabold text-center flex items-center justify-center gap-2"}>
               <span role="img" aria-label="trophy">🏆</span> Congratulations on winning!
             </h1>
           </div>
         </div>
         {/* Main content: 2 columns on desktop, stacked on mobile */}
-        <div className="flex flex-col md:flex-row gap-6 w-full items-start">
+        <div className={isMobile ? "flex flex-col gap-6 w-full items-center" : "flex flex-col md:flex-row gap-6 w-full items-start"}>
           {/* Left: Product info and shipping */}
-          <div className="flex-1 min-w-0 flex flex-col gap-6">
+          <div className={isMobile ? "flex-1 min-w-0 flex flex-col gap-6 items-center w-full" : "flex-1 min-w-0 flex flex-col gap-6"}>
             {/* Product Info */}
             <section>
               {auction && (
-                <div className="flex flex-col gap-4">
-                  <h2 className="text-xl md:text-2xl font-bold text-left mb-1">{auction.title}</h2>
-                  <img src={auction.image_url} alt={auction.title} className="w-56 h-56 object-contain rounded-xl border border-white/10 self-start" />
-                  <div className="text-gray-200 mb-1 text-left">{auction.description}</div>
-                  <div className="text-base mb-1 text-left">Final Price: <span className="text-green-300 font-bold">${auction.current_highest_bid || auction.final_bid}</span></div>
-                  <div className="text-base mb-1 text-left">Type: <span className="font-semibold capitalize">{auction.type || 'settled'}</span></div>
-                  <div className="text-base flex items-center gap-2 text-left">Seller: <span className="font-semibold">{getSellerInfo().name}</span>
+                <div className={isMobile ? "flex flex-col gap-4 items-center text-center" : "flex flex-col gap-4"}>
+                  <h2 className={isMobile ? "text-xl md:text-2xl font-bold text-center mb-1" : "text-xl md:text-2xl font-bold text-left mb-1"}>{auction.title}</h2>
+                  <img src={auction.image_url} alt={auction.title} className={isMobile ? "w-56 h-56 object-contain rounded-xl border border-white/10 mx-auto" : "w-56 h-56 object-contain rounded-xl border border-white/10 self-start"} />
+                  <div className={isMobile ? "text-gray-200 mb-1 text-center" : "text-gray-200 mb-1 text-left"}>{auction.description}</div>
+                  <div className={isMobile ? "text-base mb-1 text-center" : "text-base mb-1 text-left"}>Final Price: <span className="text-green-300 font-bold">${auction.current_highest_bid || auction.final_bid}</span></div>
+                  <div className={isMobile ? "text-base mb-1 text-center" : "text-base mb-1 text-left"}>Type: <span className="font-semibold capitalize">{auction.type || 'settled'}</span></div>
+                  <div className={isMobile ? "text-base flex flex-col items-center gap-2 text-center" : "text-base flex items-center gap-2 text-left"}>Seller: <span className="font-semibold">{getSellerInfo().name}</span>
                     {getSellerInfo().email && (
                       <Button
                         size="sm"
                         variant="secondary"
-                        className="ml-3 px-3 py-1 text-xs font-semibold"
+                        className={isMobile ? "ml-0 mt-2 px-3 py-1 text-xs font-semibold" : "ml-3 px-3 py-1 text-xs font-semibold"}
                         as="a"
                       >
                         <a
@@ -459,35 +462,39 @@ function WinningPage() {
                     </button>
                   )}
                   <Modal open={showEditAddress} onClose={() => setShowEditAddress(false)} title={profile && profile.address ? 'Edit Address' : 'Add Address'}>
-                    <form onSubmit={handleSaveAddress} className="space-y-4 w-full animate-fade-in">
-                      <div>
-                        <label className="block text-xs mb-1 text-left">Address *</label>
-                        <input type="text" name="address" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-blue-400 text-base" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Street, Apt, etc." />
-                      </div>
-                      <div>
-                        <label className="block text-xs mb-1 text-left">City *</label>
-                        <input type="text" name="city" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-blue-400 text-base" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="City" />
-                      </div>
-                      <div>
-                        <label className="block text-xs mb-1 text-left">Province *</label>
-                        <select name="province" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-blue-400 text-base" value={form.province} onChange={e => setForm(f => ({ ...f, province: e.target.value }))}>
-                          <option value="">Select Province</option>
-                          {CANADA_PROVINCES.map(p => (
-                            <option key={p} value={p}>{p}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs mb-1 text-left">Postal Code *</label>
-                        <input type="text" name="postal_code" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-blue-400 text-base" value={form.postal_code} onChange={e => setForm(f => ({ ...f, postal_code: e.target.value }))} placeholder="K1A 0B1" />
-                      </div>
-                      <div className="flex justify-end mt-4 gap-2">
-                        <Button type="submit" disabled={saving} className="px-6 py-2 text-base font-bold">
-                          {saving ? 'Saving...' : 'Save Address'}
-                        </Button>
-                        <Button type="button" className="px-6 py-2 text-base font-bold bg-gray-500/60 hover:bg-gray-600/80" onClick={() => setShowEditAddress(false)}>Cancel</Button>
-                      </div>
-                    </form>
+                    <div className="bg-black/30 backdrop-blur-lg rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-white/20">
+                        <form onSubmit={handleSaveAddress} className="space-y-4 w-full animate-fade-in">
+                          <div>
+                            <label className="block text-xs mb-1 text-left">Address *</label>
+                            <input type="text" name="address" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-blue-400 text-base" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Street, Apt, etc." />
+                          </div>
+                          <div>
+                            <label className="block text-xs mb-1 text-left">City *</label>
+                            <input type="text" name="city" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-blue-400 text-base" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="City" />
+                          </div>
+                          <div>
+                            <label className="block text-xs mb-1 text-left">Province *</label>
+                            <select name="province" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-blue-400 text-base" value={form.province} onChange={e => setForm(f => ({ ...f, province: e.target.value }))}>
+                              <option value="">Select Province</option>
+                              {CANADA_PROVINCES.map(p => (
+                                <option key={p} value={p}>{p}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs mb-1 text-left">Postal Code *</label>
+                            <input type="text" name="postal_code" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-blue-400 text-base" value={form.postal_code} onChange={e => setForm(f => ({ ...f, postal_code: e.target.value }))} placeholder="K1A 0B1" />
+                          </div>
+                          <div className="flex justify-end mt-4 gap-2">
+                            <Button type="submit" variant="primary" className="px-6 py-2 text-base font-bold" disabled={saving}>
+                              {saving ? 'Saving...' : 'Save Address'}
+                            </Button>
+                            <Button type="button" variant="secondary" className="px-6 py-2 text-base font-bold" onClick={() => setShowEditAddress(false)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                    </div>
                   </Modal>
                   <Button
                     type="button"
@@ -502,7 +509,7 @@ function WinningPage() {
             </section>
           </div>
           {/* Right: Bid History */}
-          <div className="flex-1 min-w-0 flex flex-col gap-6 mt-0 md:mt-2">
+          <div className={isMobile ? "flex-1 min-w-0 flex flex-col gap-6 mt-0 w-full items-center" : "flex-1 min-w-0 flex flex-col gap-6 mt-0 md:mt-2"}>
             <section>
                 {/* Only one card, not nested */}
                 <BidHistory auctionId={auctionId} type={auction?.type || 'settled'} />

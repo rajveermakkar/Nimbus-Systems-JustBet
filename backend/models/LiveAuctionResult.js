@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const LiveAuction = require('./LiveAuction');
 const LiveAuctionBid = require('./LiveAuctionBid');
+require('../services/liveAuctionCron'); // Start the live auction cron job
 
 const LiveAuctionResult = {
   // Create a new auction result

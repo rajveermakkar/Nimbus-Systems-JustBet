@@ -5,6 +5,20 @@ import Button from '../src/components/Button';
 import Toast from '../src/components/Toast';
 import apiService from '../src/services/apiService';
 
+// Custom hook for screen size
+function useScreenSize() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  return isMobile;
+}
+
 function MyBidHistory() {
   const navigate = useNavigate();
   const { user } = useContext(UserContext);
@@ -12,6 +26,28 @@ function MyBidHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+
+  // Pagination settings
+  const isMobile = useScreenSize();
+  const CARDS_PER_PAGE = 3;
+  const [page, setPage] = useState(1);
+
+  // Only calculate pagination after loading is false and bidHistory is loaded
+  let totalPages = 1;
+  let paginatedBids = bidHistory;
+  if (!loading && bidHistory.length > 0 && isMobile) {
+    totalPages = Math.ceil(bidHistory.length / CARDS_PER_PAGE);
+    paginatedBids = bidHistory.slice((page - 1) * CARDS_PER_PAGE, page * CARDS_PER_PAGE);
+  }
+
+  // Reset page to 1 if bidHistory changes and current page is out of range
+  useEffect(() => {
+    if (!loading && bidHistory.length > 0 && isMobile) {
+      const newTotalPages = Math.ceil(bidHistory.length / CARDS_PER_PAGE);
+      if (page > newTotalPages) setPage(1);
+    }
+    // eslint-disable-next-line
+  }, [bidHistory.length, isMobile, loading]);
 
   // Format price
   const formatPrice = (price) => {
@@ -150,15 +186,21 @@ function MyBidHistory() {
               </div>
             </div>
           ) : (
+            <>
             <div className="space-y-4">
-              {bidHistory.map((bid) => (
+              {(!loading && bidHistory.length > 0 ? (isMobile ? paginatedBids : bidHistory) : []).map((bid) => (
                 <div 
                   key={`${bid.auction_type}-${bid.id}`}
                   className="bg-white/10 rounded-lg p-4 hover:bg-white/15 transition-colors"
                 >
-                  <div className="flex items-start gap-4">
+                  {/* Responsive image position */}
+                  <div className={isMobile ? "flex flex-row items-center gap-3" : "flex flex-row items-start gap-4"}>
                     {/* Auction Image */}
-                    <div className="w-20 h-20 bg-white/5 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                    <div className={
+                      isMobile
+                        ? "w-16 h-16 bg-white/5 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0"
+                        : "w-20 h-20 bg-white/5 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0 mr-4"
+                    }>
                       {bid.image_url ? (
                         <img
                           src={bid.image_url}
@@ -169,71 +211,149 @@ function MyBidHistory() {
                         <i className="fa-solid fa-image text-gray-400 text-xl"></i>
                       )}
                     </div>
-
                     {/* Bid Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-lg truncate">{bid.title}</h3>
-                        <div className="flex items-center gap-2 ml-2">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            bid.auction_type === 'live' 
-                              ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-                              : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                          }`}>
-                            {bid.auction_type}
-                          </span>
-                          {bid.is_winning_bid && (
-                            <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded-full text-xs font-semibold">
-                              Winning
+                    {isMobile ? (
+                      <>
+                        <div className="flex-1 min-w-0 w-full text-center flex flex-col justify-center">
+                          <div className="flex flex-col items-center mb-1">
+                            <h3 className="font-semibold text-base truncate mb-0">{bid.title}</h3>
+                            <div className="flex gap-2 mt-1 justify-center">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                bid.auction_type === 'live' 
+                                  ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                                  : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                              }`}>
+                                {bid.auction_type}
+                              </span>
+                              {bid.is_winning_bid && (
+                                <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded-full text-xs font-semibold">
+                                  Winning
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs text-center">
+                            <div>
+                              <p className="text-gray-400">Seller</p>
+                              <p className="text-white truncate">{bid.seller_name}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-400">Bid</p>
+                              <p className="text-green-400 font-semibold">{formatPrice(bid.amount)}</p>
+                            </div>
+                          </div>
+                          <div className="mt-1 text-xs text-gray-400 text-center">
+                            <span>Bid Date: <span className="text-white">{formatDate(bid.created_at)}</span></span>
+                          </div>
+                          <div className="mt-1 text-xs text-gray-400 text-center">
+                            Auction Status:
+                            <span className={`font-semibold ${
+                              bid.status === 'closed' ? 'text-red-400' : 'text-green-400'
+                            }`}>
+                              {bid.status === 'closed'
+                                ? <>
+                                    Ended&nbsp;<span className="ml-1 text-gray-400 font-normal"><br/>End Date: {formatDate(bid.end_time)}</span>
+                                  </>
+                                : 'Active'}
                             </span>
-                          )}
+                          </div>
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-400">Seller</p>
-                          <p className="text-white">{bid.seller_name}</p>
+                        {/* View Auction Button in third column on mobile */}
+                        <div className="flex items-center pl-2">
+                          <Button
+                            onClick={() => handleViewAuction(bid)}
+                            className="text-xs px-2 py-1"
+                          >
+                            View
+                          </Button>
                         </div>
-                        <div>
-                          <p className="text-gray-400">Bid Amount</p>
-                          <p className="text-green-400 font-semibold">{formatPrice(bid.amount)}</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex-1 min-w-0 w-full text-left">
+                          <div className="flex items-center mb-2">
+                            <h3 className="font-semibold text-lg truncate mr-2">{bid.title}</h3>
+                            <div className="flex gap-2 ml-2">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                bid.auction_type === 'live' 
+                                  ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                                  : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                              }`}>
+                                {bid.auction_type}
+                              </span>
+                              {bid.is_winning_bid && (
+                                <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded-full text-xs font-semibold">
+                                  Winning
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-4 gap-4 text-sm items-end">
+                            <div>
+                              <p className="text-gray-400">Seller</p>
+                              <p className="text-white">{bid.seller_name}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-400">Bid Amount</p>
+                              <p className="text-green-400 font-semibold">{formatPrice(bid.amount)}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-400">Bid Date</p>
+                              <p className="text-white">{formatDate(bid.created_at)}</p>
+                            </div>
+                            {/* Button column on desktop/tablet */}
+                            <div className="flex justify-end items-end h-full">
+                              <Button
+                                onClick={() => handleViewAuction(bid)}
+                                className="text-sm"
+                              >
+                                View Auction
+                              </Button>
+                            </div>
+                          </div>
+                          {/* Auction Status and Ended info */}
+                          <div className="mt-3">
+                            <p className="text-gray-400 text-sm">
+                              Auction Status: <span className={`font-semibold ${
+                                bid.status === 'closed' ? 'text-red-400' : 'text-green-400'
+                              }`}>
+                                {bid.status === 'closed' ? 'Ended' : 'Active'}
+                              </span>
+                            </p>
+                            {bid.status === 'closed' && (
+                              <p className="text-gray-400 text-sm">
+                                Ended: {formatDate(bid.end_time)}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-gray-400">Bid Date</p>
-                          <p className="text-white">{formatDate(bid.created_at)}</p>
-                        </div>
-                      </div>
-
-                      <div className="mt-3">
-                        <p className="text-gray-400 text-sm">
-                          Auction Status: <span className={`font-semibold ${
-                            bid.status === 'closed' ? 'text-red-400' : 'text-green-400'
-                          }`}>
-                            {bid.status === 'closed' ? 'Ended' : 'Active'}
-                          </span>
-                        </p>
-                        {bid.status === 'closed' && (
-                          <p className="text-gray-400 text-sm">
-                            Ended: {formatDate(bid.end_time)}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Action Button */}
-                      <div className="mt-3">
-                        <Button
-                          onClick={() => handleViewAuction(bid)}
-                          className="text-sm"
-                        >
-                          View Auction
-                        </Button>
-                      </div>
-                    </div>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
+            {/* Mobile Pagination Controls */}
+            {!loading && bidHistory.length > 0 && isMobile && totalPages > 1 && (
+              <div className="flex justify-center items-center gap-4 mt-6">
+                <button
+                  className="px-4 py-2 rounded bg-white/10 text-white disabled:opacity-40"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  Previous
+                </button>
+                <span className="text-white/80 text-sm">Page {page} of {totalPages}</span>
+                <button
+                  className="px-4 py-2 rounded bg-white/10 text-white disabled:opacity-40"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+            </>
           )}
 
           {/* Back Button */}
