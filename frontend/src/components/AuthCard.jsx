@@ -8,7 +8,8 @@ function AuthCard({
   success,
   children,
   footer,
-  plain // if true, render only content, no card container
+  plain, // if true, render only content, no card container
+  bgClassName = "bg-white/10" // new prop for background class
 }) {
   const content = (
     <>
@@ -33,7 +34,7 @@ function AuthCard({
   );
   if (plain) return content;
   return (
-    <div className="w-full max-w-sm mx-auto bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 p-6 animate-fade-in flex flex-col justify-center">
+    <div className={`w-full max-w-sm mx-auto ${bgClassName} backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 p-6 animate-fade-in flex flex-col justify-center`}>
       {content}
     </div>
   );

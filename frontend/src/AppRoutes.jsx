@@ -36,6 +36,8 @@ import NotFound from '../pages/NotFound';
 import UserProfile from '../pages/UserProfile';
 import WinningPage from '../pages/WinningPage';
 import Wallet from '../pages/Wallet.jsx';
+import AboutUs from '../pages/AboutUs';
+import ContactUs from '../pages/ContactUs';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -313,6 +315,8 @@ function AppRoutes() {
             <Wallet />
           </ProtectedRoute>
         } />
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/contact" element={<ContactUs />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
