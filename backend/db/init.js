@@ -957,6 +957,16 @@ const initDatabase = async () => {
       }
     }
     
+    // Check if auction_id column exists in wallet_transactions
+    const auctionIdColCheck = await pool.query(`
+      SELECT column_name FROM information_schema.columns WHERE table_name = 'wallet_transactions' AND column_name = 'auction_id'
+    `);
+    if (auctionIdColCheck.rows.length === 0) {
+      logDbChange('Adding auction_id column to wallet_transactions table');
+      await pool.query(`ALTER TABLE wallet_transactions ADD COLUMN auction_id UUID`);
+      console.log('Added auction_id column to wallet_transactions table');
+    }
+    
     // Check if stripe_connected_customers table exists
     const connectedCustomersTableCheck = await pool.query(`
       SELECT EXISTS (
@@ -1015,6 +1025,46 @@ const initDatabase = async () => {
           }
         }
       }
+    }
+
+    // Check if order_documents table exists
+    const orderDocumentsTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'order_documents'
+      );
+    `);
+    if (!orderDocumentsTableCheck.rows[0].exists) {
+      logDbChange('Creating order_documents table');
+      await pool.query(`
+        CREATE TABLE order_documents (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+          type VARCHAR(20) NOT NULL, -- 'invoice', 'certificate', etc.
+          url TEXT NOT NULL,
+          wallet_txn_id UUID REFERENCES wallet_transactions(id),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      // Trigger for updated_at
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION update_order_documents_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = CURRENT_TIMESTAMP;
+          RETURN NEW;
+        END;
+        $$ language 'plpgsql';
+      `);
+      await pool.query(`
+        DROP TRIGGER IF EXISTS update_order_documents_updated_at ON order_documents;
+        CREATE TRIGGER update_order_documents_updated_at
+          BEFORE UPDATE ON order_documents
+          FOR EACH ROW
+          EXECUTE FUNCTION update_order_documents_updated_at_column();
+      `);
+      console.log('Created order_documents table');
     }
 
     console.log('Database initialization complete!');
