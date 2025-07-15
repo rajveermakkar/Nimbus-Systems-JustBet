@@ -40,18 +40,27 @@ function scheduleAuctionProcessing(auctionId, endTime) {
   }
 }
 
-// Initialize: Schedule all pending live auctions
+// Cancel scheduled auction processing for a given auctionId
+function cancelAuctionProcessing(auctionId) {
+  if (scheduledAuctions.has(auctionId)) {
+    clearTimeout(scheduledAuctions.get(auctionId));
+    scheduledAuctions.delete(auctionId);
+    console.log(`Cancelled scheduled processing for live auction ${auctionId}`);
+  }
+}
+
+// Initialize: Schedule all approved live auctions
 async function initializeScheduledAuctions() {
   try {
     const now = new Date();
     const result = await pool.query(
       `SELECT id, end_time FROM live_auctions 
        WHERE end_time > $1 
-       AND status != 'closed'`,
+       AND status = 'approved'`,
       [now]
     );
 
-    console.log(`Scheduling ${result.rows.length} pending live auctions...`);
+    console.log(`Scheduling ${result.rows.length} approved live auctions...`);
     
     for (const auction of result.rows) {
       scheduleAuctionProcessing(auction.id, auction.end_time);
@@ -71,12 +80,12 @@ cron.schedule('*/10 * * * *', async () => {
       `SELECT id FROM live_auctions 
        WHERE end_time <= $1 
        AND end_time >= $2 
-       AND status != 'closed'`,
+       AND status = 'approved'`,
       [now, fiveMinutesAgo]
     );
     
     if (result.rows.length > 0) {
-      console.log(`Fallback: Processing ${result.rows.length} missed live auctions...`);
+      console.log(`Fallback: Processing ${result.rows.length} missed approved live auctions...`);
       for (const auction of result.rows) {
         processAuction(auction.id);
       }
@@ -93,6 +102,7 @@ initializeScheduledAuctions();
 module.exports = {
   scheduleAuctionProcessing,
   processAuction,
+  cancelAuctionProcessing,
   // Add function to manually process a specific auction (useful for testing or fixing missed auctions)
   async processSpecificAuction(auctionId) {
     console.log(`Manually processing live auction ${auctionId}...`);

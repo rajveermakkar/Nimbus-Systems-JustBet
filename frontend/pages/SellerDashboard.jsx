@@ -406,6 +406,15 @@ function SellerDashboard() {
     }
   };
 
+  // Helper function for LIVE_NOW
+  function isLiveNow(listing) {
+    return (
+      listing.status === 'approved' &&
+      listing.start_time && new Date(listing.start_time) <= new Date() &&
+      listing.end_time && new Date(listing.end_time) > new Date()
+    );
+  }
+
   if (!user || !user.isApproved) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
@@ -730,7 +739,13 @@ function SellerDashboard() {
                     {listings
                       .filter(listing => listing.status !== 'closed')
                       .map((listing, idx) => (
-                        <div key={`${listing.auction_type || 'listing'}-${listing.id}-${idx}`} className="bg-white/5 rounded-lg p-4 border border-white/20">
+                        <div key={`${listing.auction_type || 'listing'}-${listing.id}-${idx}`} className="bg-white/5 rounded-lg p-4 border border-white/20 relative">
+                          {/* LIVE_NOW badge - now top left */}
+                          {isLiveNow(listing) && (
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold animate-pulse">
+                              LIVE_NOW
+                            </span>
+                          )}
                           <h3 className="font-semibold text-lg mb-2">{listing.title}</h3>
                           <img 
                             src={listing.image_url} 
@@ -773,7 +788,8 @@ function SellerDashboard() {
                             <Button
                               onClick={() => navigate(`/seller/edit-listing/${listing.id}?type=${listing.auction_type}`)}
                               variant="secondary"
-                              className="flex-1 text-sm"
+                              className={`flex-1 text-sm ${isLiveNow(listing) ? 'cursor-not-allowed opacity-60' : ''}`}
+                              disabled={isLiveNow(listing)}
                             >
                               <i className="fas fa-edit mr-1"></i>
                               Edit
