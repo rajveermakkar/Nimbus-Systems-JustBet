@@ -248,7 +248,21 @@ const adminController = {
     }
     try {
       const users = await User.getAll();
-      const response = { users };
+      // Add pendingDeleteDays field if user is scheduled for deletion
+      const now = new Date();
+      const usersWithDeleteInfo = users.map(u => {
+        let pendingDeleteDays = null;
+        if (u.status === 'inactive' && u.deletionscheduledat) {
+          const scheduled = new Date(u.deletionscheduledat);
+          const diff = Math.ceil((scheduled - now) / (1000 * 60 * 60 * 24));
+          pendingDeleteDays = diff > 0 ? diff : 0;
+        }
+        return {
+          ...u,
+          pendingDeleteDays
+        };
+      });
+      const response = { users: usersWithDeleteInfo };
       await auctionCache.set(cacheKey, response, ADMIN_CACHE_TTL);
       console.log('[DB] Admin users - CACHE MISS');
       res.json(response);
@@ -505,6 +519,15 @@ const adminController = {
         relatedId: user.id,
         type: 'user',
       }));
+      // Add User_Deleted_Account logs for users deleted in last 48h
+      const deletedUserLogs = users.filter(u => u.status === 'deleted' && within48h(u.deletionscheduledat)).map(user => ({
+        timestamp: user.deletionscheduledat,
+        user: `${user.first_name} ${user.last_name}`,
+        action: 'USER_DELETED_ACCOUNT',
+        description: `User deleted account: ${user.email}`,
+        relatedId: user.id,
+        type: 'user',
+      }));
 
       // Settled Auctions (created in last 48h)
       const settledAuctions = await SettledAuction.findByStatus ? await SettledAuction.findByStatus('approved') : [];
@@ -557,6 +580,7 @@ const adminController = {
       // Aggregate all logs
       let logs = [
         ...userLogs,
+        ...deletedUserLogs,
         ...settledAuctionLogs,
         ...liveAuctionLogs,
         ...settledResultLogs,

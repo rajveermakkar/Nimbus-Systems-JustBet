@@ -158,9 +158,10 @@ const SettledAuctionResult = {
         walletId: winnerWallet.id,
         type: 'auction_payment',
         amount: -highestBid.amount,
-        description: `Payment for winning auction: ${auction.title}`, // No id or title
+        description: `Payment for winning auction: ${auction.title}`,
         referenceId: auction.id,
-        status: 'succeeded'
+        status: 'succeeded',
+        auctionId: auction.id
       });
     }
     // 3. Distribute funds
@@ -175,9 +176,10 @@ const SettledAuctionResult = {
       walletId: sellerWallet.id,
       type: 'auction_income',
       amount: sellerAmount,
-      description: `Income from auction: ${auction.title}`, // No id or title
+      description: `Income from auction: ${auction.title}`,
       referenceId: auction.id,
-      status: 'succeeded'
+      status: 'succeeded',
+      auctionId: auction.id
     });
     // Admin wallet
     const adminUser = await User.findByEmail('admin@justbet.com');
@@ -191,7 +193,8 @@ const SettledAuctionResult = {
         amount: platformFee,
         description: `Platform fee from auction ${auction.id}`,
         referenceId: auction.id,
-        status: 'succeeded'
+        status: 'succeeded',
+        auctionId: auction.id
       });
     }
     // --- END WALLET BLOCK/FUND LOGIC ---

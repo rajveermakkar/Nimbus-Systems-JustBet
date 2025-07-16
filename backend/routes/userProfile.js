@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db/init');
 const jwtauthMiddleware = require('../middleware/jwtauth');
+const User = require('../models/User');
 
 // Middleware: require authentication (assume req.user.id is set)
 function requireAuth(req, res, next) {
@@ -78,6 +79,39 @@ router.patch('/profile', jwtauthMiddleware, requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Error updating user profile:', err);
     res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// PATCH /api/user/schedule-deletion
+router.patch('/schedule-deletion', jwtauthMiddleware, requireAuth, async (req, res) => {
+  try {
+    // Configurable grace period (in days)
+    const gracePeriodDays = parseInt(process.env.ACCOUNT_DELETION_GRACE_DAYS, 10) || 30;
+    const scheduledAt = new Date(Date.now() + gracePeriodDays * 24 * 60 * 60 * 1000);
+    const user = await User.scheduleDeletion(req.user.id, scheduledAt);
+    res.json({
+      message: `Account scheduled for deletion in ${gracePeriodDays} days.`,
+      status: user.status,
+      deletionScheduledAt: user.deletionscheduledat || user.deletionScheduledAt
+    });
+  } catch (err) {
+    console.error('Error scheduling account deletion:', err);
+    res.status(500).json({ error: 'Failed to schedule account deletion' });
+  }
+});
+
+// PATCH /api/user/reactivate
+router.patch('/reactivate', jwtauthMiddleware, requireAuth, async (req, res) => {
+  try {
+    const user = await User.reactivate(req.user.id);
+    res.json({
+      message: 'Account reactivated successfully.',
+      status: user.status,
+      deletionScheduledAt: user.deletionScheduledAt
+    });
+  } catch (err) {
+    console.error('Error reactivating account:', err);
+    res.status(500).json({ error: 'Failed to reactivate account' });
   }
 });
 

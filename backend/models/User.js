@@ -237,6 +237,24 @@ const User = {
     const user = await this.findById(userId);
     if (!user) throw new Error('User not found');
     return user.ban_history || [];
+  },
+
+  // Schedule account deletion (set status to 'inactive' and set deletionScheduledAt)
+  async scheduleDeletion(userId, scheduledAt) {
+    const query = `
+      UPDATE users SET status = 'inactive', deletionScheduledAt = $1 WHERE id = $2 RETURNING *
+    `;
+    const result = await queryWithRetry(query, [scheduledAt, userId]);
+    return result.rows[0];
+  },
+
+  // Reactivate user (set status to 'active' and clear deletionScheduledAt)
+  async reactivate(userId) {
+    const query = `
+      UPDATE users SET status = 'active', deletionScheduledAt = NULL WHERE id = $1 RETURNING *
+    `;
+    const result = await queryWithRetry(query, [userId]);
+    return result.rows[0];
   }
 };
 

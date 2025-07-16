@@ -78,6 +78,21 @@ function EditListing({ showToast: _showToast }) {
     return new Date(utcString);
   }
 
+  // Helper to map camelCase to snake_case for live auction PATCH
+  function mapLiveAuctionFieldsToSnakeCase(fields) {
+    return {
+      title: fields.title,
+      description: fields.description,
+      image_url: fields.imageUrl,
+      start_time: fields.startTime,
+      end_time: fields.endTime,
+      starting_price: fields.startingPrice,
+      reserve_price: fields.reservePrice,
+      min_bid_increment: fields.minBidIncrement,
+      max_participants: fields.maxParticipants,
+    };
+  }
+
   // Fetch auction data
   const fetchAuction = async () => {
     try {
@@ -109,7 +124,8 @@ function EditListing({ showToast: _showToast }) {
         if (res.ok) {
           data = await res.json();
           setAuctionType("live");
-          populateForm(data, "live");
+          const auctionData = data.auction || data;
+          populateForm(auctionData, "live");
           return;
         } else {
           throw new Error('Live auction not found');
@@ -293,14 +309,10 @@ function EditListing({ showToast: _showToast }) {
         maxParticipants: auctionType === "live" ? 50 : undefined
       });
       
-      const res = await fetch(endpoint, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: "include",
-        body: JSON.stringify({
+      let responseData; // <-- Declare at the top
+      // PATCH for live auction
+      if (auctionType === 'live') {
+        const patchBody = mapLiveAuctionFieldsToSnakeCase({
           title,
           description,
           imageUrl: finalImageUrl,
@@ -309,23 +321,68 @@ function EditListing({ showToast: _showToast }) {
           startTime: finalStartTime,
           endTime: finalEndTime,
           maxParticipants: auctionType === "live" ? 50 : undefined
-        })
-      });
-      
-      console.log('Response status:', res.status);
-      console.log('Response ok:', res.ok);
-      
-      if (!res.ok) {
-        const data = await res.json();
-        console.log('Error response:', data);
-        throw new Error(data.message || "Failed to update listing");
+        });
+        const res = await fetch(`${apiUrl}/api/seller/auctions/live/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'include',
+          body: JSON.stringify(patchBody)
+        });
+        console.log('Response status:', res.status);
+        console.log('Response ok:', res.ok);
+        
+        if (!res.ok) {
+          const data = await res.json();
+          console.log('Error response:', data);
+          throw new Error(data.message || "Failed to update listing");
+        }
+        
+        responseData = await res.json();
+        console.log('Success response:', responseData);
+        console.log('Updated auction data:', responseData.auction);
+        console.log('Updated start_time:', responseData.auction?.start_time);
+        console.log('Updated end_time:', responseData.auction?.end_time);
+      } else {
+        // For settled auctions, use the original PATCH logic
+        const patchBody = {
+          title,
+          description,
+          image_url: finalImageUrl,
+          starting_price: startingPrice,
+          reserve_price: reservePrice,
+          start_time: finalStartTime,
+          end_time: finalEndTime,
+          min_bid_increment: minBidIncrement
+        };
+        const res = await fetch(endpoint, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: "include",
+          body: JSON.stringify(patchBody)
+        });
+        
+        console.log('Response status:', res.status);
+        console.log('Response ok:', res.ok);
+        
+        if (!res.ok) {
+          const data = await res.json();
+          console.log('Error response:', data);
+          throw new Error(data.message || "Failed to update listing");
+        }
+        
+        responseData = await res.json();
+        console.log('Success response:', responseData);
+        console.log('Updated auction data:', responseData.auction);
+        console.log('Updated start_time:', responseData.auction?.start_time);
+        console.log('Updated end_time:', responseData.auction?.end_time);
       }
       
-      const responseData = await res.json();
-      console.log('Success response:', responseData);
-      console.log('Updated auction data:', responseData.auction);
-      console.log('Updated start_time:', responseData.auction?.start_time);
-      console.log('Updated end_time:', responseData.auction?.end_time);
       setLoading(false);
       
       // Check the response message to show appropriate toast
@@ -378,6 +435,9 @@ function EditListing({ showToast: _showToast }) {
     setShowConfirm(false);
   }
 
+  // Helper: is this auction LIVE_NOW?
+  const isLiveNow = auctionType === 'live' && auctionStatus === 'approved' && startTime && new Date(startTime) <= new Date() && endTime && new Date(endTime) > new Date();
+
   if (fetching) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
@@ -408,11 +468,16 @@ function EditListing({ showToast: _showToast }) {
         </div>
       )}
       <div className="w-full max-w-2xl mx-auto">
-        <div className="bg-white/10 rounded-xl p-6 mb-6 border border-white/20">
+        <div className="bg-white/10 rounded-xl p-6 mb-6 border border-white/20 flex items-center gap-4">
           <h2 className="text-2xl font-bold flex items-center gap-2 mb-1">
             <i className="fa-solid fa-edit"></i> Edit Listing
           </h2>
-          <p className="text-white/70 text-sm text-left">Update your auction listing details</p>
+          {/* LIVE_NOW badge */}
+          {isLiveNow && (
+            <span className="ml-4 px-3 py-1 rounded-full bg-red-600 text-white text-xs font-bold animate-pulse" title="LIVE_NOW auctions cannot be edited">
+              LIVE_NOW
+            </span>
+          )}
         </div>
         
         {error && (
@@ -668,16 +733,23 @@ function EditListing({ showToast: _showToast }) {
             <Button type="button" variant="secondary" size="sm" onClick={() => navigate("/seller/dashboard")}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" size="sm" disabled={loading}>
-              {loading ? "Updating..." : (auctionStatus === 'rejected' ? "Save and Request Approval" : "Update Listing")}
-            </Button>
+            <span style={{ position: 'relative', display: 'inline-block' }}>
+              <Button type="submit" variant="primary" size="sm" disabled={loading || isLiveNow}>
+                {loading ? "Updating..." : (auctionStatus === 'rejected' ? "Save and Request Approval" : "Update Listing")}
+              </Button>
+              {isLiveNow && (
+                <span style={{ position: 'absolute', top: '-28px', left: 0, background: '#222', color: '#fff', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', whiteSpace: 'nowrap', zIndex: 10 }}>
+                  LIVE_NOW auctions cannot be edited
+                </span>
+              )}
+            </span>
             {auctionStatus !== 'closed' && (
               <Button
                 type="button"
                 variant="danger"
                 size="sm"
                 onClick={handleDelete}
-                disabled={loading}
+                disabled={loading || isLiveNow}
                 className="bg-red-600 hover:bg-red-700 text-white border border-red-700 transition-colors"
               >
                 Delete Listing

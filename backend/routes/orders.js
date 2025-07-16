@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db/init');
 const jwtauthMiddleware = require('../middleware/jwtauth');
+const { getOrderPdfData } = require('../services/pdfDataService');
+const { generateAndStoreOrderDocument } = require('../services/pdfService');
+const OrderDocument = require('../models/orderDocument');
 
 // Apply JWT auth to all order routes
 router.use(jwtauthMiddleware);
@@ -92,6 +95,40 @@ router.get('/seller', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Error fetching seller orders:', err);
     res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// GET /api/orders/:orderId/invoice - Download invoice PDF
+router.get('/:orderId/invoice', requireAuth, async (req, res) => {
+  try {
+    const orderId = req.params.orderId;
+    let doc = await OrderDocument.findByOrderAndType(orderId, 'invoice');
+    if (!doc) {
+      // Generate on demand if missing
+      const data = await getOrderPdfData(orderId);
+      doc = await generateAndStoreOrderDocument(data, 'invoice');
+    }
+    return res.json({ url: doc.url });
+  } catch (err) {
+    console.error('Error fetching invoice PDF:', err);
+    res.status(500).json({ error: 'Failed to fetch invoice PDF' });
+  }
+});
+
+// GET /api/orders/:orderId/certificate - Download certificate PDF
+router.get('/:orderId/certificate', requireAuth, async (req, res) => {
+  try {
+    const orderId = req.params.orderId;
+    let doc = await OrderDocument.findByOrderAndType(orderId, 'certificate');
+    if (!doc) {
+      // Generate on demand if missing
+      const data = await getOrderPdfData(orderId);
+      doc = await generateAndStoreOrderDocument(data, 'certificate');
+    }
+    return res.json({ url: doc.url });
+  } catch (err) {
+    console.error('Error fetching certificate PDF:', err);
+    res.status(500).json({ error: 'Failed to fetch certificate PDF' });
   }
 });
 

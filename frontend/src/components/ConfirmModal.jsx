@@ -18,7 +18,7 @@ function ConfirmModal({
   if (confirmColor === 'red') confirmBtnClass = "bg-red-600 hover:bg-red-700";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="bg-purple-500/30 backdrop-blur-md rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-purple-200/30">
+      <div className="bg-purple-400/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-purple-200/30">
         <svg className="w-10 h-10 mb-3 text-purple-200" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
           <path d="M12 8v4m0 4h.01" strokeLinecap="round" strokeLinejoin="round" />

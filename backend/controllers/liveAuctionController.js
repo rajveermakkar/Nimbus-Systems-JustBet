@@ -3,7 +3,7 @@ const { pool } = require('../db/init');
 const multer = require('multer');
 const { uploadImageToAzure } = require('../services/azureBlobService');
 const Wallet = require('../models/Wallet');
-const { scheduleAuctionProcessing } = require('../services/liveAuctionCron');
+const { scheduleAuctionProcessing, cancelAuctionProcessing } = require('../services/liveAuctionCron');
 
 // Create a new live auction
 async function createLiveAuction(req, res) {
@@ -51,8 +51,7 @@ async function createLiveAuction(req, res) {
       min_bid_increment: minBidIncrement !== undefined && minBidIncrement !== null && minBidIncrement !== '' ? Number(minBidIncrement) : 1,
       status: 'pending' // Default to pending for admin approval
     });
-    // Schedule the auction for auto-finalization
-    scheduleAuctionProcessing(auction.id, auction.endTime || auction.end_time);
+    // Do NOT schedule the auction here. Only schedule after admin approval.
     res.status(201).json({ auction });
   } catch (error) {
     console.error('Error creating live auction:', error);
@@ -164,12 +163,18 @@ async function updateLiveAuction(req, res) {
     if (auction.seller_id !== user.id) {
       return res.status(403).json({ error: 'You can only update your own live auctions.' });
     }
+    // Prevent editing if auction is approved and start_time has passed
+    if (auction.status === 'approved' && new Date(auction.start_time) <= new Date()) {
+      return res.status(400).json({ error: 'Cannot edit a live auction that has already started.' });
+    }
     
     const fields = req.body;
     
     // If the auction was previously approved or rejected and is being updated, set status back to pending
     if (auction.status === 'approved' || auction.status === 'rejected') {
       fields.status = 'pending';
+      // Cancel any existing schedule for this auction
+      cancelAuctionProcessing(id);
     }
     
     const updated = await LiveAuction.updateAuction(id, fields);
@@ -220,6 +225,8 @@ async function approveLiveAuction(req, res) {
     if (!auction) {
       return res.status(404).json({ error: 'Live auction not found.' });
     }
+    // Schedule the auction for processing when it ends
+    scheduleAuctionProcessing(id, auction.end_time);
     res.json({ auction, message: 'Live auction approved.' });
   } catch (error) {
     console.error('Error approving live auction:', error);

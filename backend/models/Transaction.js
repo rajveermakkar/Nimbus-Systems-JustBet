@@ -1,13 +1,13 @@
 const { pool, queryWithRetry } = require('../db/init');
 
 // Create a new wallet transaction
-async function createTransaction({ walletId, type, amount, description, referenceId, status = 'pending' }) {
+async function createTransaction({ walletId, type, amount, description, referenceId, status = 'pending', auctionId = null }) {
   const query = `
-    INSERT INTO wallet_transactions (wallet_id, type, amount, description, reference_id, status)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO wallet_transactions (wallet_id, type, amount, description, reference_id, status, auction_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *
   `;
-  const result = await queryWithRetry(query, [walletId, type, amount, description, referenceId, status]);
+  const result = await queryWithRetry(query, [walletId, type, amount, description, referenceId, status, auctionId]);
   return result.rows[0];
 }
 
@@ -67,20 +67,19 @@ async function getTotalPlatformFees() {
 }
 
 // Create transaction directly (for admin payouts)
-async function create({ user_id, type, amount, description, status = 'succeeded', reference_id = null }) {
+async function create({ user_id, type, amount, description, status = 'succeeded', reference_id = null, auction_id = null }) {
   // Get user's wallet
   const Wallet = require('./Wallet');
   const wallet = await Wallet.getWalletByUserId(user_id);
   if (!wallet) {
     throw new Error('User wallet not found');
   }
-  
   const query = `
-    INSERT INTO wallet_transactions (wallet_id, type, amount, description, reference_id, status)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO wallet_transactions (wallet_id, type, amount, description, reference_id, status, auction_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *
   `;
-  const result = await queryWithRetry(query, [wallet.id, type, amount, description, reference_id, status]);
+  const result = await queryWithRetry(query, [wallet.id, type, amount, description, reference_id, status, auction_id]);
   return result.rows[0];
 }
 

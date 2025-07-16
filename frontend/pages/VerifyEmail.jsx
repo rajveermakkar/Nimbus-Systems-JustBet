@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import formImage from "./assets/auction_online.jpg";
+import Toast from "../src/components/Toast";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -44,32 +45,38 @@ function VerifyEmail() {
 
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">
-      <div className="w-full max-w-4xl bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex">
+      {success && showToast && (
+        <Toast
+          message="Email verified successfully!"
+          type="success"
+          duration={2000}
+          onClose={() => {
+            setShowToast(false);
+            navigate("/login", { state: { verified: true } });
+          }}
+        />
+      )}
+      <div className="w-full max-w-3xl bg-black/15 backdrop-blur-[16px] text-white shadow-2xl rounded-2xl overflow-hidden border border-white/30 flex" style={{boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'}}>
         {/* Left side image */}
-        <div className="hidden lg:block w-1/2">
+        <div className="hidden lg:block w-1/2 bg-gradient-to-b from-[#23235b] to-[#63e]">
           <img
             src={formImage}
             alt="Verify Email Visual"
-            className="object-cover w-full h-full"
+            className="object-contain w-full h-full p-8 drop-shadow-xl"
           />
         </div>
         {/* Right side */}
         <div className="flex-1 flex flex-col justify-center p-12 items-center">
           <div className="flex flex-col items-center gap-2 mb-6 select-none">
-            <i className="fa-solid fa-gavel text-3xl text-white"></i>
-            <span className="text-2xl font-bold text-white tracking-wide">JustBet</span>
+            <i className="fa-solid fa-gavel text-3xl text-white drop-shadow-lg"></i>
+            <span className="text-2xl font-bold text-white tracking-wide drop-shadow-lg">JustBet</span>
           </div>
-          <h2 className="text-xl font-semibold text-white text-center mb-1">Email Verification</h2>
-          {loading && <p className="text-gray-300 text-base text-center mb-4">Verifying your email...</p>}
+          <h2 className="text-2xl font-bold text-white text-center mb-2 drop-shadow-lg">Email Verification</h2>
+          {loading && <p className="text-gray-200 text-base text-center mb-4">Verifying your email...</p>}
           {!loading && !success && error && (
             <div className="text-center">
-              <p className="text-red-400 font-medium mb-2">{error}</p>
+              <p className="text-red-400 font-medium mb-2 drop-shadow">{error}</p>
               <Link to="/login" className="text-blue-300 hover:underline font-medium">Back to Login</Link>
-            </div>
-          )}
-          {success && showToast && (
-            <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded shadow-lg z-50 animate-fade-in">
-              Email verified successfully!
             </div>
           )}
         </div>

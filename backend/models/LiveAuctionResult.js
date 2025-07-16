@@ -172,9 +172,10 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
       walletId: winnerWallet.id,
       type: 'auction_payment',
       amount: -highestBid.amount,
-      description: `Payment for winning live auction`, // No id number
+      description: `Payment for winning live auction`,
       referenceId: auctionId,
-      status: 'succeeded'
+      status: 'succeeded',
+      auctionId: auctionId
     });
   }
   // 3. Distribute funds
@@ -189,10 +190,10 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
     walletId: sellerWallet.id,
     type: 'auction_income',
     amount: sellerAmount,
-    description: `Income from live auction`, // No id number
+    description: `Income from live auction`,
     referenceId: auctionId,
-    status: 'succeeded'
-    // Frontend: use trophy icon for this type
+    status: 'succeeded',
+    auctionId: auctionId
   });
   // Admin wallet
   const adminUser = await User.findByEmail('admin@justbet.com');
@@ -204,9 +205,10 @@ LiveAuctionResult.finalizeAuction = async function(auctionId) {
       walletId: adminWallet.id,
       type: 'platform_fee',
       amount: platformFee,
-      description: `Platform fee from live auction`,
+      description: `Platform fee from live auction ${auctionId}`,
       referenceId: auctionId,
-      status: 'succeeded'
+      status: 'succeeded',
+      auctionId: auctionId
     });
   }
   // --- END WALLET BLOCK/FUND LOGIC ---
