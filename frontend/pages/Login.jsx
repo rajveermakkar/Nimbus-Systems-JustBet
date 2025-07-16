@@ -42,13 +42,6 @@ function Login({ showToast }) {
     }
   }, []);
 
-  // Show toast if redirected from email verification
-  useEffect(() => {
-    if (location.state && location.state.verified) {
-      showToast && showToast("Email verified successfully!", "success");
-    }
-  }, [location.state, showToast]);
-
   // Show logout success toast if user just logged out
   useEffect(() => {
     const showLogoutSuccess = sessionStorage.getItem("showLogoutSuccess");

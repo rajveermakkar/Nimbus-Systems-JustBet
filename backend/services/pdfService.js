@@ -18,14 +18,15 @@ function generateInvoiceBuffer(data) {
 
     // --- JustBet Watermark ---
     doc.save();
-    doc.fontSize(60)
+    doc.fontSize(36)
       .fillColor('#eeeeee')
-      .opacity(0.2)
-      .rotate(-30, { origin: [300, 400] })
-      .text('JustBet', 100, 300, { align: 'center', width: 400 });
+      .opacity(0.15)
+      .rotate(-30, { origin: [300, 200] })
+      .text('JustBet', 100, 150, { align: 'center', width: 400 });
     doc.restore();
     doc.opacity(1);
     doc.fillColor('black');
+    doc.y = 60; // Reset y position for main content
 
     // --- Header ---
     doc.fontSize(28).text('Invoice', { align: 'center', underline: true });

@@ -5,7 +5,7 @@ import Button from '../src/components/Button';
 import Toast from '../src/components/Toast';
 import BidHistory from '../src/components/auctions/BidHistory';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faPen, faEnvelope, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faPen, faEnvelope, faTrash, faDownload, faFileInvoice, faCertificate, faFileAlt } from '@fortawesome/free-solid-svg-icons';
 import Modal from '../src/components/Modal';
 import LoadingSpinner from '../src/components/LoadingSpinner';
 import apiService from '../src/services/apiService';
@@ -36,6 +36,7 @@ function WinningPage() {
   const [profile, setProfile] = useState(null);
   const [useProfileAddress, setUseProfileAddress] = useState(false);
   const [showEditAddress, setShowEditAddress] = useState(false);
+  const [pdfUrls, setPdfUrls] = useState({ invoiceUrl: null, certificateUrl: null });
 
   // Try to get auction type from location state (passed from MyWinnings), fallback to 'settled'
   const auctionType = location.state?.auctionType || location.state?.type || location.state?.auction_type || 'settled';
@@ -49,6 +50,29 @@ function WinningPage() {
     fetchProfileAddress();
     // eslint-disable-next-line
   }, [auctionId]);
+
+  // Fetch PDF URLs when order is loaded
+  useEffect(() => {
+    async function fetchPdfs() {
+      if (order && order.id) {
+        try {
+          const [invoiceRes, certRes] = await Promise.all([
+            apiService.get(`/api/orders/${order.id}/invoice`),
+            apiService.get(`/api/orders/${order.id}/certificate`)
+          ]);
+          setPdfUrls({
+            invoiceUrl: invoiceRes.url,
+            certificateUrl: certRes.url
+          });
+        } catch {
+          setPdfUrls({ invoiceUrl: null, certificateUrl: null });
+        }
+      } else {
+        setPdfUrls({ invoiceUrl: null, certificateUrl: null });
+      }
+    }
+    fetchPdfs();
+  }, [order]);
 
   async function fetchOrderAndAuction() {
     setLoading(true);
@@ -183,6 +207,10 @@ function WinningPage() {
       });
       setSubmitted(true);
       setToast({ show: true, message: 'Order claimed successfully! The seller will be notified and will ship your item soon.', type: 'success' });
+      // Auto-refresh after 3 seconds to fetch new certificate/invoice links
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
     } catch (err) {
       setToast({ show: true, message: 'Failed to submit shipping details', type: 'error' });
     } finally {
@@ -302,7 +330,7 @@ function WinningPage() {
   }
 
   return (
-    <div className={isMobile ? "min-h-screen flex flex-col items-center justify-start py-10 px-2 bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white" : "min-h-screen flex flex-col items-start justify-start py-10 px-2 bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white"}>
+    <div className="min-h-screen flex flex-col items-center justify-start py-10 px-2 bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white md:items-start">
       {toast.show && (
         <Toast
           message={toast.message}
@@ -315,30 +343,37 @@ function WinningPage() {
         {/* Green glassy Congratulations card */}
         <div className={isMobile ? "w-full flex justify-center items-center" : "w-full flex justify-center"}>
           <div className="bg-green-500/20 backdrop-blur rounded-xl shadow border border-green-300/30 py-2 px-4 mb-4 w-full max-w-xl mx-auto">
-            <h1 className={isMobile ? "text-base md:text-lg font-extrabold text-center flex items-center justify-center gap-2" : "text-base md:text-lg font-extrabold text-center flex items-center justify-center gap-2"}>
-              <span role="img" aria-label="trophy">🏆</span> Congratulations on winning!
+            <h1 className="text-base md:text-lg font-extrabold text-center flex items-center justify-center gap-2 md:text-left">              <span role="img" aria-label="trophy">🏆</span> Congratulations on winning!
             </h1>
           </div>
         </div>
         {/* Main content: 2 columns on desktop, stacked on mobile */}
-        <div className={isMobile ? "flex flex-col gap-6 w-full items-center" : "flex flex-col md:flex-row gap-6 w-full items-start"}>
+        <div className="flex flex-col gap-6 w-full items-center md:flex-row md:items-start">
           {/* Left: Product info and shipping */}
-          <div className={isMobile ? "flex-1 min-w-0 flex flex-col gap-6 items-center w-full" : "flex-1 min-w-0 flex flex-col gap-6"}>
+          <div className="flex-1 min-w-0 flex flex-col gap-6 items-center w-full md:items-start">
             {/* Product Info */}
             <section>
               {auction && (
                 <div className={isMobile ? "flex flex-col gap-4 items-center text-center" : "flex flex-col gap-4"}>
-                  <h2 className={isMobile ? "text-xl md:text-2xl font-bold text-center mb-1" : "text-xl md:text-2xl font-bold text-left mb-1"}>{auction.title}</h2>
-                  <img src={auction.image_url} alt={auction.title} className={isMobile ? "w-56 h-56 object-contain rounded-xl border border-white/10 mx-auto" : "w-56 h-56 object-contain rounded-xl border border-white/10 self-start"} />
-                  <div className={isMobile ? "text-gray-200 mb-1 text-center" : "text-gray-200 mb-1 text-left"}>{auction.description}</div>
-                  <div className={isMobile ? "text-base mb-1 text-center" : "text-base mb-1 text-left"}>Final Price: <span className="text-green-300 font-bold">${auction.current_highest_bid || auction.final_bid}</span></div>
-                  <div className={isMobile ? "text-base mb-1 text-center" : "text-base mb-1 text-left"}>Type: <span className="font-semibold capitalize">{auction.type || 'settled'}</span></div>
-                  <div className={isMobile ? "text-base flex flex-col items-center gap-2 text-center" : "text-base flex items-center gap-2 text-left"}>Seller: <span className="font-semibold">{getSellerInfo().name}</span>
+                  <h2 className="text-xl md:text-2xl font-bold text-center mb-1 md:text-left">{auction.title}</h2>
+                  <img src={auction.image_url} alt={auction.title} className="w-56 h-56 object-contain rounded-xl border border-white/10 mx-auto md:mx-0 md:self-start" />
+
+
+
+                  <div className="text-gray-200 mb-1 text-center md:text-left">{auction.description}</div>
+
+                  <div className="text-base mb-1 text-center md:text-left">Final Price: <span className="text-green-300 font-bold">${auction.current_highest_bid || auction.final_bid}</span></div>
+                  <div className="text-base mb-1 text-center md:text-left">Type: <span className="font-semibold capitalize">{auction.type || 'settled'}</span></div>
+
+
+                  <div className="text-base flex flex-col items-center gap-2 text-center md:flex-row md:items-center md:text-left">Seller: <span className="font-semibold">{getSellerInfo().name}</span>
                     {getSellerInfo().email && (
                       <Button
                         size="sm"
                         variant="secondary"
-                        className={isMobile ? "ml-0 mt-2 px-3 py-1 text-xs font-semibold" : "ml-3 px-3 py-1 text-xs font-semibold"}
+                        className="ml-0 mt-2 px-3 py-1 text-xs font-semibold md:ml-3 md:mt-0"
+
+
                         as="a"
                       >
                         <a
@@ -435,7 +470,8 @@ function WinningPage() {
               )}
 
               {/* Show shipping form only if order is not shipped/delivered and not just submitted */}
-              {!isShipped && !isDelivered && !submitted && (
+              {!order && (
+                // Show shipping form, edit/delete/claim UI here
                 <>
                   {profile && profile.address ? (
                     <div className="flex items-center gap-4 mb-2">
@@ -507,12 +543,80 @@ function WinningPage() {
                 </>
               )}
             </section>
+            {/* After the shipping/order status section, add the green box if order is claimed (but not shipped/delivered) */}
+            {order && !isShipped && !isDelivered && (
+              <div className="bg-green-500/20 backdrop-blur rounded-xl shadow border border-green-300/30 p-4 mb-4 flex flex-col items-center gap-3">
+                <i className="fa-solid fa-check-circle text-green-400 text-xl"></i>
+                <span className="text-green-300 font-semibold">Order Claimed! Your order has been placed and the seller will process it soon.</span>
+                {/* Generate Invoice/Certificate Button */}
+                {!(pdfUrls.invoiceUrl && pdfUrls.certificateUrl) && (
+                  <Button
+                    className="mt-4 flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded shadow"
+                    onClick={async () => {
+                      setSaving(true);
+                      setToast({ show: true, message: 'Generating documents...', type: 'info' });
+                      try {
+                        await apiService.get(`/api/orders/${order.id}/invoice`);
+                        await apiService.get(`/api/orders/${order.id}/certificate`);
+                        setToast({ show: true, message: 'Documents generated!', type: 'success' });
+                        // Refetch links
+                        const [invoiceRes, certRes] = await Promise.all([
+                          apiService.get(`/api/orders/${order.id}/invoice`),
+                          apiService.get(`/api/orders/${order.id}/certificate`)
+                        ]);
+                        setPdfUrls({
+                          invoiceUrl: invoiceRes.url,
+                          certificateUrl: certRes.url
+                        });
+                      } catch (err) {
+                        setToast({ show: true, message: 'Failed to generate documents', type: 'error' });
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    disabled={saving}
+                  >
+                    <FontAwesomeIcon icon={faFileAlt} /> Generate Invoice & Certificate
+                  </Button>
+                )}
+              </div>
+            )}
+            {/* After the shipping/order status section, add the note if no order exists */}
+            {!order && (
+              <div className="text-yellow-300 text-xs mb-2 italic">Invoice and certificate will be available after claiming your order.</div>
+            )}
           </div>
           {/* Right: Bid History */}
-          <div className={isMobile ? "flex-1 min-w-0 flex flex-col gap-6 mt-0 w-full items-center" : "flex-1 min-w-0 flex flex-col gap-6 mt-0 md:mt-2"}>
+          <div className="flex-1 min-w-0 flex flex-col gap-6 mt-0 w-full items-center text-center md:items-start md:text-left">
             <section>
                 {/* Only one card, not nested */}
                 <BidHistory auctionId={auctionId} type={auction?.type || 'settled'} />
+                {order && (pdfUrls.invoiceUrl || pdfUrls.certificateUrl) && (
+                  <div className="flex gap-4 mt-6 w-full justify-center md:justify-start">
+                    {pdfUrls.invoiceUrl && (
+                      <a
+                        href={pdfUrls.invoiceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow transition"
+                        title="Download Invoice PDF"
+                      >
+                        <FontAwesomeIcon icon={faDownload} className="text-white" /> Invoice
+                      </a>
+                    )}
+                    {pdfUrls.certificateUrl && (
+                      <a
+                        href={pdfUrls.certificateUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-semibold shadow transition"
+                        title="Download Ownership Certificate PDF"
+                      >
+                        <FontAwesomeIcon icon={faDownload} className="text-white" /> Certificate
+                      </a>
+                    )}
+                  </div>
+                )}
             </section>
           </div>
         </div>
