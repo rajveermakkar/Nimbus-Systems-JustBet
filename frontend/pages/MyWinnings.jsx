@@ -32,6 +32,22 @@ function MyWinnings() {
     fetchWinningsAndOrders();
   }, []);
 
+  // Fetch invoice and certificate URLs for an order
+  async function fetchOrderPdfs(orderId) {
+    try {
+      const [invoiceRes, certRes] = await Promise.all([
+        apiService.get(`/api/orders/${orderId}/invoice`),
+        apiService.get(`/api/orders/${orderId}/certificate`)
+      ]);
+      return {
+        invoiceUrl: invoiceRes.url,
+        certificateUrl: certRes.url
+      };
+    } catch (err) {
+      return { invoiceUrl: null, certificateUrl: null };
+    }
+  }
+
   async function fetchWinningsAndOrders() {
     setLoading(true);
     try {
@@ -41,7 +57,14 @@ function MyWinnings() {
       setWinnings(winningsArr);
       // Fetch all orders for this user
       const ordersArr = await apiService.get('/api/orders/winner');
-      setOrders(Array.isArray(ordersArr) ? ordersArr : []);
+      // For each order, fetch invoice/certificate URLs
+      const ordersWithPdfs = await Promise.all(
+        ordersArr.map(async (order) => {
+          const pdfs = await fetchOrderPdfs(order.id);
+          return { ...order, ...pdfs };
+        })
+      );
+      setOrders(Array.isArray(ordersWithPdfs) ? ordersWithPdfs : []);
     } catch (err) {
       setToast({ show: true, message: 'Failed to load winnings', type: 'error' });
     } finally {
@@ -128,8 +151,33 @@ function MyWinnings() {
                       </div>
                     )}
                     <div className="text-gray-300 text-sm mb-1">Status: <span className="font-bold text-white">{order ? (STATUS_LABELS[order.status] || order.status) : 'Not Claimed'}</span></div>
-                    <div className="flex justify-center mt-4">
+                    {!order && (
+                      <div className="text-yellow-300 text-xs mb-1 italic">Invoice and certificate will be available after claiming your order.</div>
+                    )}
+                    <div className="flex justify-center mt-4 gap-2">
                       <Button className="w-fit" onClick={() => navigate(`/winning/${win.auction_id}`, { state: { auctionType: win.auction_type } })}>{buttonLabel}</Button>
+                      {order && order.invoiceUrl && (
+                        <a
+                          href={order.invoiceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 underline text-sm ml-2"
+                          title="Download Invoice PDF"
+                        >
+                          Invoice
+                        </a>
+                      )}
+                      {order && order.certificateUrl && (
+                        <a
+                          href={order.certificateUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-400 underline text-sm ml-2"
+                          title="Download Ownership Certificate PDF"
+                        >
+                          Certificate
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>

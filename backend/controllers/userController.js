@@ -132,6 +132,11 @@ const userController = {
         return errorResponse(res, 401, 'Invalid email or password');
       }
 
+      // Block login if user is deleted
+      if (user.status === 'deleted') {
+        return errorResponse(res, 403, 'Your account has been permanently deleted and cannot be reactivated.');
+      }
+
       // Check password
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) {
@@ -292,7 +297,9 @@ const userController = {
         lastName: user.last_name,
         email: user.email,
         role: user.role,
-        createdAt: user.created_at
+        createdAt: user.created_at,
+        status: user.status,
+        deletionScheduledAt: user.deletionScheduledAt || user.deletionscheduledat || null
       }});
     } catch (error) {
       console.error('Profile error:', error);

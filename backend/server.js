@@ -29,6 +29,9 @@ if (process.env.NODE_ENV !== 'test') {
   require('./services/settledAuctionCron');
 }
 
+// Start account deletion cron job
+require('./services/accountDeletionCron');
+
 const app = express();
 const port = process.env.PORT || 3000;
 

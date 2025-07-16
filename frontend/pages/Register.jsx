@@ -4,6 +4,8 @@ import AuthCard from "../src/components/AuthCard";
 import registerImage from "./assets/register.png";
 import { UserContext } from "../src/context/UserContext";
 import Button from "../src/components/Button";
+import Modal from "../src/components/Modal";
+import LoadingSpinner from "../src/components/LoadingSpinner";
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 function useIsMobile() {
@@ -33,6 +35,7 @@ function Register({ showToast }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -97,8 +100,7 @@ function Register({ showToast }) {
       const data = await response.json();
 
       if (response.ok) {
-        showToast && showToast("Registration successful! Please log in.", "success");
-        navigate("/login");
+        setShowVerifyModal(true);
       } else {
         setErrors({ form: data.error || data.message || "Registration failed" });
       }
@@ -118,7 +120,7 @@ function Register({ showToast }) {
             type="text"
             name="firstName"
             id="firstName"
-            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.firstName ? "border-red-500" : ""}`}
+            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.firstName ? "border-red-500" : ""}`}
             placeholder="First name"
             value={form.firstName}
             onChange={handleChange}
@@ -134,7 +136,7 @@ function Register({ showToast }) {
             type="text"
             name="lastName"
             id="lastName"
-            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.lastName ? "border-red-500" : ""}`}
+            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.lastName ? "border-red-500" : ""}`}
             placeholder="Last name"
             value={form.lastName}
             onChange={handleChange}
@@ -151,7 +153,7 @@ function Register({ showToast }) {
           type="email"
           name="email"
           id="email"
-          className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.email ? "border-red-500" : ""}`}
+          className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.email ? "border-red-500" : ""}`}
           placeholder="Email address"
           value={form.email}
           onChange={handleChange}
@@ -168,7 +170,7 @@ function Register({ showToast }) {
             type={showPassword ? "text" : "password"}
             name="password"
             id="password"
-            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
+            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
             placeholder="Password"
             value={form.password}
             onChange={handleChange}
@@ -195,7 +197,7 @@ function Register({ showToast }) {
             type={showConfirmPassword ? "text" : "password"}
             name="confirmPassword"
             id="confirmPassword"
-            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
+            className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
             placeholder="Confirm password"
             value={form.confirmPassword}
             onChange={handleChange}
@@ -244,6 +246,31 @@ function Register({ showToast }) {
 
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">
+      {loading && <LoadingSpinner message="Registering..." />}
+      <Modal
+        open={showVerifyModal}
+        onClose={() => {
+          setShowVerifyModal(false);
+          navigate("/login");
+        }}
+        title="Verify Your Email"
+      >
+        <div className="text-center text-lg">
+          Registration Successful !! <br/>
+          Check your email and you must verify it before logging in.
+        </div>
+        <Button
+          type="button"
+          variant="primary"
+          className="w-full mt-4"
+          onClick={() => {
+            setShowVerifyModal(false);
+            navigate("/login");
+          }}
+        >
+          Go to Login
+        </Button>
+      </Modal>
       {isMobile ? (
         <AuthCard
           icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
@@ -285,7 +312,7 @@ function Register({ showToast }) {
                       type="text"
                       name="firstName"
                       id="firstName"
-                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.firstName ? "border-red-500" : ""}`}
+                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.firstName ? "border-red-500" : ""}`}
                       placeholder="First name"
                       value={form.firstName}
                       onChange={handleChange}
@@ -301,7 +328,7 @@ function Register({ showToast }) {
                       type="text"
                       name="lastName"
                       id="lastName"
-                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.lastName ? "border-red-500" : ""}`}
+                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.lastName ? "border-red-500" : ""}`}
                       placeholder="Last name"
                       value={form.lastName}
                       onChange={handleChange}
@@ -318,7 +345,7 @@ function Register({ showToast }) {
                     type="email"
                     name="email"
                     id="email"
-                    className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.email ? "border-red-500" : ""}`}
+                    className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.email ? "border-red-500" : ""}`}
                     placeholder="Email address"
                     value={form.email}
                     onChange={handleChange}
@@ -335,7 +362,7 @@ function Register({ showToast }) {
                       type={showPassword ? "text" : "password"}
                       name="password"
                       id="password"
-                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
+                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.password ? "border-red-500" : ""}`}
                       placeholder="Password"
                       value={form.password}
                       onChange={handleChange}
@@ -362,7 +389,7 @@ function Register({ showToast }) {
                       type={showConfirmPassword ? "text" : "password"}
                       name="confirmPassword"
                       id="confirmPassword"
-                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-blue-500 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
+                      className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm ${errors.confirmPassword ? "border-red-500" : ""}`}
                       placeholder="Confirm password"
                       value={form.confirmPassword}
                       onChange={handleChange}
