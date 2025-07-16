@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import Toast from '../src/components/Toast';
 import ConfirmModal from '../src/components/ConfirmModal';
 import Button from '../src/components/Button';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../src/services/apiService';
+import { UserContext } from "../src/context/UserContext";
+import axios from 'axios';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -52,6 +54,9 @@ function UserProfile() {
   const [countryLoading, setCountryLoading] = useState(true);
   const [stateLoading, setStateLoading] = useState(false);
   const navigate = useNavigate();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { setUser } = useContext(UserContext);
 
   useEffect(() => {
     fetchProfile();
@@ -144,6 +149,37 @@ function UserProfile() {
       setToast({ show: true, message: 'Failed to update profile', type: 'error' });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    setError('');
+    try {
+      // 1. Call backend logout endpoint with credentials (same as Navbar)
+      try {
+        await axios.post(`${BACKEND_URL}/api/auth/logout`, {}, { withCredentials: true });
+      } catch (e) { /* ignore errors */ }
+      // 2. Schedule account deletion
+      await apiService.patch('/api/user/schedule-deletion');
+      setShowDeleteModal(false);
+      setToast({
+        show: true,
+        message: 'Account deletion requested. You can reactivate by logging in before the scheduled deletion date. After that, your account will be permanently deleted.',
+        type: 'info',
+        duration: 6000
+      });
+      setTimeout(() => {
+        localStorage.removeItem('justbetToken');
+        localStorage.removeItem('justbetUser');
+        if (setUser) setUser(null);
+        window.location.href = '/login';
+      }, 2000);
+    } catch (err) {
+      setError('Failed to request account deletion');
+      setToast({ show: true, message: 'Failed to request account deletion', type: 'error' });
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -252,13 +288,41 @@ function UserProfile() {
                 </div>
               </div>
             </div>
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-between mt-6 gap-4">
+              <button
+                className="px-6 py-2 rounded-lg bg-red-800 hover:bg-red-700 text-white font-semibold shadow-lg border border-red-500/30 transition disabled:opacity-60"
+                onClick={() => setShowDeleteModal(true)}
+                disabled={deleting}
+                type="button"
+              >
+                Delete Account
+              </button>
               <Button type="submit" disabled={saving} className="px-6 py-2 text-base font-semibold">
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </form>
         </div>
+        {/* Delete Account Confirmation Modal */}
+        {showDeleteModal && (
+          <ConfirmModal
+            open={showDeleteModal}
+            title="Delete Account"
+            message={
+              <div>
+                <p className="mb-2">Are you sure you want to delete your account?</p>
+                <p className="text-red-300 text-sm mb-2">Your account will be scheduled for deletion in 30 days. You can reactivate by logging in before then. After 30 days, your account will be permanently deleted.</p>
+                <p className="text-yellow-200 text-xs">This action is reversible until the scheduled deletion date.</p>
+              </div>
+            }
+            onCancel={() => setShowDeleteModal(false)}
+            onConfirm={handleDeleteAccount}
+            loading={deleting}
+            confirmText="Yes, Delete My Account"
+            cancelText="Cancel"
+            confirmColor="red"
+          />
+        )}
       </div>
     </div>
   );

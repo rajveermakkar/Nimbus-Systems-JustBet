@@ -5,6 +5,8 @@ import formImage from "./assets/auction_online.jpg";
 import AuthCard from "../src/components/AuthCard";
 import { UserContext } from "../src/context/UserContext";
 import Button from "../src/components/Button";
+import ConfirmModal from '../src/components/ConfirmModal';
+import apiService from '../src/services/apiService';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -32,6 +34,9 @@ function Login({ showToast }) {
   const hasRedirected = useRef(false);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [reactivateModal, setReactivateModal] = useState(false);
+  const [reactivateLoading, setReactivateLoading] = useState(false);
+  const [reactivateUser, setReactivateUser] = useState(null);
 
   // On mount, check if user wanted to remember their email
   useEffect(() => {
@@ -53,7 +58,10 @@ function Login({ showToast }) {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user && user.token && !hasRedirected.current) {
+    if (
+      user && user.token && !hasRedirected.current &&
+      !(user.status === 'inactive' && user.deletionScheduledAt && reactivateModal)
+    ) {
       hasRedirected.current = true;
       // Only show 'already logged in' if NOT just logged in
       if (!justLoggedIn) {
@@ -65,7 +73,7 @@ function Login({ showToast }) {
         navigate('/dashboard');
       }
     }
-  }, [user, navigate, showToast, justLoggedIn]);
+  }, [user, navigate, showToast, justLoggedIn, reactivateModal]);
 
   // Simple validation for email and password
   const validate = () => {
@@ -121,7 +129,16 @@ function Login({ showToast }) {
           });
           if (profileRes.ok) {
             const profileData = await profileRes.json();
+            console.log('Fetched user profile:', profileData.user);
             const userWithToken = { ...profileData.user, token: data.token };
+            // Reactivation check
+            if (userWithToken.status === 'inactive' && userWithToken.deletionScheduledAt) {
+              console.log('User is inactive and scheduled for deletion:', userWithToken);
+              setReactivateUser(userWithToken);
+              setReactivateModal(true);
+              setUser(userWithToken); // Set user context so modal can use it
+              return;
+            }
             if (profileData.user.role === "seller") {
               // Fetch latest seller status
               const statusRes = await fetch(`${backendUrl}/api/seller/status`, {
@@ -174,6 +191,39 @@ function Login({ showToast }) {
       showToast && showToast("Network error. Please try again.", "error");
     }
   };
+
+  // Reactivate handler
+  async function handleReactivate() {
+    setReactivateLoading(true);
+    try {
+      const res = await apiService.patch('/api/user/reactivate');
+      const user = { ...reactivateUser, status: 'active', deletionScheduledAt: null };
+      setUser(user);
+      localStorage.setItem('justbetUser', JSON.stringify(user));
+      setReactivateModal(false);
+      showToast && showToast('Account reactivated successfully!', 'success');
+      navigate('/dashboard');
+    } catch (err) {
+      setReactivateModal(false);
+      setUser(null);
+      localStorage.removeItem('justbetUser');
+      showToast && showToast('Failed to reactivate account. Please contact support.', 'error');
+      navigate('/login');
+    } finally {
+      setReactivateLoading(false);
+    }
+  }
+
+  // Cancel reactivation: log out and redirect
+  async function handleCancelReactivate() {
+    setReactivateModal(false);
+    setUser(null);
+    localStorage.removeItem('justbetUser');
+    try {
+      await apiService.post('/auth/logout', {}, { withCredentials: true });
+    } catch (e) {}
+    navigate('/login');
+  }
 
   const form = (
     <form onSubmit={handleSubmit} noValidate className="space-y-4 w-full">
@@ -292,6 +342,23 @@ function Login({ showToast }) {
             </AuthCard>
           </div>
         </div>
+      )}
+      {reactivateModal && (
+        <ConfirmModal
+          open={reactivateModal}
+          title="Reactivate Account?"
+          message={<div>
+            <p>Your account is scheduled for deletion.</p>
+            <p className="text-yellow-200 mt-2">Do you want to reactivate your account and cancel deletion?</p>
+          </div>}
+          confirmText="Yes, Reactivate"
+          cancelText="Cancel"
+          confirmColor="green"
+          loading={reactivateLoading}
+          onConfirm={handleReactivate}
+          onCancel={handleCancelReactivate}
+          disabled={reactivateLoading}
+        />
       )}
     </div>
   );

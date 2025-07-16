@@ -196,6 +196,26 @@ const updateUsersTable = async () => {
         await pool.query(`ALTER TABLE users ${col.sql}`);
       }
     }
+    // Add status column if it doesn't exist
+    const statusCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'status'
+    `);
+    if (statusCheck.rows.length === 0) {
+      logDbChange('Adding status column to users table');
+      await pool.query(`ALTER TABLE users ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active'`);
+    }
+    // Add deletionScheduledAt column if it doesn't exist (case-insensitive check)
+    const deletionScheduledAtCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND lower(column_name) = 'deletionscheduledat'
+    `);
+    if (deletionScheduledAtCheck.rows.length === 0) {
+      logDbChange('Adding deletionScheduledAt column to users table');
+      await pool.query(`ALTER TABLE users ADD COLUMN deletionScheduledAt TIMESTAMP WITH TIME ZONE`);
+    }
   } catch (error) {
     console.error('Error updating users table:', error);
     throw error;
@@ -216,9 +236,9 @@ const createInitialAdmin = async () => {
       
       // Create initial admin user
       await pool.query(
-        `INSERT INTO users (first_name, last_name, email, password, role, is_verified)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        ['Admin', 'User', 'admin@justbet.com', hashedPassword, 'admin', true]
+        `INSERT INTO users (first_name, last_name, email, password, role, is_verified, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        ['Admin', 'User', 'admin@justbet.com', hashedPassword, 'admin', true, 'active']
       );
       console.log('Created initial admin user');
     } else {
