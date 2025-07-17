@@ -233,14 +233,14 @@ function WinningPage() {
 
   // Helper to get seller info robustly
   const getSellerInfo = () => {
-    if (!auction) return { name: 'Unknown', email: '' };
-    if (auction.seller_email) return { name: auction.seller_name || auction.business_name || `${auction.first_name || ''} ${auction.last_name || ''}`.trim(), email: auction.seller_email };
-    if (auction.seller && (auction.seller.email || auction.seller.first_name)) {
+    if (!auction) return { name: 'Not available', email: '' };
+    if (auction.seller && (auction.seller.business_name || auction.seller.first_name)) {
       return {
         name: auction.seller.business_name || `${auction.seller.first_name || ''} ${auction.seller.last_name || ''}`.trim(),
         email: auction.seller.email || ''
       };
     }
+    // fallback for legacy data
     return { name: auction.business_name || auction.seller_name || `${auction.first_name || ''} ${auction.last_name || ''}`.trim(), email: auction.email || '' };
   };
 

@@ -26,6 +26,7 @@ import AllAuctionsPage from '../pages/AllAuctionsPage';
 import LiveAuctionsPage from '../pages/LiveAuctionsPage';
 import SettledAuctionsPage from '../pages/SettledAuctionsPage';
 import EndedAuctionPage from '../pages/EndedAuctionPage';
+import ClosedAuctionsPage from '../pages/ClosedAuctionsPage';
 
 // Import user pages
 import MyWinnings from '../pages/MyWinnings';
@@ -251,6 +252,7 @@ function AppRoutes() {
         <Route path="/live-auctions" element={<LiveAuctionsPage />} />
         <Route path="/ended-auction/:id" element={<EndedAuctionPage />} />
         <Route path="/settled-auctions" element={<SettledAuctionsPage />} />
+        <Route path="/closed-auctions" element={<ClosedAuctionsPage />} />
         
         {/* User Routes */}
         <Route path="/my-winnings" element={

@@ -141,7 +141,12 @@ function MyWinnings() {
                   )}
                   <div className="flex-1 flex flex-col p-4 gap-2">
                     <div className="font-bold text-base mb-1 truncate" title={win.title}>{win.title}</div>
-                    <div className="text-gray-300 text-xs mb-1">Seller: <span className="text-white font-semibold">{win.seller_name}</span></div>
+                    <div className="text-gray-300 text-xs mb-1">Seller: <span className="text-white font-semibold">{
+                      win.seller?.business_name
+                        || (win.seller?.first_name && win.seller?.last_name
+                          ? `${win.seller.first_name} ${win.seller.last_name}`
+                          : 'Not available')
+                    }</span></div>
                     <div className="text-gray-300 text-xs mb-1">End Time: <span className="text-white">{new Date(win.end_time).toLocaleString()}</span></div>
                     <div className="text-gray-300 text-xs mb-1">Winning Bid: <span className="text-green-400 font-bold">{formatPrice(win.final_bid)}</span></div>
                     {order && (

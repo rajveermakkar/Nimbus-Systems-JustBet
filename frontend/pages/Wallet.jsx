@@ -1226,6 +1226,8 @@ function getTxIconAndColor(tx) {
     return { icon: faArrowDown, color: '#6fffbe', bg: 'rgba(111,255,190,0.12)' };
   } else if (tx.type === 'withdrawal') {
     return { icon: faArrowUp, color: '#ff6b6b', bg: 'rgba(255,107,107,0.12)' };
+  } else if (tx.type === 'payout') {
+    return { icon: faArrowUp, color: '#6366f1', bg: 'rgba(99,102,241,0.12)' };
   } else if (tx.type === 'platform_fee') {
     return { icon: faMoneyBillWave, color: '#10b981', bg: 'rgba(16,185,129,0.12)' };
   } else if (tx.description?.toLowerCase().includes('payment')) {
@@ -1394,20 +1396,25 @@ function Wallet() {
     return () => { delete window.fetchPaymentMethods; };
   }, []);
 
-  // Monthly summary
+  // Monthly summary (local, not backend)
   const now = new Date();
   const thisMonthTxs = transactions.filter(tx => {
     const d = new Date(tx.created_at);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
-  const totalSpent = 0; // TODO: Replace with actual spent calculation when bidding/purchase is implemented
   const totalAdded = thisMonthTxs
-    .filter(tx => Number(tx.amount) > 0)
-    .reduce((sum, tx) => {
-      const amt = Number(tx.amount);
-      return isNaN(amt) ? sum : sum + amt;
-    }, 0);
-  const totalWithdrawn = thisMonthTxs.filter(tx => tx.type === 'withdrawal' && tx.amount < 0).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    .filter(tx => tx.type === 'deposit' && Number(tx.amount) > 0)
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const totalWithdrawn = thisMonthTxs
+    .filter(tx => (tx.type === 'withdrawal' || tx.type === 'payout') && Number(tx.amount) < 0)
+    .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
+  const totalSpent = thisMonthTxs
+    .filter(tx => tx.type === 'auction_payment' && Number(tx.amount) < 0)
+    .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
+  const totalEarned = thisMonthTxs
+    .filter(tx => tx.type === 'auction_income' && Number(tx.amount) > 0)
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const transactionCount = thisMonthTxs.filter(tx => tx.type !== 'platform_fee').length;
 
   // Only fetchWallet after AddFundsStepper closes, not during payment
   function handleAddFundsModalClose(depositAmount = 0) {
@@ -1611,19 +1618,25 @@ function Wallet() {
               <div style={{ fontSize: 16, marginBottom: 12 }}>
                 <div style={{ marginBottom: 10 }}>
                   <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Withdrawn:</span>
-                  <span style={{ color: '#ff6b6b', fontWeight: 700, marginLeft: 10 }}>${Number(monthlySummary.totalWithdrawn || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span style={{ color: '#ff6b6b', fontWeight: 700, marginLeft: 10 }}>${totalWithdrawn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Spent:</span>
-                  <span style={{ color: '#ffd166', fontWeight: 700, marginLeft: 10 }}>${Number(monthlySummary.totalSpent || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span style={{ color: '#ffd166', fontWeight: 700, marginLeft: 10 }}>${totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Added:</span>
-                  <span style={{ color: '#6fffbe', fontWeight: 700, marginLeft: 10 }}>${Number(monthlySummary.totalAdded || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span style={{ color: '#6fffbe', fontWeight: 700, marginLeft: 10 }}>${totalAdded.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
+                {user?.role === 'seller' && (
+                  <div style={{ marginBottom: 10 }}>
+                    <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Total Earned:</span>
+                    <span style={{ color: '#a78bfa', fontWeight: 700, marginLeft: 10 }}>${totalEarned.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                )}
                 <div>
                   <span style={{ color: '#b3b3c9', fontWeight: 500 }}>Transactions:</span>
-                  <span style={{ color: '#fff', fontWeight: 700, marginLeft: 10 }}>{monthlySummary.transactionCount}</span>
+                  <span style={{ color: '#fff', fontWeight: 700, marginLeft: 10 }}>{transactionCount}</span>
                 </div>
               </div>
             </div>
@@ -1712,8 +1725,8 @@ function Wallet() {
                       <div key={tx.id} style={{
                         display: 'flex',
                         flexDirection: isMobile ? 'column' : 'row',
-                        alignItems: isMobile ? 'flex-start' : 'center',
-                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        justifyContent: isMobile ? 'center' : 'space-between',
                         background: 'rgba(35,43,74,0.32)',
                         borderRadius: 16,
                         padding: isMobile ? '12px 10px' : '16px 20px',
@@ -1722,6 +1735,7 @@ function Wallet() {
                         border: '1.5px solid rgba(255,255,255,0.06)',
                         gap: isMobile ? 8 : 18,
                         width: '100%',
+                        textAlign: isMobile ? 'center' : undefined,
                       }}>
                         {/* Icon */}
                         <div style={{
@@ -1735,30 +1749,29 @@ function Wallet() {
                           fontSize: 22,
                           color,
                           flexShrink: 0,
-                          marginBottom: isMobile ? 8 : 0,
+                          margin: isMobile ? '0 auto 8px auto' : '0',
                         }}>
                           <FontAwesomeIcon icon={icon} />
                         </div>
                         {/* Main info */}
-                        <div style={{ flex: 1, marginLeft: isMobile ? 0 : 12, width: '100%' }}>
-                          <div style={{ fontWeight: 600, fontSize: 17, color: '#fff', marginBottom: 2 }}>
-                            {tx.type === 'withdrawal' ? 'Wallet Withdrawal' : tx.type === 'deposit' ? 'Wallet Deposit' : tx.description}
-                          </div>
-                          <div style={{ fontSize: 13, color: '#b3b3c9', fontWeight: 500 }}>
-                            {format(new Date(tx.created_at), 'MMM d, yyyy h:mm a')}
-                          </div>
-                          <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
-                            Ref: {tx.reference_id || tx.id}
-                          </div>
+                        <div style={{ flex: 1, marginLeft: isMobile ? 0 : 12, width: '100%', textAlign: isMobile ? 'center' : 'left' }}>
+                          <div style={{ fontWeight: 600, fontSize: 17, color: '#fff', marginBottom: 2 }}>{tx.type === 'withdrawal' ? 'Wallet Withdrawal' : tx.type === 'deposit' ? 'Wallet Deposit' : tx.description}</div>
+                          <div style={{ fontSize: 13, color: '#b3b3c9', fontWeight: 500 }}>{format(new Date(tx.created_at), 'MMM d, yyyy h:mm a')}</div>
+                          <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{'Ref: '}{tx.reference_id || tx.id}</div>
                         </div>
                         {/* Amount */}
-                        <div style={{ textAlign: isMobile ? 'left' : 'right', minWidth: isMobile ? undefined : 110, width: isMobile ? '100%' : undefined, marginTop: isMobile ? 8 : 0 }}>
-                          <div style={{ fontWeight: 700, fontSize: 18, color: isPositive ? '#6fffbe' : '#ff6b6b' }}>
-                            {isPositive ? '+' : ''}{formatBalance(tx.amount)}
-                          </div>
-                          <div style={{ fontSize: 13, color: getStatusColor(tx.status), fontWeight: 600, marginTop: 2, textTransform: 'capitalize' }}>
-                            {tx.status}
-                          </div>
+                        <div style={{
+                          textAlign: 'center',
+                          minWidth: isMobile ? undefined : 110,
+                          width: isMobile ? '100%' : undefined,
+                          marginTop: isMobile ? 8 : 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <div style={{ fontWeight: 700, fontSize: 18, color: isPositive ? '#6fffbe' : '#ff6b6b', textAlign: 'center' }}>{isPositive ? '+' : ''}{formatBalance(tx.amount)}</div>
+                          <div style={{ fontSize: 13, color: getStatusColor(tx.status), fontWeight: 600, marginTop: 2, textTransform: 'capitalize', textAlign: 'center' }}>{tx.status}</div>
                         </div>
                       </div>
                     );

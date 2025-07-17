@@ -194,9 +194,24 @@ function Login({ showToast }) {
           showToast && showToast("Login succeeded but failed to fetch user profile.", "error");
         }
       } else {
+        // If error is auth-related, clear cookies/localStorage
+        const errorMsg = (data.error || '').toLowerCase();
+        if (
+          errorMsg.includes('already logged in') ||
+          errorMsg.includes('token expired') ||
+          errorMsg.includes('invalid token') ||
+          errorMsg.includes('not authenticated')
+        ) {
+          document.cookie = 'token=; Max-Age=0; path=/;';
+          document.cookie = 'refreshToken=; Max-Age=0; path=/;';
+          localStorage.removeItem('justbetToken');
+          localStorage.removeItem('justbetUser');
+          window.location.href = '/login';
+          return;
+        }
         setToast({ show: true, message: data.error || "Login failed", type: "error" });
         setErrors({});
-        if ((data.error || '').toLowerCase().includes('verify your email')) {
+        if (errorMsg.includes('verify your email')) {
           setShowResendVerification(true);
         } else {
           setShowResendVerification(false);

@@ -13,6 +13,7 @@ function AllAuctionsPage() {
   const [search, setSearch] = useState('');
   const searchTimeout = useRef();
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [closedAuctions, setClosedAuctions] = useState([]);
 
   // Debounce search input
   useEffect(() => {
@@ -27,12 +28,14 @@ function AllAuctionsPage() {
       if (isInitial) setShowInitialLoading(true);
       setError(null);
       try {
-        const [live, settled] = await Promise.all([
+        const [live, settled, closed] = await Promise.all([
           auctionService.getLiveAuctions(),
-          auctionService.getSettledAuctions()
+          auctionService.getSettledAuctions(),
+          auctionService.getClosedAuctions()
         ]);
         setLiveAuctions(live || []);
         setSettledAuctions(settled || []);
+        setClosedAuctions(closed || []);
       } catch (err) {
         setError('Failed to load auctions. Please try again.');
       } finally {
@@ -49,6 +52,10 @@ function AllAuctionsPage() {
     a.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
   const filteredSettled = settledAuctions.filter(a =>
+    a.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    a.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
+  );
+  const filteredClosed = closedAuctions.filter(a =>
     a.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
     a.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
@@ -137,6 +144,29 @@ function AllAuctionsPage() {
                 </div>
               ) : (
                 <div className="text-gray-400 text-center py-8">No settled auctions right now.</div>
+              )}
+            </div>
+            <hr className="border-white/20 my-8" />
+            {/* Closed Auctions Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-semibold">Closed Auctions</h2>
+                <button 
+                  onClick={() => window.location.href = '/closed-auctions'}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg transition-all duration-200"
+                >
+                  <span>Show More</span>
+                  <i className="fas fa-arrow-right text-xs"></i>
+                </button>
+              </div>
+              {filteredClosed.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {filteredClosed.slice(0, 4).map(auction => (
+                    <AuctionCard key={auction.id} auction={auction} actionLabel="View Result" />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-400 text-center py-8">No closed auctions yet.</div>
               )}
             </div>
           </>

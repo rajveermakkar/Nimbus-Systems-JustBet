@@ -7,6 +7,7 @@ import auctionService from "../src/services/auctionService";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearchDollar, faFileInvoice, faBullseye } from "@fortawesome/free-solid-svg-icons";
 import { UserContext } from "../src/context/UserContext";
+import auctionComingImg from "./assets/Home/auctionComing.png";
 
 function AnimatedNumber({ value, duration = 1200 }) {
   const [display, setDisplay] = useState(0);
@@ -50,13 +51,15 @@ const placeholderAuction = {
   id: 'placeholder',
   title: 'Auction Coming Soon',
   description: 'Stay tuned for more exciting auctions!',
-  image_url: '',
+  image_url: auctionComingImg,
   current_highest_bid: 0,
   starting_price: 0,
-  start_time: new Date().toISOString(),
+  start_time: new Date(Date.now() + 10 * 3600 * 1000).toISOString(), // 10 hours from now
   end_time: new Date(Date.now() + 3600 * 1000).toISOString(),
-  seller: { first_name: '', last_name: '' },
+  seller: { first_name: 'JustBet', last_name: 'Auction House' },
   type: 'settled',
+  badge: 'Coming Soon',
+  placeholder: true,
 };
 
 export default function Home() {
@@ -242,7 +245,7 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {allCards.map(auction => (
-              <AuctionCard key={auction.id} auction={auction} actionLabel={auction.id.startsWith('placeholder') ? undefined : "View Auction"} />
+              <AuctionCard key={auction.id} auction={auction} actionLabel={auction.id.startsWith('placeholder') ? undefined : "View Auction"} badge={auction.badge} />
             ))}
           </div>
         )}

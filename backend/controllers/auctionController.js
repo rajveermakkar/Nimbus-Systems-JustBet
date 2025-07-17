@@ -615,6 +615,89 @@ async function deleteAuction(req, res) {
   }
 }
 
+// GET /api/auctions/closed - public endpoint to get all closed auctions (settled and live)
+async function getAllClosedAuctions(req, res) {
+  try {
+    const { pool } = require('../db/init');
+    // Get closed settled auctions
+    const settledQuery = `
+      SELECT sa.*, u.first_name AS winner_first_name, u.last_name AS winner_last_name, u.email AS winner_email
+      FROM settled_auctions sa
+      LEFT JOIN users u ON sa.current_highest_bidder_id = u.id
+      WHERE sa.status = 'closed'
+      ORDER BY sa.end_time DESC
+      LIMIT 100
+    `;
+    const settledResult = await pool.query(settledQuery);
+    const settledAuctions = [];
+    for (const a of settledResult.rows) {
+      // Fetch seller info
+      let seller = null;
+      try {
+        const sellerQuery = 'SELECT id, first_name, last_name, email, business_name FROM users WHERE id = $1';
+        const sellerResult = await pool.query(sellerQuery, [a.seller_id]);
+        if (sellerResult.rows[0]) {
+          seller = sellerResult.rows[0];
+        }
+      } catch {}
+      settledAuctions.push({
+        ...a,
+        type: 'settled',
+        seller,
+        winner: a.current_highest_bidder_id ? {
+          id: a.current_highest_bidder_id,
+          first_name: a.winner_first_name,
+          last_name: a.winner_last_name,
+          email: a.winner_email,
+          amount: a.current_highest_bid
+        } : null
+      });
+    }
+
+    // Get closed live auctions
+    const liveQuery = `
+      SELECT la.*, u.first_name AS winner_first_name, u.last_name AS winner_last_name, u.email AS winner_email
+      FROM live_auctions la
+      LEFT JOIN users u ON la.current_highest_bidder_id = u.id
+      WHERE la.status = 'closed'
+      ORDER BY la.end_time DESC
+      LIMIT 100
+    `;
+    const liveResult = await pool.query(liveQuery);
+    const liveAuctions = [];
+    for (const a of liveResult.rows) {
+      // Fetch seller info
+      let seller = null;
+      try {
+        const sellerQuery = 'SELECT id, first_name, last_name, email, business_name FROM users WHERE id = $1';
+        const sellerResult = await pool.query(sellerQuery, [a.seller_id]);
+        if (sellerResult.rows[0]) {
+          seller = sellerResult.rows[0];
+        }
+      } catch {}
+      liveAuctions.push({
+        ...a,
+        type: 'live',
+        seller,
+        winner: a.current_highest_bidder_id ? {
+          id: a.current_highest_bidder_id,
+          first_name: a.winner_first_name,
+          last_name: a.winner_last_name,
+          email: a.winner_email,
+          amount: a.current_highest_bid
+        } : null
+      });
+    }
+
+    // Combine and sort by end_time DESC
+    const auctions = [...settledAuctions, ...liveAuctions].sort((a, b) => new Date(b.end_time) - new Date(a.end_time));
+    res.json({ auctions });
+  } catch (error) {
+    console.error('Error fetching closed auctions:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+}
+
 module.exports = {
   createAuction,
   listPendingAuctions,
@@ -628,7 +711,8 @@ module.exports = {
   getAuctionByIdForSeller,
   getAuctionCountdownAPI,
   processSpecificAuction,
-  deleteAuction
+  deleteAuction,
+  getAllClosedAuctions
 };
 
 module.exports.upload = upload.single('image');

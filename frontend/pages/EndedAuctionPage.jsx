@@ -6,7 +6,7 @@ import BidHistory from '../src/components/auctions/BidHistory';
 import Button from '../src/components/Button';
 import Toast from '../src/components/Toast';
 import WinnerDeclaration from '../src/components/WinnerDeclaration';
-import EndpointSVG from './assets/Endpoint-amico.svg';
+import EndpointSVG from './assets/auction-white.png';
 
 function EndedAuctionPage() {
   const { id } = useParams();
@@ -291,9 +291,9 @@ function EndedAuctionPage() {
                     auction.seller.business_name
                     || (auction.seller.first_name && auction.seller.last_name
                         ? `${auction.seller.first_name} ${auction.seller.last_name}`
-                        : auction.seller.email || 'Unknown')
+                        : auction.seller.email || 'Not available')
                   )
-                : 'Unknown'}
+                : 'Not available'}
             </span>
           </div>
           <div className="text-sm text-gray-200 whitespace-pre-line text-center mt-2">
@@ -311,10 +311,10 @@ function EndedAuctionPage() {
       </div>
       <Button
         variant="primary"
-        onClick={() => navigate(auction.type === 'settled' ? '/auctions' : '/live-auctions')}
+        onClick={() => navigate('/auctions')}
         className="mx-auto"
       >
-        Back to {auction.type === 'settled' ? 'Settled' : 'Live'} Auctions
+        Back to All Auctions
       </Button>
     </div>
   );

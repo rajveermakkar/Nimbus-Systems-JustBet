@@ -896,7 +896,12 @@ function AuctionPage() {
             <div className="rounded-lg bg-white/10 shadow p-4">
               <h1 className="text-lg font-bold mb-1 text-left mb-2">{auction.title}</h1>
               <div className="mb-1 text-xs text-gray-300 text-left mt-2">
-                Seller: <span className="font-semibold text-white">{auction.seller?.first_name + ' ' + auction.seller?.last_name + (auction.seller?.business_name ? ` (${auction.seller.business_name})` : '')}</span>
+                Seller: <span className="font-semibold text-white">{
+                  auction.seller?.business_name
+                  || (auction.seller?.first_name && auction.seller?.last_name
+                    ? `${auction.seller.first_name} ${auction.seller.last_name}`
+                    : 'Not available')
+                }</span>
               </div>
               <div className="text-sm text-gray-200 whitespace-pre-line text-left mt-2">
                 {auction.description}
