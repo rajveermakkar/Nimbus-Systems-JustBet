@@ -103,29 +103,83 @@ const User = {
     return result.rows[0];
   },
 
-  // Update user role and approval status with business details
-  async updateRoleAndApproval(userId, role, isApproved, businessDetails = null) {
-    const query = `
-      UPDATE users 
-      SET role = $1,
-          is_approved = $2,
-          business_name = $3,
-          business_description = $4,
-          business_address = $5,
-          business_phone = $6
-      WHERE id = $7
-      RETURNING id, email, role, is_approved, business_name, business_description, 
-                business_address, business_phone
-    `;
-    const result = await queryWithRetry(query, [
-      role, 
-      isApproved, 
-      businessDetails?.businessName || null,
-      businessDetails?.businessDescription || null,
-      businessDetails?.businessAddress || null,
-      businessDetails?.businessPhone || null,
-      userId
-    ]);
+  // Update user role and approval status with business details and optional rejection reason
+  async updateRoleAndApproval(userId, role, isApproved, businessDetails = null, rejectionReason = null) {
+    let query, params;
+    if (role === 'seller' && isApproved === false && rejectionReason) {
+      // Set rejection reason when rejecting
+      query = `
+        UPDATE users 
+        SET role = $1,
+            is_approved = $2,
+            business_name = $3,
+            business_description = $4,
+            business_address = $5,
+            business_phone = $6,
+            seller_rejection_reason = $7
+        WHERE id = $8
+        RETURNING id, email, role, is_approved, business_name, business_description, 
+                  business_address, business_phone, seller_rejection_reason
+      `;
+      params = [
+        role, 
+        isApproved, 
+        businessDetails?.businessName || null,
+        businessDetails?.businessDescription || null,
+        businessDetails?.businessAddress || null,
+        businessDetails?.businessPhone || null,
+        rejectionReason,
+        userId
+      ];
+    } else if (role === 'seller' && isApproved === false && !rejectionReason) {
+      // Clear rejection reason when reapplying
+      query = `
+        UPDATE users 
+        SET role = $1,
+            is_approved = $2,
+            business_name = $3,
+            business_description = $4,
+            business_address = $5,
+            business_phone = $6,
+            seller_rejection_reason = NULL
+        WHERE id = $7
+        RETURNING id, email, role, is_approved, business_name, business_description, 
+                  business_address, business_phone, seller_rejection_reason
+      `;
+      params = [
+        role, 
+        isApproved, 
+        businessDetails?.businessName || null,
+        businessDetails?.businessDescription || null,
+        businessDetails?.businessAddress || null,
+        businessDetails?.businessPhone || null,
+        userId
+      ];
+    } else {
+      // Default: do not touch rejection reason
+      query = `
+        UPDATE users 
+        SET role = $1,
+            is_approved = $2,
+            business_name = $3,
+            business_description = $4,
+            business_address = $5,
+            business_phone = $6
+        WHERE id = $7
+        RETURNING id, email, role, is_approved, business_name, business_description, 
+                  business_address, business_phone, seller_rejection_reason
+      `;
+      params = [
+        role, 
+        isApproved, 
+        businessDetails?.businessName || null,
+        businessDetails?.businessDescription || null,
+        businessDetails?.businessAddress || null,
+        businessDetails?.businessPhone || null,
+        userId
+      ];
+    }
+    const result = await queryWithRetry(query, params);
     return result.rows[0];
   },
 
@@ -136,7 +190,7 @@ const User = {
              business_name, business_description, business_address, 
              business_phone
       FROM users
-      WHERE role = 'seller' AND is_approved = false
+      WHERE role = 'seller' AND is_approved = false AND (seller_rejection_reason IS NULL OR seller_rejection_reason = '')
     `;
     const result = await queryWithRetry(query);
     return result.rows;
@@ -250,10 +304,23 @@ const User = {
 
   // Reactivate user (set status to 'active' and clear deletionScheduledAt)
   async reactivate(userId) {
-    const query = `
-      UPDATE users SET status = 'active', deletionScheduledAt = NULL WHERE id = $1 RETURNING *
-    `;
-    const result = await queryWithRetry(query, [userId]);
+    // First, get the user to check their role
+    const user = await this.findById(userId);
+    if (!user) throw new Error('User not found');
+    let query, params;
+    if (user.role === 'seller') {
+      // For sellers, also set is_approved to true
+      query = `
+        UPDATE users SET status = 'active', deletionScheduledAt = NULL, is_approved = true WHERE id = $1 RETURNING *
+      `;
+      params = [userId];
+    } else {
+      query = `
+        UPDATE users SET status = 'active', deletionScheduledAt = NULL WHERE id = $1 RETURNING *
+      `;
+      params = [userId];
+    }
+    const result = await queryWithRetry(query, params);
     return result.rows[0];
   }
 };

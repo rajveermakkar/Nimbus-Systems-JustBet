@@ -126,6 +126,7 @@ async function approveAuction(req, res) {
     
     // Invalidate any existing cache for this auction
     await auctionCache.del(`auction:closed:${id}:full`);
+    await auctionCache.del('admin:auctions:settled');
     
     res.json({ auction });
   } catch (error) {

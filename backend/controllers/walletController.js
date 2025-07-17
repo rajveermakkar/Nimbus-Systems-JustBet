@@ -451,7 +451,16 @@ async function listPaymentMethods(req, res) {
       return res.json({ paymentMethods: [] });
     }
     const methods = await stripeService.listPaymentMethods(user.stripe_customer_id);
-    res.json({ paymentMethods: methods });
+    // Filter by fingerprint
+    const seen = new Set();
+    const uniqueMethods = methods.filter(pm => {
+      const fp = pm.card && pm.card.fingerprint;
+      if (!fp) return true; // If no fingerprint, include it
+      if (seen.has(fp)) return false;
+      seen.add(fp);
+      return true;
+    });
+    res.json({ paymentMethods: uniqueMethods });
   } catch (err) {
     res.status(500).json({ error: 'Failed to list payment methods' });
   }

@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
 import Button from "../src/components/Button";
 import heroImg from "./assets/Home/Hero1.png";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import AuctionCard from "../src/components/auctions/AuctionCard";
 import auctionService from "../src/services/auctionService";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearchDollar, faFileInvoice, faBullseye } from "@fortawesome/free-solid-svg-icons";
+import { UserContext } from "../src/context/UserContext";
 
 function AnimatedNumber({ value, duration = 1200 }) {
   const [display, setDisplay] = useState(0);
@@ -63,6 +64,7 @@ export default function Home() {
   const [auctions, setAuctions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user } = useContext(UserContext);
 
   useEffect(() => {
     let isMounted = true;
@@ -115,12 +117,20 @@ export default function Home() {
             Join the next-generation auction platform. Bid live, win rare items, and experience transparent, secure auctions.
           </p>
           <div className="flex gap-4 justify-center">
-            <Link to="/register">
-              <Button variant="primary" size="lg">Register</Button>
-            </Link>
-            <Link to="/login">
-              <Button variant="secondary" size="lg" className="hover:bg-white/20 hover:border-purple-300 hover:text-purple-200 hover:scale-105 transition">Login</Button>
-            </Link>
+            {user ? (
+              <Link to={user.role === 'admin' ? '/admin/dashboard' : user.role === 'seller' ? '/seller/dashboard' : '/dashboard'}>
+                <Button variant="primary" size="lg">Go to Dashboard</Button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/register">
+                  <Button variant="primary" size="lg">Register</Button>
+                </Link>
+                <Link to="/login">
+                  <Button variant="secondary" size="lg" className="hover:bg-white/20 hover:border-purple-300 hover:text-purple-200 hover:scale-105 transition">Login</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
         {/* Right: Hero Image - NO shadow, NO border, NO nested card */}

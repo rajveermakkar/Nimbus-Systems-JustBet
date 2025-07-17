@@ -216,6 +216,19 @@ const updateUsersTable = async () => {
       logDbChange('Adding deletionScheduledAt column to users table');
       await pool.query(`ALTER TABLE users ADD COLUMN deletionScheduledAt TIMESTAMP WITH TIME ZONE`);
     }
+    // Add seller_rejection_reason column if it doesn't exist
+    const sellerRejectionReasonCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'seller_rejection_reason'
+    `);
+    if (sellerRejectionReasonCheck.rows.length === 0) {
+      logDbChange('Adding seller_rejection_reason column to users table');
+      await pool.query(`
+        ALTER TABLE users 
+        ADD COLUMN seller_rejection_reason TEXT
+      `);
+    }
   } catch (error) {
     console.error('Error updating users table:', error);
     throw error;

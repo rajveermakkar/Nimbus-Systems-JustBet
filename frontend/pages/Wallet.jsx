@@ -446,6 +446,10 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
       setAmountError('Enter a valid amount');
       return;
     }
+    if (Number(amount) > 2000) {
+      setAmountError('Maximum deposit per transaction is $2,000');
+      return;
+    }
     if (paymentMethods && paymentMethods.length > 0) {
       goToStep(1); // Go to card selection
     } else {
@@ -735,7 +739,7 @@ function AddFundsStepper({ open, onClose, onSuccess, userEmail, paymentMethods }
             <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 16, fontWeight: 400 }}>
               How much would you like to add?
             </div>
-            <input type="number" placeholder="Amount (CAD)" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inputStyle, fontSize: 20, textAlign: 'center', marginBottom: 8 }} />
+            <input type="number" placeholder="Amount (CAD)" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inputStyle, fontSize: 20, textAlign: 'center', marginBottom: 8, border: '2px solid #a78bfa', boxShadow: '0 1px 4px rgba(167,139,250,0.10)' }} />
             {amountError && <div style={{ color: 'red', marginBottom: 8 }}>{amountError}</div>}
             <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={handleAmountNext}>
               Continue
@@ -881,13 +885,13 @@ function AddCardPaymentElement({ onSuccess, onError, onClose }) {
   const [error, setError] = useState('');
   const { user } = useContext(UserContext); // Get user email
 
-  // Use the same PaymentElement options as the deposit modal
+  // Restrict to only 'card' payment method
   const paymentElementOptions = React.useMemo(() => ({
     layout: 'tabs',
     defaultValues: { billingDetails: { email: '' } },
     fields: { billingDetails: { email: 'never' } },
     wallets: { link: 'never' },
-    paymentMethodTypes: ['card'],
+    paymentMethodTypes: ['card'], // Only allow card
     appearance: {
       theme: 'stripe',
       variables: {
@@ -1168,7 +1172,7 @@ function WithdrawStepper({ open, onClose, onSuccess, onAddCard, balance }) {
           <div style={{ textAlign: 'center', marginBottom: 18, color: '#b3b3c9', fontSize: 16, fontWeight: 400 }}>
             How much would you like to withdraw?
           </div>
-          <input type="number" placeholder="Amount (CAD)" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inputStyle, fontSize: 20, textAlign: 'center', marginBottom: 8 }} />
+          <input type="number" placeholder="Amount (CAD)" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inputStyle, fontSize: 20, textAlign: 'center', marginBottom: 8, border: '2px solid #a78bfa', boxShadow: '0 1px 4px rgba(167,139,250,0.10)' }} />
           {amountError && <div style={{ color: 'red', marginBottom: 8 }}>{amountError}</div>}
           <Button variant="primary" size="default" style={{ width: '100%', height: actionButtonHeight, fontSize: actionFontSize, borderRadius: actionBorderRadius, marginTop: 0, marginBottom: 0 }} onClick={handleAmountNext}>
             Continue
@@ -1755,12 +1759,6 @@ function Wallet() {
                           <div style={{ fontSize: 13, color: getStatusColor(tx.status), fontWeight: 600, marginTop: 2, textTransform: 'capitalize' }}>
                             {tx.status}
                           </div>
-                          {/* Running balance: only show on first page */}
-                          {currentPage === 1 && tx.runningBalance !== undefined && (
-                            <div style={{ fontSize: 12, color: '#b3b3c9', marginTop: 2 }}>
-                              Balance: {formatBalance(tx.runningBalance)}
-                            </div>
-                          )}
                         </div>
                       </div>
                     );

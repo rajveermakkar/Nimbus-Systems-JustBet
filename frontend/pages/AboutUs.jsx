@@ -6,26 +6,26 @@ const team = [
   {
     name: "Rajveer Singh",
     avatar: "https://ui-avatars.com/api/?name=Rajveer+Singh&background=6a11cb&color=fff&size=128",
-    github: "#",
-    linkedin: "#"
+    github: "https://github.com/rajveermakkar",
+    linkedin: "https://www.linkedin.com/in/rajveersingh08/"
   },
   {
     name: "Dhaval Sutariya",
     avatar: "https://ui-avatars.com/api/?name=Dhaval+Sutariya&background=6a11cb&color=fff&size=128",
-    github: "#",
-    linkedin: "#"
+    github: "https://github.com/dhavalsutariya/",
+    linkedin: "https://www.linkedin.com/in/dhavalsutariya/"
   },
   {
     name: "Nirlep Tamboli",
     avatar: "https://ui-avatars.com/api/?name=Nirlep+Tamboli&background=6a11cb&color=fff&size=128",
-    github: "#",
-    linkedin: "#"
+    github: "https://github.com/NirlepTamboli ",
+    linkedin: "https://www.linkedin.com/in/nirlep-tamboli-496753289"
   },
   {
     name: "Tania",
     avatar: "https://ui-avatars.com/api/?name=Tania&background=6a11cb&color=fff&size=128",
-    github: "#",
-    linkedin: "#"
+    github: "https://github.com/tania2300",
+    linkedin: "https://www.linkedin.com/in/tania-655019211"
   },
 ];
 

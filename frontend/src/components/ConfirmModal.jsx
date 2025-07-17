@@ -10,7 +10,8 @@ function ConfirmModal({
   cancelText = "Cancel",
   confirmColor = "purple", // 'green' | 'red' | 'purple'
   loading = false,
-  confirmDisabled = false
+  confirmDisabled = false,
+  confirmClassName = ""
 }) {
   if (!open) return null;
   let confirmBtnClass = "bg-purple-600 hover:bg-purple-700";
@@ -28,7 +29,7 @@ function ConfirmModal({
         <div className="flex gap-4 w-full justify-center">
           <button
             onClick={loading ? undefined : onConfirm}
-            className={`${confirmBtnClass} text-white font-semibold px-4 py-2 rounded-lg shadow-md transition flex-1`}
+            className={`${confirmBtnClass} text-white font-semibold px-4 py-2 rounded-lg shadow-md transition flex-1 ${confirmClassName}`}
             disabled={loading || confirmDisabled}
           >
             {loading ? 'Loading...' : confirmText}

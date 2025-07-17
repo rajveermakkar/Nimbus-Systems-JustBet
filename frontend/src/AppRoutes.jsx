@@ -39,6 +39,7 @@ import WinningPage from '../pages/WinningPage';
 import Wallet from '../pages/Wallet.jsx';
 import AboutUs from '../pages/AboutUs';
 import ContactUs from '../pages/ContactUs';
+import TermsOfService from '../pages/TermsOfService';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -242,6 +243,7 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword showToast={showToast} />} />
         <Route path="/verify-email" element={<VerifyEmail showToast={showToast} />} />
         <Route path="/resend-verification" element={<ResendVerification showToast={showToast} />} />
+        <Route path="/terms" element={<TermsOfService />} />
         
         {/* Auction Routes */}
         <Route path="/auctions" element={<AllAuctionsPage />} />

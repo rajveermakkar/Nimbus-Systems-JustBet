@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import apiService from '../src/services/apiService';
 import { UserContext } from "../src/context/UserContext";
 import axios from 'axios';
+import Select from 'react-select';
+import LoadingSpinner from '../src/components/LoadingSpinner';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -57,6 +59,7 @@ function UserProfile() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { setUser } = useContext(UserContext);
+  const [reactivating, setReactivating] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -68,8 +71,8 @@ function UserProfile() {
     setError('');
     try {
       const data = await apiService.get('/api/user/profile');
-      setProfile(data);
-      setForm({ ...data });
+      setProfile(data); // use the flat object
+      setForm({ ...data }); // use the flat object
     } catch (err) {
       setError('Failed to load profile data');
       setToast({ show: true, message: 'Failed to load profile data', type: 'error' });
@@ -183,6 +186,30 @@ function UserProfile() {
     }
   }
 
+  async function handleReactivateAccount() {
+    setReactivating(true);
+    setError('');
+    try {
+      await apiService.patch('/api/user/reactivate');
+      // Fetch latest profile after reactivation
+      const data = await apiService.get('/api/user/profile');
+      // Normalize is_approved to isApproved for context
+      const updatedUser = { ...data.user, isApproved: data.user.is_approved };
+      if (setUser) setUser(updatedUser);
+      localStorage.setItem('justbetUser', JSON.stringify(updatedUser));
+      // Redirect based on role
+      if (updatedUser.role === 'seller') {
+        window.location.href = '/seller/dashboard';
+      } else {
+        window.location.href = '/user/dashboard';
+      }
+    } catch (err) {
+      setError('Failed to reactivate account');
+      setToast({ show: true, message: 'Failed to reactivate account', type: 'error' });
+      setReactivating(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
@@ -193,6 +220,43 @@ function UserProfile() {
       </div>
     );
   }
+
+  if (reactivating) {
+    return <LoadingSpinner message="Reactivating..." />;
+  }
+
+  if (deleting) {
+    return <LoadingSpinner message="Deleting account..." />;
+  }
+
+  // Custom react-select styles (from CreateListing.jsx)
+  const selectStyles = {
+    control: (base, state) => ({
+      ...base,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderColor: state.isFocused ? '#a78bfa' : '#ffffff33',
+      boxShadow: 'none',
+      color: '#fff',
+      minHeight: '40px',
+      borderRadius: '8px',
+      fontSize: '1rem',
+      fontFamily: 'inherit',
+      transition: 'border-color 0.2s',
+    }),
+    singleValue: (base) => ({ ...base, color: '#fff' }),
+    menu: (base) => ({ ...base, background: '#2a2a72', color: '#fff' }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? '#4f46e5' // blue for selected
+        : state.isFocused
+        ? '#3730a3' // darker blue for focused
+        : '#2a2a72', // default background
+      color: '#fff',
+      cursor: 'pointer',
+      fontSize: '1rem'
+    }),
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white py-8">
@@ -255,32 +319,30 @@ function UserProfile() {
                 </div>
                 <div>
                   <label className="block text-xs mb-1 text-left">Province *</label>
-                  <select
+                  <Select
                     name="state"
-                    className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white focus:outline-none focus:border-blue-400 text-sm"
-                    value={form.state || ''}
-                    onChange={e => setForm(f => ({ ...f, state: e.target.value, city: '' }))}
-                  >
-                    <option value="">Select Province</option>
-                    {states.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                    classNamePrefix="react-select"
+                    options={states.map(s => ({ value: s, label: s }))}
+                    value={form.state ? { value: form.state, label: form.state } : null}
+                    onChange={option => setForm(f => ({ ...f, state: option ? option.value : '', city: '' }))}
+                    placeholder="Select Province"
+                    isClearable
+                    styles={selectStyles}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs mb-1 text-left">City *</label>
-                  <select
+                  <Select
                     name="city"
-                    className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white focus:outline-none focus:border-blue-400 text-sm"
-                    value={form.city || ''}
-                    onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-                    disabled={!form.state}
-                  >
-                    <option value="">{form.state ? 'Select City' : 'Select Province First'}</option>
-                    {cities.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                    classNamePrefix="react-select"
+                    options={cities.map(c => ({ value: c, label: c }))}
+                    value={form.city ? { value: form.city, label: form.city } : null}
+                    onChange={option => setForm(f => ({ ...f, city: option ? option.value : '' }))}
+                    placeholder={form.state ? 'Select City' : 'Select Province First'}
+                    isDisabled={!form.state}
+                    isClearable
+                    styles={selectStyles}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs mb-1 text-left">Postal Code *</label>
@@ -304,21 +366,26 @@ function UserProfile() {
           </form>
         </div>
         {/* Delete Account Confirmation Modal */}
+        {console.log('Profile in ConfirmModal:', profile)}
         {showDeleteModal && (
           <ConfirmModal
             open={showDeleteModal}
             title="Delete Account"
             message={
               <div>
-                <p className="mb-2">Are you sure you want to delete your account?</p>
-                <p className="text-red-300 text-sm mb-2">Your account will be scheduled for deletion in 30 days. You can reactivate by logging in before then. After 30 days, your account will be permanently deleted.</p>
-                <p className="text-yellow-200 text-xs">This action is reversible until the scheduled deletion date.</p>
+                <div className="mb-4">Are you sure you want to delete your account?</div>
+                {profile?.role === 'seller' && (
+                  <div className="mb-2 text-yellow-400 font-semibold">
+                    Note: All your auctions will be closed right now.
+                  </div>
+                )}
+                <div className="text-gray-300 text-sm">This action cannot be undone. You can reactivate your account within 30 days.</div>
               </div>
             }
             onCancel={() => setShowDeleteModal(false)}
             onConfirm={handleDeleteAccount}
             loading={deleting}
-            confirmText="Yes, Delete My Account"
+            confirmText="Delete"
             cancelText="Cancel"
             confirmColor="red"
           />

@@ -4,6 +4,7 @@ const multer = require('multer');
 const { uploadImageToAzure } = require('../services/azureBlobService');
 const Wallet = require('../models/Wallet');
 const { scheduleAuctionProcessing, cancelAuctionProcessing } = require('../services/liveAuctionCron');
+const { auctionCache } = require('../services/redisService');
 
 // Create a new live auction
 async function createLiveAuction(req, res) {
@@ -227,6 +228,9 @@ async function approveLiveAuction(req, res) {
     }
     // Schedule the auction for processing when it ends
     scheduleAuctionProcessing(id, auction.end_time);
+    // Invalidate any existing cache for this auction (admin and public keys)
+    await auctionCache.del(`admin:auctions:live`);
+    await auctionCache.del(`live:auction:${id}:full`); // If you use a per-auction cache key, adjust as needed
     res.json({ auction, message: 'Live auction approved.' });
   } catch (error) {
     console.error('Error approving live auction:', error);

@@ -31,7 +31,7 @@ const adminController = {
   async handleSellerApproval(req, res) {
     try {
       const { userId } = req.params;
-      const { approved } = req.body;
+      const { approved, rejectionReason } = req.body;
 
       if (typeof approved !== 'boolean') {
         return res.status(400).json({ error: 'Approval status must be a boolean' });
@@ -68,8 +68,8 @@ const adminController = {
           }
         }
       }
-      
-      const updatedUser = await User.updateRoleAndApproval(userId, 'seller', approved, businessDetails);
+      // Pass rejectionReason if rejecting, or clear if approving
+      const updatedUser = await User.updateRoleAndApproval(userId, 'seller', approved, businessDetails, approved ? null : (rejectionReason || null));
       const token = generateToken(req.user);
 
       await auctionCache.del('admin:stats');
