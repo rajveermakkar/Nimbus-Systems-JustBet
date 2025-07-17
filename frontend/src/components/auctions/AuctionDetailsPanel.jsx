@@ -48,7 +48,10 @@ function AuctionDetailsPanel({ auction, onViewSeller, onBack, onUserClick, winne
                 onClick={() => onViewSeller && onViewSeller(auction.seller)}
                 title="View Seller Profile"
               >
-                {auction.seller.first_name} {auction.seller.last_name}
+                {auction.seller?.business_name
+                  || (auction.seller?.first_name && auction.seller?.last_name
+                    ? `${auction.seller.first_name} ${auction.seller.last_name}`
+                    : 'Not available')}
               </span>
             </div>
             <hr className="border-white/10 my-2" />

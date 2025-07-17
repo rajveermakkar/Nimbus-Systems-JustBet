@@ -40,6 +40,9 @@ function AuctionCard({ auction, actionLabel }) {
 
   // Get auction status
   const getAuctionStatus = () => {
+    if (auction.status === 'closed') {
+      return { status: 'ended', text: 'Ended', color: 'bg-gray-500' };
+    }
     const now = new Date();
     const start = new Date(auction.start_time);
     const end = new Date(auction.end_time);
@@ -115,6 +118,8 @@ function AuctionCard({ auction, actionLabel }) {
     return [h, m, s].map(n => n.toString().padStart(2, '0')).join(':');
   };
 
+  const isClosed = auction.status === 'closed';
+
   return (
     <div className="bg-white/5 rounded-2xl shadow-xl overflow-hidden flex flex-col flex-1 min-w-[220px] max-w-[300px] w-full mx-auto transition-transform hover:scale-[1.025] hover:shadow-2xl">
       {/* Image */}
@@ -141,29 +146,50 @@ function AuctionCard({ auction, actionLabel }) {
         </div>
         <p className="text-gray-300 text-xs mb-3 line-clamp-2 text-left px-2">{auction.description}</p>
         <div className="mb-3 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-gray-400 px-2">
-          <span className="text-left">Current Bid:</span>
+          <span className="text-left">{isClosed ? 'Winning Bid:' : 'Current Bid:'}</span>
           <span className="text-green-400 font-bold text-left">{formatPrice(currentBid)}</span>
-          <span className="text-left">{auction.id && auction.id.startsWith('placeholder') ? 'Starting In:' : countdownStatus === 'pre' ? 'Starting In:' : countdownStatus === 'ongoing' ? 'Remaining Time:' : 'Time Left:'}</span>
-          <span className="text-white font-semibold text-left">
-            {auction.id && auction.id.startsWith('placeholder')
-              ? (() => {
-                  if (placeholderSeconds == null) return '--:--';
-                  const m = Math.floor(placeholderSeconds / 60).toString().padStart(2, '0');
-                  const s = (placeholderSeconds % 60).toString().padStart(2, '0');
-                  return `${m}:${s}`;
-                })()
-              : formatSeconds(countdown)}
-          </span>
+          {isClosed ? (
+            <>
+              <span className="text-left">Winner:</span>
+              <span className="font-semibold text-white text-left">
+                {auction.winner && auction.winner.first_name ? `${auction.winner.first_name} ${auction.winner.last_name}` : 'No winner'}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-left">{auction.id && auction.id.startsWith('placeholder') ? 'Starting In:' : countdownStatus === 'pre' ? 'Starting In:' : countdownStatus === 'ongoing' ? 'Remaining Time:' : 'Time Left:'}</span>
+              <span className="text-white font-semibold text-left">
+                {auction.id && auction.id.startsWith('placeholder')
+                  ? (() => {
+                      if (placeholderSeconds == null) return '--:--';
+                      const m = Math.floor(placeholderSeconds / 60).toString().padStart(2, '0');
+                      const s = (placeholderSeconds % 60).toString().padStart(2, '0');
+                      return `${m}:${s}`;
+                    })()
+                  : formatSeconds(countdown)}
+              </span>
+            </>
+          )}
           <span className="text-left">Seller:</span>
           <span className="font-semibold text-white text-left">
-            {auction.seller
-              ? `${auction.seller.first_name} ${auction.seller.last_name}${auction.seller.business_name ? ` (${auction.seller.business_name})` : ''}`
-              : auction.email || 'Unknown'}
+            {auction.seller && auction.seller.business_name
+              ? auction.seller.business_name
+              : auction.seller && auction.seller.first_name
+                ? `${auction.seller.first_name} ${auction.seller.last_name}`
+                : 'Not available'}
           </span>
           {auction.category && <><span className="text-left">Category:</span><span className="text-white text-left">{auction.category}</span></>}
         </div>
         <div className="mt-auto flex flex-col gap-2">
-          {auction.id && auction.id.startsWith('placeholder') ? (
+          {isClosed ? (
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={() => navigate(`/auction/${type}/${auction.id}`)}
+            >
+              View Result
+            </Button>
+          ) : auction.id && auction.id.startsWith('placeholder') ? (
             <Button
               variant="secondary"
               className="w-full opacity-80 cursor-not-allowed"
@@ -179,7 +205,7 @@ function AuctionCard({ auction, actionLabel }) {
                 })()}
               </span>
             </Button>
-          ) : actionLabel && (
+          ) : (
             <div className="mt-4 flex flex-col gap-2">
               {countdownStatus === 'pre' ? (
                 <Button

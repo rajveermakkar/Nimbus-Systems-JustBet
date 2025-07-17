@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import auctionService from '../src/services/auctionService';
 import AuctionCard from '../src/components/auctions/AuctionCard';
-import Button from '../src/components/Button';
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -13,74 +12,90 @@ function useIsMobile() {
   return isMobile;
 }
 
-function SettledAuctionsPage() {
-  const [auctions, setAuctions] = useState([]);
+function ClosedAuctionsPage() {
+  const [closedAuctions, setClosedAuctions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showInitialLoading, setShowInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const searchTimeout = useRef();
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const isMobile = useIsMobile();
   const cardsPerPage = isMobile ? 6 : 12;
   const [page, setPage] = useState(1);
 
+  // Debounce search input
   useEffect(() => {
-    let intervalId;
-    const fetchAuctions = async (isInitial = false) => {
-      if (isInitial) setShowInitialLoading(true);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(searchTimeout.current);
+  }, [search]);
+
+  useEffect(() => {
+    async function fetchClosed() {
+      setLoading(true);
       setError(null);
       try {
-        const data = await auctionService.getSettledAuctions();
-        setAuctions(data);
+        const closed = await auctionService.getClosedAuctions();
+        setClosedAuctions(closed || []);
       } catch (err) {
-        setError('Failed to load settled auctions. Please try again.');
+        setError('Failed to load closed auctions. Please try again.');
       } finally {
-        if (isInitial) setShowInitialLoading(false);
+        setLoading(false);
       }
-    };
-    fetchAuctions(true);
-    intervalId = setInterval(() => fetchAuctions(false), 7000);
-    return () => clearInterval(intervalId);
+    }
+    fetchClosed();
   }, []);
 
-  const filtered = auctions.filter(a =>
-    a.title.toLowerCase().includes(search.toLowerCase()) ||
-    a.description.toLowerCase().includes(search.toLowerCase())
+  const filteredClosed = closedAuctions.filter(a =>
+    a.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    a.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
   );
-  const totalPages = Math.ceil(filtered.length / cardsPerPage);
-  const paginated = filtered.slice((page - 1) * cardsPerPage, page * cardsPerPage);
+  const totalPages = Math.ceil(filteredClosed.length / cardsPerPage);
+  const paginatedClosed = filteredClosed.slice((page - 1) * cardsPerPage, page * cardsPerPage);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-2">Settled Auctions</h1>
-        <p className="text-gray-300 mb-8">Browse and bid on traditional settled auctions.</p>
-        <div className="mb-6 max-w-md mx-auto">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search settled auctions..."
-            className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400"
-          />
-        </div>
+        <h1 className="text-3xl font-bold mb-2">Closed Auctions</h1>
+        <p className="text-gray-300 mb-8">Browse all completed auctions, their winners, and winning bids.</p>
         {error && (
           <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 max-w-md mx-auto mb-8">
             <i className="fas fa-exclamation-triangle text-red-400 text-2xl mb-2"></i>
             <span className="text-red-300">{error}</span>
           </div>
         )}
-        {showInitialLoading ? (
+        <div className="mb-6 max-w-md mx-auto flex items-center gap-2">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search closed auctions..."
+            aria-label="Search closed auctions"
+            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:outline-none bg-white/10 text-white placeholder-gray-400 transition"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="ml-2 px-2 py-1 rounded text-gray-300 hover:text-white focus:outline-none"
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-              <p>Loading auctions...</p>
+              <p>Loading closed auctions...</p>
             </div>
           </div>
-        ) : filtered.length > 0 ? (
+        ) : filteredClosed.length > 0 ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {paginated.map(auction => (
-                <AuctionCard key={auction.id} auction={auction} actionLabel="Bid Now" />
+              {paginatedClosed.map(auction => (
+                <AuctionCard key={auction.id} auction={auction} actionLabel="View Result" />
               ))}
             </div>
             {totalPages > 1 && (
@@ -104,11 +119,11 @@ function SettledAuctionsPage() {
             )}
           </>
         ) : (
-          <div className="text-gray-400 text-center py-8">No settled auctions found.</div>
+          <div className="text-gray-400 text-center py-8">No closed auctions yet.</div>
         )}
       </div>
     </div>
   );
 }
 
-export default SettledAuctionsPage; 
+export default ClosedAuctionsPage; 

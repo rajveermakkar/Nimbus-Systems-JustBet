@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Button from "./Button";
 import { UserContext } from "../context/UserContext";
 import axios from 'axios';
+import { ImHammer2 } from "react-icons/im";
 
 // Add custom dropdown animation
 const dropdownStyle = `
@@ -95,7 +96,7 @@ function Navbar() {
         <div className="max-w-5xl mx-auto flex items-center justify-between px-2 relative">
           {/* Logo (left) */}
           <Link to="/" className="flex items-center gap-1 select-none">
-            <i className="fa-solid fa-gavel text-base text-white"></i>
+            <ImHammer2 className="text-2xl text-white" />
             <span className="text-base font-bold text-white text-xl tracking-wide">JustBet</span>
           </Link>
           {/* Hamburger (right, only on mobile, absolutely positioned) */}
@@ -114,7 +115,7 @@ function Navbar() {
               to="/auctions"
               className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-sm px-3 py-2 rounded-lg hover:bg-white/10"
             >
-              <i className="fa-solid fa-gavel"></i>
+              <ImHammer2 />
               Auctions
             </Link>
             <Link
@@ -153,7 +154,7 @@ function Navbar() {
                 )}
                 <div className="relative" ref={dropdownRef}>
                   <button
-                    className="flex items-center gap-2 text-white font-semibold text-xs px-2 py-1 rounded-lg hover:bg-[#2a2a72]/80 focus:outline-none transition-colors"
+                    className="flex items-center gap-2 text-white font-semibold text-xs px-2 py-1 rounded-lg hover:bg-[#2a2a72] focus:outline-none transition-colors"
                     onClick={() => setDropdownOpen((open) => !open)}
                     aria-haspopup="true"
                     aria-expanded={dropdownOpen}
@@ -250,7 +251,7 @@ function Navbar() {
         {/* Logo centered at top */}
         <div className="w-full flex flex-col items-center mb-4">
           <Link to="/" className="flex items-center gap-3 justify-center" onClick={() => setMobileMenuOpen(false)}>
-            <i className="fa-solid fa-gavel text-3xl text-white"></i>
+            <ImHammer2 className="text-3xl text-white" />
             <span className="text-2xl font-extrabold text-white tracking-wide">JustBet</span>
           </Link>
           {/* User info centered below logo, with divider below */}
@@ -264,7 +265,7 @@ function Navbar() {
           <hr className="w-full border-t border-white/20 mt-2" />
         </div>
         <div className="flex flex-col gap-6 w-full max-w-xs">
-          <Link to="/auctions" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-gavel mr-2"></i>Auctions</Link>
+          <Link to="/auctions" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><ImHammer2 className="mr-2" />Auctions</Link>
           <Link to="/about" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-users mr-2"></i>About</Link>
           <Link to="/contact" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-envelope mr-2"></i>Contact</Link>
           {user && (

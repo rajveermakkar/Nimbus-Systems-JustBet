@@ -4,6 +4,7 @@ import formImage from "./assets/reset-password.png";
 import AuthCard from "../src/components/AuthCard";
 import Button from "../src/components/Button";
 import Toast from "../src/components/Toast";
+import { ImHammer2 } from "react-icons/im";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -221,7 +222,7 @@ function ResetPassword({ showToast }) {
       )}
       {isMobile ? (
         <AuthCard
-          icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+          icon={<ImHammer2 className="text-3xl text-white"></ImHammer2>}
           title="Reset Password"
           subtitle="Enter your new password below"
           footer={footer}
@@ -242,7 +243,7 @@ function ResetPassword({ showToast }) {
           {/* Right side form */}
           <div className="w-1/2 flex flex-col justify-center p-12">
             <AuthCard
-              icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+              icon={<ImHammer2 className="text-3xl text-white"></ImHammer2>}
               title="Reset Password"
               subtitle="Enter your new password below"
               footer={footer}

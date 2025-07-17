@@ -1000,6 +1000,29 @@ const initDatabase = async () => {
       console.log('Added auction_id column to wallet_transactions table');
     }
     
+    // Remove duplicate platform_fee transactions for the same auction_id, keeping only the latest
+    await pool.query(`
+      DELETE FROM wallet_transactions wt1
+      USING wallet_transactions wt2
+      WHERE wt1.id < wt2.id
+        AND wt1.type = 'platform_fee'
+        AND wt2.type = 'platform_fee'
+        AND wt1.auction_id = wt2.auction_id;
+    `);
+    // Add unique partial index for platform_fee on (auction_id)
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_indexes WHERE indexname = 'wallet_transactions_platform_fee_unique_idx'
+        ) THEN
+          CREATE UNIQUE INDEX wallet_transactions_platform_fee_unique_idx
+          ON wallet_transactions(auction_id)
+          WHERE type = 'platform_fee';
+        END IF;
+      END$$;
+    `);
+    
     // Check if stripe_connected_customers table exists
     const connectedCustomersTableCheck = await pool.query(`
       SELECT EXISTS (

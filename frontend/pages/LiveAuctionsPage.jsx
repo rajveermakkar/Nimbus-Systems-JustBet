@@ -3,12 +3,25 @@ import auctionService from '../src/services/auctionService';
 import AuctionCard from '../src/components/auctions/AuctionCard';
 import Button from '../src/components/Button';
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return isMobile;
+}
+
 function LiveAuctionsPage() {
   const [auctions, setAuctions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showInitialLoading, setShowInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const isMobile = useIsMobile();
+  const cardsPerPage = isMobile ? 6 : 12;
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let intervalId;
@@ -33,6 +46,8 @@ function LiveAuctionsPage() {
     a.title.toLowerCase().includes(search.toLowerCase()) ||
     a.description.toLowerCase().includes(search.toLowerCase())
   );
+  const totalPages = Math.ceil(filtered.length / cardsPerPage);
+  const paginated = filtered.slice((page - 1) * cardsPerPage, page * cardsPerPage);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
@@ -62,11 +77,32 @@ function LiveAuctionsPage() {
             </div>
           </div>
         ) : filtered.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {filtered.map(auction => (
-              <AuctionCard key={auction.id} auction={auction} actionLabel="Join Live Auction" />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {paginated.map(auction => (
+                <AuctionCard key={auction.id} auction={auction} actionLabel="Join Live Auction" />
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-4 mt-6">
+                <button
+                  className="px-4 py-2 rounded bg-white/10 text-white disabled:opacity-40"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  Previous
+                </button>
+                <span className="text-white/80 text-sm">Page {page} of {totalPages}</span>
+                <button
+                  className="px-4 py-2 rounded bg-white/10 text-white disabled:opacity-40"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === totalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-gray-400 text-center py-8">No live auctions found.</div>
         )}

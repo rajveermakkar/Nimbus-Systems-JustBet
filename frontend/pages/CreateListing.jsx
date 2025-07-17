@@ -5,6 +5,7 @@ import Toast from "../src/components/Toast";
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
+import { ImHammer2 } from "react-icons/im";
 
 const DEV_MODE = true; // Set to false for production, true for dev/testing
 
@@ -329,7 +330,7 @@ function CreateListing() {
                   }`}
                   onClick={() => setAuctionType("settled")}
                 >
-                  <i className="fas fa-gavel mr-2"></i>
+                  <ImHammer2 className="mr-2" />
                   Settled Auction
                 </button>
               </div>

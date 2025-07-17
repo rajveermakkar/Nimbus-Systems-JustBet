@@ -121,6 +121,17 @@ const auctionService = {
     }
   },
 
+  // Get all closed auctions (public)
+  async getClosedAuctions() {
+    try {
+      const response = await api.get('/auctions/closed');
+      return response.data.auctions;
+    } catch (error) {
+      console.error('Error fetching closed auctions:', error);
+      throw error;
+    }
+  },
+
   // Polling function for settled auctions
   startPolling(callback, interval = 15000) {
     const poll = async () => {

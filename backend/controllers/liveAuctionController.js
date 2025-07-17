@@ -447,6 +447,10 @@ async function placeLiveBid(req, res) {
     if (!auction) {
       return res.status(404).json({ error: 'Live auction not found.' });
     }
+    // Prevent seller from bidding on their own auction
+    if (auction.seller_id === user.id) {
+      return res.status(400).json({ error: 'Sellers cannot bid on their own listings.' });
+    }
     if (auction.status !== 'approved') {
       return res.status(400).json({ error: 'Auction is not open for bidding.' });
     }
