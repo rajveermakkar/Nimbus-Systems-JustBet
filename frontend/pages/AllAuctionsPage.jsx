@@ -3,6 +3,7 @@ import auctionService from '../src/services/auctionService';
 import AuctionCard from '../src/components/auctions/AuctionCard';
 import Button from '../src/components/Button';
 import { useRef } from 'react';
+import AuctionFiltersDropdown from '../src/components/auctions/AuctionFiltersDropdown';
 
 function AllAuctionsPage() {
   const [liveAuctions, setLiveAuctions] = useState([]);
@@ -13,6 +14,7 @@ function AllAuctionsPage() {
   const [search, setSearch] = useState('');
   const searchTimeout = useRef();
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterValues, setFilterValues] = useState({});
 
   // Debounce search input
   useEffect(() => {
@@ -44,14 +46,45 @@ function AllAuctionsPage() {
     return () => clearInterval(intervalId);
   }, []);
 
-  const filteredLive = liveAuctions.filter(a =>
-    a.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-    a.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
-  const filteredSettled = settledAuctions.filter(a =>
-    a.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-    a.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
+  // Helper functions for filter logic
+  const now = new Date();
+  const hoursFromNow = (h) => new Date(now.getTime() + h * 60 * 60 * 1000);
+
+  // Live auctions filtering
+  const filteredLive = liveAuctions.filter(a => {
+    // Search
+    const matchesSearch = a.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      a.description?.toLowerCase().includes(debouncedSearch.toLowerCase());
+    if (!matchesSearch) return false;
+    // Current Price
+    const currentPrice = a.current_highest_bid != null ? a.current_highest_bid : a.starting_price;
+    if (filterValues.minCurrentPrice && currentPrice < Number(filterValues.minCurrentPrice)) return false;
+    if (filterValues.maxCurrentPrice && currentPrice > Number(filterValues.maxCurrentPrice)) return false;
+    // Starting Soon
+    if (filterValues.startingSoon && a.start_time) {
+      const start = new Date(a.start_time);
+      if (!(start > now && start < hoursFromNow(Number(filterValues.startingSoon)))) return false;
+    }
+    // Ending Soon
+    if (filterValues.endingSoon && a.end_time) {
+      const end = new Date(a.end_time);
+      if (!(end > now && end < hoursFromNow(Number(filterValues.endingSoon)))) return false;
+    }
+    return true;
+  });
+
+  // Settled auctions filtering
+  const filteredSettled = settledAuctions.filter(a => {
+    // Search
+    const matchesSearch = a.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      a.description?.toLowerCase().includes(debouncedSearch.toLowerCase());
+    if (!matchesSearch) return false;
+    // Current Price
+    const currentPrice = a.current_highest_bid != null ? a.current_highest_bid : a.starting_price;
+    if (filterValues.minCurrentPrice && currentPrice < Number(filterValues.minCurrentPrice)) return false;
+    if (filterValues.maxCurrentPrice && currentPrice > Number(filterValues.maxCurrentPrice)) return false;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
@@ -72,9 +105,9 @@ function AllAuctionsPage() {
             </div>
           </div>
         ) : (
-          <>
-            {/* Search Bar */}
-            <div className="mb-6 max-w-md mx-auto flex items-center gap-2">
+          <div className="flex-1">
+            {/* Search Bar + Filters Button Row */}
+            <div className="mb-6 max-w-2xl mx-auto flex items-center gap-2 relative">
               <input
                 type="text"
                 value={search}
@@ -93,6 +126,15 @@ function AllAuctionsPage() {
                   ×
                 </button>
               )}
+              {/* Filters Dropdown Button */}
+              <AuctionFiltersDropdown
+                showStartingPrice={true}
+                showEndingPrice={true}
+                showStartingSoon={true}
+                showEndingSoon={true}
+                values={filterValues}
+                onChange={setFilterValues}
+              />
             </div>
             {/* Live Auctions Section */}
             <div className="mb-12">
@@ -139,7 +181,7 @@ function AllAuctionsPage() {
                 <div className="text-gray-400 text-center py-8">No settled auctions right now.</div>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import auctionService from '../src/services/auctionService';
 import AuctionCard from '../src/components/auctions/AuctionCard';
 import Button from '../src/components/Button';
+import AuctionFiltersDropdown from '../src/components/auctions/AuctionFiltersDropdown';
 
 function SettledAuctionsPage() {
   const [auctions, setAuctions] = useState([]);
@@ -9,6 +10,7 @@ function SettledAuctionsPage() {
   const [showInitialLoading, setShowInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [filterValues, setFilterValues] = useState({});
 
   useEffect(() => {
     let intervalId;
@@ -29,23 +31,44 @@ function SettledAuctionsPage() {
     return () => clearInterval(intervalId);
   }, []);
 
-  const filtered = auctions.filter(a =>
-    a.title.toLowerCase().includes(search.toLowerCase()) ||
-    a.description.toLowerCase().includes(search.toLowerCase())
-  );
+  const now = new Date();
+  const hoursFromNow = (h) => new Date(now.getTime() + h * 60 * 60 * 1000);
+
+  const filtered = auctions.filter(a => {
+    const matchesSearch = a.title.toLowerCase().includes(search.toLowerCase()) ||
+      a.description.toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    // Current Price
+    const currentPrice = a.current_highest_bid != null ? a.current_highest_bid : a.starting_price;
+    if (filterValues.minCurrentPrice && currentPrice < Number(filterValues.minCurrentPrice)) return false;
+    if (filterValues.maxCurrentPrice && currentPrice > Number(filterValues.maxCurrentPrice)) return false;
+    // Starting Soon
+    if (filterValues.startingSoon && a.start_time) {
+      const start = new Date(a.start_time);
+      if (!(start > now && start < hoursFromNow(Number(filterValues.startingSoon)))) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-2">Settled Auctions</h1>
         <p className="text-gray-300 mb-8">Browse and bid on traditional settled auctions.</p>
-        <div className="mb-6 max-w-md mx-auto">
+        <div className="mb-6 max-w-2xl mx-auto flex items-center gap-2 relative">
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search settled auctions..."
             className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400"
+          />
+          <AuctionFiltersDropdown
+            showCurrentPrice={true}
+            showStartingSoon={true}
+            showEndingSoon={false}
+            values={filterValues}
+            onChange={setFilterValues}
           />
         </div>
         {error && (
