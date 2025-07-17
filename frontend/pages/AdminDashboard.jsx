@@ -304,25 +304,20 @@ function AdminDashboard() {
   const handleSettledAuctionApproval = async (id, approved, reason) => {
     setActionLoading(true); setActionError(null);
     try {
+      let response;
       if (approved) {
-        await api.patch(`/admin/auctions/settled/${id}/approve`);
+        response = await api.patch(`/admin/auctions/settled/${id}/approve`);
       } else {
-        await api.patch(`/admin/auctions/settled/${id}/reject`, { rejectionReason: reason });
+        response = await api.patch(`/admin/auctions/settled/${id}/reject`, { rejectionReason: reason });
       }
-      
+      console.log('[Admin] Settled auction approval/rejection response:', response.data);
       // Immediately update local state instead of refetching
       setPendingSettledAuctions(prev => prev.filter(auction => auction.id !== id));
-      
       // Also update all auctions if we're in manage-auctions section
       if (section === 'manage-auctions') {
-        setAllSettledAuctions(prev => prev.map(auction => 
-          auction.id === id 
-            ? { ...auction, status: approved ? 'approved' : 'rejected' }
-            : auction
-        ));
+        await fetchAllSettledAuctions();
+        await fetchAllLiveAuctions();
       }
-      
-      // Show success message
       showToast(`Settled auction ${approved ? 'approved' : 'rejected'} successfully!`, 'success');
     } catch (e) {
       setActionError("Failed to update settled auction");
@@ -348,25 +343,20 @@ function AdminDashboard() {
   const handleLiveAuctionApproval = async (id, approved, reason) => {
     setActionLoading(true); setActionError(null);
     try {
+      let response;
       if (approved) {
-        await api.patch(`/admin/auctions/live/${id}/approve`);
+        response = await api.patch(`/admin/auctions/live/${id}/approve`);
       } else {
-        await api.patch(`/admin/auctions/live/${id}/reject`, { rejectionReason: reason });
+        response = await api.patch(`/admin/auctions/live/${id}/reject`, { rejectionReason: reason });
       }
-      
+      console.log('[Admin] Live auction approval/rejection response:', response.data);
       // Immediately update local state instead of refetching
       setPendingLiveAuctions(prev => prev.filter(auction => auction.id !== id));
-      
       // Also update all auctions if we're in manage-auctions section
       if (section === 'manage-auctions') {
-        setAllLiveAuctions(prev => prev.map(auction => 
-          auction.id === id 
-            ? { ...auction, status: approved ? 'approved' : 'rejected' }
-            : auction
-        ));
+        await fetchAllLiveAuctions();
+        await fetchAllSettledAuctions();
       }
-      
-      // Show success message
       showToast(`Live auction ${approved ? 'approved' : 'rejected'} successfully!`, 'success');
     } catch (e) {
       setActionError("Failed to update live auction");
@@ -394,6 +384,7 @@ function AdminDashboard() {
     try {
       const res = await api.get("/admin/auctions/settled/all");
       setAllSettledAuctions(res.data.auctions || []);
+      console.log('[Admin] fetchAllSettledAuctions response:', res.data.auctions);
     } catch (e) {
       setAllSettledError("Failed to load all settled auctions");
     } finally {
@@ -407,6 +398,7 @@ function AdminDashboard() {
     try {
       const res = await api.get("/admin/auctions/live/all");
       setAllLiveAuctions(res.data.auctions || []);
+      console.log('[Admin] fetchAllLiveAuctions response:', res.data.auctions);
     } catch (e) {
       setAllLiveError("Failed to load all live auctions");
     } finally {
