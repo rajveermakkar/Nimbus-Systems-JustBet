@@ -600,7 +600,7 @@ function AuctionPage() {
       }
     } catch (err) {
       console.error('[AuctionPage] Error placing bid:', err);
-      const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Failed to place bid. Please try again.';
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to place bid. Please try again.';
       setBidError(errorMsg);
       setToast({ show: true, message: errorMsg, type: 'error' });
       setPlacingBid(false);

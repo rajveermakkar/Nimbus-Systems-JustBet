@@ -115,7 +115,11 @@ function UserProfile() {
 
   function validate() {
     if (!form.first_name?.trim()) return 'First name is required.';
+    if (form.first_name.length > 30) return 'First name cannot exceed 30 characters.';
+    if (!/^[A-Za-z\s'-]+$/.test(form.first_name)) return "First name can only contain letters, spaces, hyphens, and apostrophes.";
     if (!form.last_name?.trim()) return 'Last name is required.';
+    if (form.last_name.length > 30) return 'Last name cannot exceed 30 characters.';
+    if (!/^[A-Za-z\s'-]+$/.test(form.last_name)) return "Last name can only contain letters, spaces, hyphens, and apostrophes.";
     if (!form.phone?.trim()) return 'Phone number is required.';
     const phoneDigits = form.phone.replace(/\D/g, '');
     if (!/^[0-9+\-()\s]{7,20}$/.test(form.phone.trim()) || phoneDigits.length < 7) {

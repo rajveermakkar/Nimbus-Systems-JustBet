@@ -314,6 +314,10 @@ async function placeBid(req, res) {
     if (!auction) {
       return res.status(404).json({ error: 'Auction not found.' });
     }
+    // Prevent seller from bidding on their own auction
+    if (auction.seller_id === user.id) {
+      return res.status(400).json({ error: 'Sellers cannot bid on their own listings.' });
+    }
 
     // Check if auction is approved and active
     if (auction.status !== 'approved') {

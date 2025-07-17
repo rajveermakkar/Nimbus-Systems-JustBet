@@ -322,6 +322,12 @@ const startServer = async () => {
             socket.emit('bid_error', 'Auction has ended.');
             return;
           }
+          // Prevent seller from bidding on their own auction
+          if (auction.seller_id === socket.user.id) {
+            console.log(`[BID] Seller attempted to bid on own auction. auctionId=${auctionId}, userId=${socket.user.id}`);
+            socket.emit('bid_error', 'Sellers cannot bid on their own listings.');
+            return;
+          }
           // Check if auction has passed its end time
           const now = Date.now();
           const endTime = new Date(auction.end_time).getTime();
