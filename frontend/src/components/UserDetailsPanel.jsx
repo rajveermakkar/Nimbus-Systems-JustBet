@@ -339,6 +339,13 @@ function UserDetailsPanel({ user, onBanUnban, onBack, onAuctionClick, onUserClic
                 </div>
               </div>
             </div>
+            {/* After the seller badges and before the business info, show rejection reason if present */}
+            {user.role === 'seller' && user.seller_rejection_reason && (
+              <div className="mb-2 p-2 rounded bg-red-900/60 text-red-200 font-semibold text-center">
+                <i className="fa-solid fa-circle-exclamation mr-2"></i>
+                Seller Rejection Reason: {user.seller_rejection_reason}
+              </div>
+            )}
             <hr className="border-white/10 my-4" />
             {user.business_name && <div><b>Business:</b> {user.business_name}</div>}
             {user.business_phone && <div><b>Phone:</b> {user.business_phone}</div>}

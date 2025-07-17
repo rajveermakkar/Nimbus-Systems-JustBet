@@ -115,7 +115,7 @@ function AdminDashboard() {
     { key: "dashboard", label: "Dashboard", icon: "fa-tachometer-alt" },
     { key: "manage-users", label: "Manage Users", icon: "fa-users-cog" },
     { key: "manage-auctions", label: "Manage Auctions", icon: "fa-gavel" },
-    { key: "approve-users", label: "Approve Users", icon: "fa-user-check" },
+    { key: "approve-users", label: "Approve Sellers", icon: "fa-user-check" },
     { key: "earnings", label: "Earnings", icon: "fa-dollar-sign" },
     { key: "db-health", label: "DB Health", icon: "fa-database" },
     { key: "activity-logs", label: "Activity Logs", icon: "fa-list-alt" },
@@ -250,10 +250,10 @@ function AdminDashboard() {
   };
 
   // Approve/reject seller
-  const handleSellerApproval = async (userId, approved) => {
+  const handleSellerApproval = async (userId, approved, rejectionReason = null) => {
     setActionLoading(true); setActionError(null);
     try {
-      await api.patch(`/admin/sellers/${userId}/approve`, { approved });
+      await api.patch(`/admin/sellers/${userId}/approve`, { approved, rejectionReason });
       
       // Immediately update local state instead of refetching
       setPendingSellers(prev => prev.filter(seller => seller.id !== userId));
@@ -304,25 +304,20 @@ function AdminDashboard() {
   const handleSettledAuctionApproval = async (id, approved, reason) => {
     setActionLoading(true); setActionError(null);
     try {
+      let response;
       if (approved) {
-        await api.patch(`/admin/auctions/settled/${id}/approve`);
+        response = await api.patch(`/admin/auctions/settled/${id}/approve`);
       } else {
-        await api.patch(`/admin/auctions/settled/${id}/reject`, { rejectionReason: reason });
+        response = await api.patch(`/admin/auctions/settled/${id}/reject`, { rejectionReason: reason });
       }
-      
+      console.log('[Admin] Settled auction approval/rejection response:', response.data);
       // Immediately update local state instead of refetching
       setPendingSettledAuctions(prev => prev.filter(auction => auction.id !== id));
-      
       // Also update all auctions if we're in manage-auctions section
       if (section === 'manage-auctions') {
-        setAllSettledAuctions(prev => prev.map(auction => 
-          auction.id === id 
-            ? { ...auction, status: approved ? 'approved' : 'rejected' }
-            : auction
-        ));
+        await fetchAllSettledAuctions();
+        await fetchAllLiveAuctions();
       }
-      
-      // Show success message
       showToast(`Settled auction ${approved ? 'approved' : 'rejected'} successfully!`, 'success');
     } catch (e) {
       setActionError("Failed to update settled auction");
@@ -348,25 +343,20 @@ function AdminDashboard() {
   const handleLiveAuctionApproval = async (id, approved, reason) => {
     setActionLoading(true); setActionError(null);
     try {
+      let response;
       if (approved) {
-        await api.patch(`/admin/auctions/live/${id}/approve`);
+        response = await api.patch(`/admin/auctions/live/${id}/approve`);
       } else {
-        await api.patch(`/admin/auctions/live/${id}/reject`, { rejectionReason: reason });
+        response = await api.patch(`/admin/auctions/live/${id}/reject`, { rejectionReason: reason });
       }
-      
+      console.log('[Admin] Live auction approval/rejection response:', response.data);
       // Immediately update local state instead of refetching
       setPendingLiveAuctions(prev => prev.filter(auction => auction.id !== id));
-      
       // Also update all auctions if we're in manage-auctions section
       if (section === 'manage-auctions') {
-        setAllLiveAuctions(prev => prev.map(auction => 
-          auction.id === id 
-            ? { ...auction, status: approved ? 'approved' : 'rejected' }
-            : auction
-        ));
+        await fetchAllLiveAuctions();
+        await fetchAllSettledAuctions();
       }
-      
-      // Show success message
       showToast(`Live auction ${approved ? 'approved' : 'rejected'} successfully!`, 'success');
     } catch (e) {
       setActionError("Failed to update live auction");
@@ -394,6 +384,7 @@ function AdminDashboard() {
     try {
       const res = await api.get("/admin/auctions/settled/all");
       setAllSettledAuctions(res.data.auctions || []);
+      console.log('[Admin] fetchAllSettledAuctions response:', res.data.auctions);
     } catch (e) {
       setAllSettledError("Failed to load all settled auctions");
     } finally {
@@ -407,6 +398,7 @@ function AdminDashboard() {
     try {
       const res = await api.get("/admin/auctions/live/all");
       setAllLiveAuctions(res.data.auctions || []);
+      console.log('[Admin] fetchAllLiveAuctions response:', res.data.auctions);
     } catch (e) {
       setAllLiveError("Failed to load all live auctions");
     } finally {
@@ -508,7 +500,10 @@ function AdminDashboard() {
   useEffect(() => {
     // Log section change and what will be fetched
     console.log(`[AdminDashboard] Section changed to: ${section}`);
-    if (section === "dashboard") fetchStats();
+    if (section === "dashboard") {
+      fetchStats();
+      fetchEarnings(); // <-- Added: fetch earnings for dashboard stats
+    }
     if (section === "manage-users") {
       fetchPendingSellers();
       fetchAllUsers();
@@ -742,7 +737,7 @@ function AdminDashboard() {
   };
   const handleSellerRejectConfirm = async () => {
     if (!sellerTarget || !sellerRejectionReason.trim()) return;
-    await handleSellerApproval(sellerTarget.id, false);
+    await handleSellerApproval(sellerTarget.id, false, sellerRejectionReason);
     closeSellerRejectModal();
   };
 
@@ -1062,7 +1057,7 @@ function AdminDashboard() {
         return (
           <div className="flex flex-col flex-1 h-full min-h-0">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">Approve Users</h2>
+              <h2 className="text-2xl font-bold">Approve Sellers</h2>
               <button
                 onClick={fetchPendingSellers}
                 disabled={pendingSellersLoading}
@@ -1081,7 +1076,7 @@ function AdminDashboard() {
                       <th className="w-1/4 text-left px-4 py-2 font-bold text-base">Name</th>
                       <th className="w-1/3 text-left px-4 py-2 font-bold text-base">Email</th>
                       <th className="w-1/6 text-left px-4 py-2 font-bold text-base">Business</th>
-                      <th className="w-32 text-center px-4 py-2 font-bold text-base">Actions</th>
+                      <th className="w-24 text-center px-4 py-2 font-bold text-base">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="text-left text-sm">
@@ -1902,6 +1897,7 @@ function AdminDashboard() {
           confirmText="Reject"
           cancelText="Cancel"
           confirmColor="red"
+          confirmClassName={!sellerRejectionReason.trim() || actionLoading ? 'opacity-50 cursor-not-allowed' : ''}
         />
       )}
 
@@ -1930,6 +1926,7 @@ function AdminDashboard() {
           confirmText="Reject"
           cancelText="Cancel"
           confirmColor="red"
+          confirmClassName={!rejectionReason.trim() || actionLoading ? 'opacity-50 cursor-not-allowed' : ''}
         />
       )}
 

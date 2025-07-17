@@ -88,7 +88,6 @@ function EditListing({ showToast: _showToast }) {
       end_time: fields.endTime,
       starting_price: fields.startingPrice,
       reserve_price: fields.reservePrice,
-      min_bid_increment: fields.minBidIncrement,
       max_participants: fields.maxParticipants,
     };
   }
@@ -317,7 +316,7 @@ function EditListing({ showToast: _showToast }) {
           description,
           imageUrl: finalImageUrl,
           startingPrice,
-          reservePrice,
+          reservePrice: reservePrice || null, // Convert empty string to null
           startTime: finalStartTime,
           endTime: finalEndTime,
           maxParticipants: auctionType === "live" ? 50 : undefined
@@ -352,10 +351,9 @@ function EditListing({ showToast: _showToast }) {
           description,
           image_url: finalImageUrl,
           starting_price: startingPrice,
-          reserve_price: reservePrice,
+          reserve_price: reservePrice || null, // Convert empty string to null
           start_time: finalStartTime,
-          end_time: finalEndTime,
-          min_bid_increment: minBidIncrement
+          end_time: finalEndTime
         };
         const res = await fetch(endpoint, {
           method: "PATCH",

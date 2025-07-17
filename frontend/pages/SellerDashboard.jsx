@@ -763,9 +763,17 @@ function SellerDashboard() {
                           </div>
                           <div className="text-xs mb-3">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(listing.status || (listing.is_approved ? 'approved' : 'pending'))}`}>
-                                {listing.status === 'won' || (listing.status === 'closed' && listing.winner_id) ? 'Sold' : listing.status === 'no_bids' ? 'No Bids' : listing.status === 'reserve_not_met' ? 'Reserve Not Met' : listing.status}
-                              </span>
+                              {listing.status === 'rejected' && listing.rejection_reason ? (
+                                <Tooltip text={listing.rejection_reason}>
+                                  <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-900/60 text-red-200 border border-red-400/30 cursor-pointer hover:bg-red-700/80 transition">
+                                    Rejected
+                                  </span>
+                                </Tooltip>
+                              ) : (
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(listing.status || (listing.is_approved ? 'approved' : 'pending'))}`}>
+                                  {listing.status === 'won' || (listing.status === 'closed' && listing.winner_id) ? 'Sold' : listing.status === 'no_bids' ? 'No Bids' : listing.status === 'reserve_not_met' ? 'Reserve Not Met' : listing.status}
+                                </span>
+                              )}
                             </div>
                             {/* Only show winner info for closed auctions with winners */}
                             {listing.status === 'closed' && listing.winner && (

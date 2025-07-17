@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Button from "../src/components/Button";
 
 function SellerRequestForm({ showToast }) {
   const [form, setForm] = useState({
@@ -86,12 +87,29 @@ function SellerRequestForm({ showToast }) {
     }
   }
 
+  // Add a refresh icon button to the status panels
+  const RefreshButton = ({ onClick, loading }) => (
+    <button
+      onClick={onClick}
+      className="absolute top-4 right-4 text-purple-200 hover:text-purple-400 transition-colors"
+      title="Refresh status"
+      disabled={loading}
+      style={{ fontSize: 20 }}
+    >
+      <i className={`fa-solid fa-sync-alt ${loading ? 'animate-spin' : ''}`}></i>
+    </button>
+  );
+
+  // Only show full-page loading splash on initial load
+  if (loading && status === null) {
+    return <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] backdrop-blur-md"><div className="text-center text-white py-12">Loading...</div></div>;
+  }
   // Show status if already requested
-  if (loading) return <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] backdrop-blur-md"><div className="text-center text-white py-12">Loading...</div></div>;
   if (status && status.status === "approved") {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#000] to-[#2a2a72] backdrop-blur-md">
-        <div className="w-[90%] md:max-w-md md:w-full mx-auto bg-black/30 backdrop-blur-md rounded-2xl p-10 shadow-2xl border-2 border-purple-400 text-white text-center">
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-r from-[#000] to-[#2a2a72] backdrop-blur-md">
+        <div className="relative w-[90%] md:max-w-md md:w-full mx-auto bg-black/30 backdrop-blur-md rounded-2xl p-10 shadow-2xl border-2 border-purple-400 text-white text-center">
+          <RefreshButton onClick={fetchStatus} loading={loading} />
           <h2 className="text-2xl font-bold mb-2 text-white">Seller Approved!</h2>
           <p className="mb-4 text-white/90">Your seller application has been approved.</p>
           <p className="mb-2 text-purple-200 font-semibold">Please logout and log in to access Seller Dashboard.</p>
@@ -99,13 +117,30 @@ function SellerRequestForm({ showToast }) {
       </div>
     );
   }
+  // 1. Show rejection reason if present
+  if (status && status.status === "rejected") {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-r from-[#000] to-[#2a2a72] backdrop-blur-md">
+        <div className="relative w-[90%] md:max-w-md md:w-full mx-auto bg-black/30 backdrop-blur-md rounded-2xl p-10 shadow-2xl border-2 border-purple-400 text-white text-center">
+          <RefreshButton onClick={fetchStatus} loading={loading} />
+          <h2 className="text-2xl font-bold mb-2 text-red-400">Application Rejected</h2>
+          <p className="mb-4 text-white/90">Your seller application was rejected.</p>
+          {status.seller_rejection_reason && (
+            <div className="mb-4 text-red-300 text-sm font-semibold">Reason: {status.seller_rejection_reason}</div>
+          )}
+          <Button variant="secondary" size="default" onClick={() => setStatus(null)} className="mt-2">Request Again</Button>
+        </div>
+      </div>
+    );
+  }
+  // 2. Add refresh button to pending status
   if (status && status.status === "pending") {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#000] to-[#2a2a72] backdrop-blur-md">
-        <div className="w-[90%] md:max-w-md md:w-full mx-auto bg-black/30 backdrop-blur-md rounded-2xl p-10 shadow-2xl border-2 border-purple-400 text-white text-center">
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-r from-[#000] to-[#2a2a72] backdrop-blur-md">
+        <div className="relative w-[90%] md:max-w-md md:w-full mx-auto bg-black/10 backdrop-blur-md rounded-2xl p-10 shadow-2xl border-2 border-purple-400 text-white text-center">
+          <RefreshButton onClick={fetchStatus} loading={loading} />
           <h2 className="text-2xl font-bold mb-2 text-white">Application Pending</h2>
           <p className="mb-4 text-white/90">Your seller application is under review. Please wait for admin approval.</p>
-          <button onClick={fetchStatus} className="text-xs text-purple-200 underline">Refresh Status</button>
         </div>
       </div>
     );
@@ -113,8 +148,8 @@ function SellerRequestForm({ showToast }) {
 
   // Show form if not requested
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] backdrop-blur-md py-2">
-      <div className="w-[90%] py-10 mb-15 md:max-w-md md:w-full mx-auto bg-black/60 backdrop-blur-md rounded-2xl p-10 shadow-2xl border-2 border-purple-400">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-r from-[#000] via-[#2a2a72] to-[#63e] backdrop-blur-md py-2">
+      <div className="w-[90%] py-10 mb-15 md:max-w-md md:w-full mx-auto bg-black/10 backdrop-blur-md rounded-2xl p-10 shadow-2xl border-2 border-purple-400">
         <h2 className="text-2xl font-bold text-white mb-4 text-center">Request to Become a Seller</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

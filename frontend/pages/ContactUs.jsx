@@ -2,11 +2,21 @@ import React, { useEffect, useState } from "react";
 import { useForm, ValidationError } from "@formspree/react";
 import { useNavigate } from "react-router-dom";
 import Button from "../src/components/Button";
+import Toast from "../src/components/Toast";
 
 export default function ContactUs() {
   const [state, handleSubmit] = useForm("mblkreyq");
   const navigate = useNavigate();
   const [openFAQ, setOpenFAQ] = useState(null);
+  const [form, setForm] = useState({ name: '', email: '', message: '' });
+  const [shake, setShake] = useState({ name: false, email: false, message: false });
+  const [errors, setErrors] = useState({});
+  const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
+  const [touched, setTouched] = useState({ name: false, email: false, message: false });
+  // Strict email regex (same as Register.jsx)
+  const emailRegex = /^(?!.*\.\.)(?!\.)([A-Za-z0-9._-]+)(?<!\.)@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}$/;
+  // Name validation regex (same as Register.jsx)
+  const nameRegex = /^[A-Za-z\s'-]+$/;
 
   useEffect(() => {
     if (state.succeeded) {
@@ -48,6 +58,85 @@ export default function ContactUs() {
     setOpenFAQ(openFAQ === index ? null : index);
   };
 
+  function validate() {
+    const newErrors = {};
+    if (!form.name) newErrors.name = 'Name is required';
+    else if (!nameRegex.test(form.name)) newErrors.name = 'Name can only contain letters, spaces, hyphens, and apostrophes';
+    if (!form.email) newErrors.email = 'Email is required';
+    else if (!emailRegex.test(form.email)) newErrors.email = 'Invalid email';
+    if (!form.message) newErrors.message = 'Message is required';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
+
+  function handleInputChange(e) {
+    const { name, value } = e.target;
+    setForm(f => ({ ...f, [name]: value }));
+    // Always set touched.email to true on change for real-time feedback
+    if (name === 'email') {
+      setTouched(t => ({ ...t, email: true }));
+      if (!value) {
+        setErrors(errs => ({ ...errs, email: 'Email is required' }));
+      } else if (!emailRegex.test(value)) {
+        setErrors(errs => ({ ...errs, email: 'Invalid email' }));
+      } else {
+        setErrors(errs => {
+          const { email, ...rest } = errs;
+          return rest;
+        });
+      }
+    } else if (name === 'name') {
+      setTouched(t => ({ ...t, name: true }));
+      if (!value) {
+        setErrors(errs => ({ ...errs, name: 'Name is required' }));
+      } else if (!nameRegex.test(value)) {
+        setErrors(errs => ({ ...errs, name: 'Name can only contain letters, spaces, hyphens, and apostrophes' }));
+      } else {
+        setErrors(errs => {
+          const { name, ...rest } = errs;
+          return rest;
+        });
+      }
+    } else if (name === 'message') {
+      setTouched(t => ({ ...t, message: true }));
+      // Real-time message validation: clear error as soon as user types
+      if (!value) {
+        setErrors(errs => ({ ...errs, message: 'Message is required' }));
+      } else {
+        setErrors(errs => {
+          const { message, ...rest } = errs;
+          return rest;
+        });
+      }
+    }
+  }
+
+  async function handleCustomSubmit(e) {
+    e.preventDefault();
+    setTouched(t => ({ ...t, name: true, email: true, message: true }));
+    const emptyFields = {
+      name: !form.name,
+      email: !form.email,
+      message: !form.message
+    };
+    setShake(emptyFields);
+    setTimeout(() => setShake({ name: false, email: false, message: false }), 500);
+    if (!validate()) {
+      if (!form.message) setToast({ show: true, message: 'Message is required.', type: 'error' });
+      setToast({ show: true, message: 'Please fill all required fields correctly.', type: 'error' });
+      return;
+    }
+    // Use Formspree submission
+    handleSubmit({
+      target: {
+        name: { value: form.name },
+        email: { value: form.email },
+        message: { value: form.message }
+      },
+      preventDefault: () => {},
+    });
+  }
+
   return (
     <div className="min-h-screen w-full flex flex-col bg-gradient-to-r from-[#000000] to-[#2A2A72] justify-center items-center">
       <div className="w-full max-w-7xl mx-auto flex flex-col items-center justify-center py-20 px-4">
@@ -61,39 +150,66 @@ export default function ContactUs() {
                 Thank you for contacting us! We'll get back to you soon.
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="w-full flex flex-col gap-6 items-center">
+              <form onSubmit={handleCustomSubmit} className="w-full flex flex-col gap-6 items-center">
                 <div className="w-full">
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    required
-                    className="w-full px-5 py-4 text-lg rounded-full border border-gray-500 bg-transparent text-white placeholder-gray-400 focus:outline-none focus:border-purple-400 transition"
-                    placeholder="Enter your name"
-                  />
-                  <ValidationError prefix="Name" field="name" errors={state.errors} />
+                  <label className="block text-gray-200 text-xs mb-3 ml-1 text-left" htmlFor="name">Name *</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      id="name"
+                      name="name"
+                      className={`w-full px-5 py-4 text-lg rounded-2xl border bg-transparent text-white placeholder-gray-400 focus:outline-none focus:border-purple-400 transition${(errors.name || shake.name) ? ' border-red-500 pr-10' : ' border-gray-500'}${shake.name ? ' animate-shake' : ''}`}
+                      placeholder="Enter your name"
+                      value={form.name}
+                      onChange={handleInputChange}
+                      onAnimationEnd={() => setShake(s => ({ ...s, name: false }))}
+                    />
+                    {(errors.name || shake.name) && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 opacity-70 pointer-events-none">
+                        <i className="fa-solid fa-circle-exclamation"></i>
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="w-full">
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    required
-                    className="w-full px-5 py-4 text-lg rounded-full border border-gray-500 bg-transparent text-white placeholder-gray-400 focus:outline-none focus:border-purple-400 transition"
-                    placeholder="Enter your email"
-                  />
-                  <ValidationError prefix="Email" field="email" errors={state.errors} />
+                  <label className="block text-gray-200 text-xs mb-3 ml-1 text-left" htmlFor="email">Email *</label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      className={`w-full px-5 py-4 text-lg rounded-2xl border bg-transparent text-white placeholder-gray-400 focus:outline-none focus:border-purple-400 transition${(touched.email && errors.email) ? ' border-red-500 pr-10' : ' border-gray-500'}${shake.email ? ' animate-shake' : ''}`}
+                      placeholder="Enter your email"
+                      value={form.email}
+                      onChange={handleInputChange}
+                      onAnimationEnd={() => setShake(s => ({ ...s, email: false }))}
+                    />
+                    {(touched.email && errors.email) && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 opacity-70 pointer-events-none">
+                        <i className="fa-solid fa-circle-exclamation"></i>
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="w-full">
-                  <textarea
-                    id="message"
-                    name="message"
-                    required
-                    rows={4}
-                    className="w-full px-5 py-4 text-lg rounded-3xl border border-gray-500 bg-transparent text-white placeholder-gray-400 focus:outline-none focus:border-purple-400 transition resize-none"
-                    placeholder="Write your message"
-                  />
-                  <ValidationError prefix="Message" field="message" errors={state.errors} />
+                  <label className="block text-gray-200 text-xs mb-3 ml-1 text-left" htmlFor="message">Message *</label>
+                  <div className="relative">
+                    <textarea
+                      id="message"
+                      name="message"
+                      rows={4}
+                      className={`w-full px-5 py-4 text-lg rounded-2xl border bg-transparent text-white placeholder-gray-400 focus:outline-none focus:border-purple-400 transition resize-none${(errors.message || shake.message) ? ' border-red-500 pr-10' : ' border-gray-500'}${shake.message ? ' animate-shake' : ''}`}
+                      placeholder="Write your message here..."
+                      value={form.message}
+                      onChange={handleInputChange}
+                      onAnimationEnd={() => setShake(s => ({ ...s, message: false }))}
+                    />
+                    {(errors.message || shake.message) && (
+                      <span className="absolute right-3 top-4 text-red-500 opacity-70 pointer-events-none">
+                        <i className="fa-solid fa-circle-exclamation"></i>
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Button
                   type="submit"
@@ -158,6 +274,14 @@ export default function ContactUs() {
           </div>
         </div>
       </div>
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={2500}
+          onClose={() => setToast(t => ({ ...t, show: false }))}
+        />
+      )}
     </div>
   );
 } 

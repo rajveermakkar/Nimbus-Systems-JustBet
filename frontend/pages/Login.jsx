@@ -7,6 +7,8 @@ import { UserContext } from "../src/context/UserContext";
 import Button from "../src/components/Button";
 import ConfirmModal from '../src/components/ConfirmModal';
 import apiService from '../src/services/apiService';
+import Toast from '../src/components/Toast';
+import LoadingSpinner from '../src/components/LoadingSpinner';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -36,7 +38,11 @@ function Login({ showToast }) {
   const [showPassword, setShowPassword] = useState(false);
   const [reactivateModal, setReactivateModal] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
   const [reactivateUser, setReactivateUser] = useState(null);
+  const [shake, setShake] = useState({ email: false, password: false });
+  const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
+  const [showResendVerification, setShowResendVerification] = useState(false);
 
   // On mount, check if user wanted to remember their email
   useEffect(() => {
@@ -69,6 +75,8 @@ function Login({ showToast }) {
       }
       if (user.role === 'admin') {
         navigate('/admin/dashboard');
+      } else if (user.role === 'seller') {
+        navigate('/seller/dashboard');
       } else {
         navigate('/dashboard');
       }
@@ -88,12 +96,16 @@ function Login({ showToast }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setShake({ email: !email, password: !password });
+    setTimeout(() => setShake({ email: false, password: false }), 500);
     if (!validate()) {
-      setErrors({ form: "Email and password are required." });
+      setToast({ show: true, message: "Email and password are required.", type: "error" });
+      setErrors({});
       return;
     }
     if (!email || !password) {
-      setErrors({ form: "Email and password must not be empty." });
+      setToast({ show: true, message: "Email and password must not be empty.", type: "error" });
+      setErrors({});
       return;
     }
     setLoading(true);
@@ -130,6 +142,7 @@ function Login({ showToast }) {
           if (profileRes.ok) {
             const profileData = await profileRes.json();
             console.log('Fetched user profile:', profileData.user);
+            console.log('User role after login:', profileData.user.role);
             const userWithToken = { ...profileData.user, token: data.token };
             // Reactivation check
             if (userWithToken.status === 'inactive' && userWithToken.deletionScheduledAt) {
@@ -152,8 +165,7 @@ function Login({ showToast }) {
                 const statusData = await statusRes.json();
                 const updatedUser = {
                   ...userWithToken,
-                  isApproved: statusData.isApproved,
-                  businessDetails: statusData.businessDetails,
+                  isApproved: statusData.isApproved
                 };
                 setUser(updatedUser);
               } else {
@@ -161,7 +173,7 @@ function Login({ showToast }) {
               }
               setJustLoggedIn(true);
               showToast && showToast(`Login successful! Welcome, ${userWithToken.firstName || 'User'}`, "success");
-              navigate("/dashboard");
+              navigate("/seller/dashboard");
             } else if (profileData.user.role === "admin") {
               setUser(userWithToken);
               setJustLoggedIn(true);
@@ -182,35 +194,52 @@ function Login({ showToast }) {
           showToast && showToast("Login succeeded but failed to fetch user profile.", "error");
         }
       } else {
-        setErrors({ form: data.error || "Login failed" });
-        showToast && showToast(data.error || "Login failed", "error");
+        setToast({ show: true, message: data.error || "Login failed", type: "error" });
+        setErrors({});
+        if ((data.error || '').toLowerCase().includes('verify your email')) {
+          setShowResendVerification(true);
+        } else {
+          setShowResendVerification(false);
+        }
       }
     } catch (error) {
       setLoading(false);
-      setErrors({ form: "Network error. Please try again." });
-      showToast && showToast("Network error. Please try again.", "error");
+      setToast({ show: true, message: "Network error. Please try again.", type: "error" });
+      setErrors({});
+      setShowResendVerification(false);
     }
   };
 
   // Reactivate handler
   async function handleReactivate() {
-    setReactivateLoading(true);
+    setReactivating(true);
     try {
-      const res = await apiService.patch('/api/user/reactivate');
-      const user = { ...reactivateUser, status: 'active', deletionScheduledAt: null };
-      setUser(user);
-      localStorage.setItem('justbetUser', JSON.stringify(user));
+      await apiService.patch('/api/user/reactivate');
+      const data = await apiService.get('/api/user/profile');
+      console.log('Fetched user profile after reactivation:', data);
+      const updatedUser = { ...data, isApproved: data.is_approved, token: localStorage.getItem('justbetToken') };
+      console.log('Updated user after reactivation:', updatedUser);
+      setUser(updatedUser);
+      localStorage.setItem('justbetUser', JSON.stringify(updatedUser));
       setReactivateModal(false);
       showToast && showToast('Account reactivated successfully!', 'success');
-      navigate('/dashboard');
+      // Redirect based on role
+      if (updatedUser.role === 'seller') {
+        navigate('/seller/dashboard');
+      } else if (updatedUser.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setReactivateModal(false);
       setUser(null);
       localStorage.removeItem('justbetUser');
+      localStorage.removeItem('justbetToken');
       showToast && showToast('Failed to reactivate account. Please contact support.', 'error');
       navigate('/login');
     } finally {
-      setReactivateLoading(false);
+      setReactivating(false);
     }
   }
 
@@ -229,7 +258,7 @@ function Login({ showToast }) {
     <form onSubmit={handleSubmit} noValidate className="space-y-4 w-full">
       <input
         type="email"
-        className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-purple-400 text-white placeholder-gray-400 focus:outline-none text-base ${errors.email ? "border-red-500" : ""}`}
+        className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-purple-400 text-white placeholder-gray-400 focus:outline-none text-base${(errors.email || shake.email) ? " border-red-500" : ""}${shake.email ? " animate-shake" : ""}`}
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -237,7 +266,7 @@ function Login({ showToast }) {
       <div className="relative">
         <input
           type={showPassword ? "text" : "password"}
-          className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-purple-400 text-white placeholder-gray-400 focus:outline-none text-base ${errors.password ? "border-red-500" : ""}`}
+          className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-purple-400 text-white placeholder-gray-400 focus:outline-none text-base${(errors.password || shake.password) ? " border-red-500" : ""}${shake.password ? " animate-shake" : ""}`}
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -278,6 +307,19 @@ function Login({ showToast }) {
       >
         {loading ? "Signing In..." : "Sign In"}
       </Button>
+      <div className={`transition-all duration-300 overflow-hidden ${showResendVerification ? 'max-h-20 opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0'}`}
+           style={{ minHeight: showResendVerification ? 32 : 0 }}>
+        {showResendVerification && (
+          <div className="text-center">
+            <a
+              href="/resend-verification"
+              className="text-purple-300 hover:text-[#efe6dd] font-medium"
+            >
+              Resend verification email
+            </a>
+          </div>
+        )}
+      </div>
     </form>
   );
 
@@ -293,23 +335,30 @@ function Login({ showToast }) {
     </div>
   );
 
+  if (reactivating) {
+    return <LoadingSpinner message="Reactivating..." />;
+  }
+
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={2500}
+          onClose={() => setToast(t => ({ ...t, show: false }))}
+        />
+      )}
       {isMobile ? (
         <AuthCard
           icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
           title="Welcome Back"
           subtitle="Sign in to your account"
-          error={errors.form}
+          error={null}
           footer={footer}
           bgClassName="bg-black/30"
           className="max-w-full p-8 mb-28"
         >
-          {errors.form === "Please verify your email first" && (
-            <div className="text-center mb-2">
-              <a href="/resend-verification" className="text-blue-300 hover:underline font-medium">Resend verification email</a>
-            </div>
-          )}
           {form}
         </AuthCard>
       ) : (
@@ -329,15 +378,10 @@ function Login({ showToast }) {
               icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
               title="Welcome Back"
               subtitle="Sign in to your account"
-              error={errors.form}
+              error={null}
               footer={footer}
               plain={true}
             >
-              {errors.form === "Please verify your email first" && (
-                <div className="text-center mb-2">
-                  <a href="/resend-verification" className="text-blue-300 hover:underline font-medium">Resend verification email</a>
-                </div>
-              )}
               {form}
             </AuthCard>
           </div>

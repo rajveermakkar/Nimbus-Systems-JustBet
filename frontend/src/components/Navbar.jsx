@@ -96,7 +96,7 @@ function Navbar() {
           {/* Logo (left) */}
           <Link to="/" className="flex items-center gap-1 select-none">
             <i className="fa-solid fa-gavel text-base text-white"></i>
-            <span className="text-base font-bold text-white tracking-wide">JustBet</span>
+            <span className="text-base font-bold text-white text-xl tracking-wide">JustBet</span>
           </Link>
           {/* Hamburger (right, only on mobile, absolutely positioned) */}
           {!mobileMenuOpen && (
@@ -112,21 +112,21 @@ function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             <Link
               to="/auctions"
-              className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+              className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-sm px-3 py-2 rounded-lg hover:bg-white/10"
             >
               <i className="fa-solid fa-gavel"></i>
               Auctions
             </Link>
             <Link
               to="/about"
-              className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+              className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-sm px-3 py-2 rounded-lg hover:bg-white/10"
             >
               <i className="fa-solid fa-users"></i>
               About
             </Link>
             <Link
               to="/contact"
-              className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+              className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-sm px-3 py-2 rounded-lg hover:bg-white/10"
             >
               <i className="fa-solid fa-envelope"></i>
               Contact
@@ -137,7 +137,7 @@ function Navbar() {
                 {user.role === "seller" ? (
                   <Link
                     to="/seller/dashboard"
-                    className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+                    className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-sm px-3 py-2 rounded-lg hover:bg-white/10"
                   >
                     <i className="fa-solid fa-tachometer-alt"></i>
                     Dashboard
@@ -145,7 +145,7 @@ function Navbar() {
                 ) : (
                   <Link
                     to={user.role === "admin" ? "/admin/dashboard" : "/dashboard"}
-                    className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+                    className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-sm px-3 py-2 rounded-lg hover:bg-white/10"
                   >
                     <i className="fa-solid fa-tachometer-alt"></i>
                     Dashboard
@@ -209,7 +209,7 @@ function Navbar() {
               <>
                 <Link
                   to="/login"
-                  className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-xs px-3 py-2 rounded-lg hover:bg-white/10"
+                  className="flex items-center gap-1 text-white font-medium hover:text-purple-300 transition text-sm px-3 py-2 rounded-lg hover:bg-white/10"
                 >
                   <i className="fa-solid fa-sign-in-alt"></i>
                   Login
@@ -249,10 +249,10 @@ function Navbar() {
         </button>
         {/* Logo centered at top */}
         <div className="w-full flex flex-col items-center mb-4">
-          <div className="flex items-center gap-3 justify-center">
+          <Link to="/" className="flex items-center gap-3 justify-center" onClick={() => setMobileMenuOpen(false)}>
             <i className="fa-solid fa-gavel text-3xl text-white"></i>
             <span className="text-2xl font-extrabold text-white tracking-wide">JustBet</span>
-          </div>
+          </Link>
           {/* User info centered below logo, with divider below */}
           {user && (
             <div className="flex flex-col items-center gap-2 mt-4 mb-2">
@@ -264,33 +264,33 @@ function Navbar() {
           <hr className="w-full border-t border-white/20 mt-2" />
         </div>
         <div className="flex flex-col gap-6 w-full max-w-xs">
-          <Link to="/auctions" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-gavel mr-2"></i>Auctions</Link>
-          <Link to="/about" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-users mr-2"></i>About</Link>
-          <Link to="/contact" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-envelope mr-2"></i>Contact</Link>
+          <Link to="/auctions" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-gavel mr-2"></i>Auctions</Link>
+          <Link to="/about" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-users mr-2"></i>About</Link>
+          <Link to="/contact" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-envelope mr-2"></i>Contact</Link>
           {user && (
             <>
               {/* Dashboard logic based on role */}
               {user.role === "seller" ? (
-                <Link to="/seller/dashboard" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-tachometer-alt mr-2"></i>Dashboard</Link>
+                <Link to="/seller/dashboard" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-tachometer-alt mr-2"></i>Dashboard</Link>
               ) : (
-                <Link to={user.role === "admin" ? "/admin/dashboard" : "/dashboard"} className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-tachometer-alt mr-2"></i>Dashboard</Link>
+                <Link to={user.role === "admin" ? "/admin/dashboard" : "/dashboard"} className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-tachometer-alt mr-2"></i>Dashboard</Link>
               )}
               {/* Wallet always */}
-              <Link to="/wallet" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-wallet mr-2"></i>Wallet</Link>
+              <Link to="/wallet" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-wallet mr-2"></i>Wallet</Link>
               {/* My Profile always */}
-              <button onClick={() => { window.location.href = '/profile'; setMobileMenuOpen(false); }} className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10"><i className="fa-regular fa-user mr-2"></i>My Profile</button>
+              <button onClick={() => { window.location.href = '/profile'; setMobileMenuOpen(false); }} className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10"><i className="fa-regular fa-user mr-2"></i>My Profile</button>
               {/* Buyer Dashboard for sellers only */}
               {user.role === "seller" && (
-                <Link to="/dashboard" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-user mr-2"></i>Buyer Dashboard</Link>
+                <Link to="/dashboard" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-user mr-2"></i>Buyer Dashboard</Link>
               )}
               {/* Logout */}
-              <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="text-red-400 text-lg font-semibold py-2 w-full text-left border-b border-white/10"><i className="fa-solid fa-sign-out-alt mr-2"></i>Logout</button>
+              <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="text-red-400 text-xl font-semibold py-2 w-full text-left border-b border-white/10"><i className="fa-solid fa-sign-out-alt mr-2"></i>Logout</button>
             </>
           )}
           {!user && (
             <>
-              <Link to="/login" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-sign-in-alt mr-2"></i>Login</Link>
-              <Link to="/register" className="text-white text-lg font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-user-plus mr-2"></i>Get Started</Link>
+              <Link to="/login" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-sign-in-alt mr-2"></i>Login</Link>
+              <Link to="/register" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-user-plus mr-2"></i>Get Started</Link>
             </>
           )}
         </div>
