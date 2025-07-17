@@ -230,6 +230,29 @@ const startServer = async () => {
                   time: new Date(bid.created_at).getTime()
                 });
               });
+              // Set timerEnd if auction is open and latest bid is recent
+              const latestBid = existingBids[0]; // assuming sorted DESC by created_at
+              const latestBidTime = new Date(latestBid.created_at).getTime();
+              const countdownDuration = 120000; // 2 minutes in ms
+              const timerEnd = latestBidTime + countdownDuration;
+              const now = Date.now();
+              if (state.status === 'open' && timerEnd > now) {
+                state.timerEnd = timerEnd;
+                // Optionally, set a timer to end the auction if not already set
+                if (!state.timer) {
+                  state.timer = setTimeout(() => {
+                    state.status = 'closed';
+                    state.timer = null;
+                    state.timerEnd = null;
+                    handleAuctionEnd(auctionId);
+                  }, timerEnd - now);
+                  console.log(`[TIMER] Restored timer for auctionId=${auctionId}, ends at ${new Date(timerEnd).toLocaleString()}`);
+                }
+              } else if (state.status === 'open' && timerEnd <= now) {
+                // Timer already expired, close auction
+                liveAuctionState.closeAuction(auctionId);
+                console.log(`[TIMER] Timer already expired for auctionId=${auctionId}, closing auction`);
+              }
             }
           } catch (err) {
             console.error('Error loading existing bids:', err);

@@ -9,11 +9,24 @@ import { faPlus, faPen, faEnvelope, faTrash, faDownload, faFileInvoice, faCertif
 import Modal from '../src/components/Modal';
 import LoadingSpinner from '../src/components/LoadingSpinner';
 import apiService from '../src/services/apiService';
+import Select from 'react-select';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 const CANADA_PROVINCES = [
   "Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador", "Nova Scotia", "Ontario", "Prince Edward Island", "Quebec", "Saskatchewan"
 ];
+const CANADA_CITIES = {
+  "Alberta": ["Calgary", "Edmonton", "Red Deer", "Lethbridge", "St. Albert"],
+  "British Columbia": ["Vancouver", "Victoria", "Surrey", "Burnaby", "Richmond"],
+  "Manitoba": ["Winnipeg", "Brandon", "Steinbach", "Thompson", "Portage la Prairie"],
+  "New Brunswick": ["Moncton", "Saint John", "Fredericton", "Dieppe", "Miramichi"],
+  "Newfoundland and Labrador": ["St. John's", "Mount Pearl", "Corner Brook", "Conception Bay South", "Paradise"],
+  "Nova Scotia": ["Halifax", "Sydney", "Dartmouth", "Truro", "New Glasgow"],
+  "Ontario": ["Toronto", "Ottawa", "Mississauga", "Brampton", "Hamilton"],
+  "Prince Edward Island": ["Charlottetown", "Summerside", "Stratford", "Cornwall", "Montague"],
+  "Quebec": ["Montreal", "Quebec City", "Laval", "Gatineau", "Longueuil"],
+  "Saskatchewan": ["Saskatoon", "Regina", "Prince Albert", "Moose Jaw", "Yorkton"]
+};
 
 const CARD_STYLE = "rounded-2xl shadow-xl bg-white/10 backdrop-blur-lg border border-white/20 max-w-lg w-full";
 
@@ -178,7 +191,7 @@ function WinningPage() {
 
   function validate() {
     if (!form.address?.trim()) return 'Address is required.';
-    if (!form.city?.trim()) return 'City is required.';
+    if (!form.city?.trim() || !CANADA_CITIES[form.province]?.includes(form.city)) return 'Select a valid city.';
     if (!form.province?.trim() || !CANADA_PROVINCES.includes(form.province)) return 'Select a valid province.';
     if (!form.postal_code?.trim()) return 'Postal code is required.';
     if (!/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/i.test(form.postal_code.trim())) {
@@ -498,24 +511,172 @@ function WinningPage() {
                     </button>
                   )}
                   <Modal open={showEditAddress} onClose={() => setShowEditAddress(false)} title={profile && profile.address ? 'Edit Address' : 'Add Address'}>
-                    <div className="bg-black/30 backdrop-blur-lg rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-white/20">
+                    <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center border border-white/20">
                         <form onSubmit={handleSaveAddress} className="space-y-4 w-full animate-fade-in">
                           <div>
                             <label className="block text-xs mb-1 text-left">Address *</label>
                             <input type="text" name="address" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-blue-400 text-base" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Street, Apt, etc." />
                           </div>
                           <div>
-                            <label className="block text-xs mb-1 text-left">City *</label>
-                            <input type="text" name="city" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-blue-400 text-base" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="City" />
+                            <label className="block text-xs mb-1 text-left">Province *</label>
+                            <Select
+                              name="province"
+                              classNamePrefix="react-select"
+                              options={CANADA_PROVINCES.map(p => ({ value: p, label: p }))}
+                              value={form.province ? { value: form.province, label: form.province } : null}
+                              onChange={option => setForm(f => ({ ...f, province: option ? option.value : '', city: '' }))}
+                              placeholder="Select Province"
+                              isClearable
+                              styles={{
+                                control: (base, state) => ({
+                                  ...base,
+                                  backgroundColor: "rgba(255,255,255,0.05)",
+                                  borderColor: state.isFocused ? "#a78bfa" : "#ffffff33",
+                                  boxShadow: "none",
+                                  color: "#fff",
+                                  minHeight: "40px",
+                                  borderRadius: "8px",
+                                  fontSize: "1rem",
+                                  fontFamily: "inherit",
+                                  transition: "border-color 0.2s",
+                                  textAlign: 'left',
+                                }),
+                                valueContainer: (base) => ({
+                                  ...base,
+                                  padding: "0 12px",
+                                  textAlign: 'left',
+                                }),
+                                placeholder: (base) => ({
+                                  ...base,
+                                  color: "#bdb4e6",
+                                  fontSize: "1rem",
+                                  textAlign: 'left',
+                                }),
+                                singleValue: (base) => ({
+                                  ...base,
+                                  color: "#fff",
+                                  fontSize: "1rem",
+                                  textAlign: 'left',
+                                }),
+                                menu: (base) => ({
+                                  ...base,
+                                  backgroundColor: "#2a2a72",
+                                  color: "#fff",
+                                  borderRadius: "8px",
+                                  marginTop: 2,
+                                  fontSize: "1rem",
+                                  textAlign: 'left',
+                                }),
+                                option: (base, state) => ({
+                                  ...base,
+                                  backgroundColor: state.isSelected
+                                    ? "#4f46e5"
+                                    : state.isFocused
+                                    ? "#3730a3"
+                                    : "#2a2a72",
+                                  color: "#fff",
+                                  cursor: "pointer",
+                                  fontSize: "1rem",
+                                  textAlign: 'left',
+                                }),
+                                dropdownIndicator: (base, state) => ({
+                                  ...base,
+                                  color: "#bdb4e6",
+                                  "&:hover": { color: "#fff" }
+                                }),
+                                indicatorSeparator: (base) => ({
+                                  ...base,
+                                  backgroundColor: "#ffffff33"
+                                }),
+                                input: (base) => ({
+                                  ...base,
+                                  color: "#fff",
+                                  fontSize: "1rem",
+                                  textAlign: 'left',
+                                }),
+                              }}
+                            />
                           </div>
                           <div>
-                            <label className="block text-xs mb-1 text-left">Province *</label>
-                            <select name="province" className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-blue-400 text-base" value={form.province} onChange={e => setForm(f => ({ ...f, province: e.target.value }))}>
-                              <option value="">Select Province</option>
-                              {CANADA_PROVINCES.map(p => (
-                                <option key={p} value={p}>{p}</option>
-                              ))}
-                            </select>
+                            <label className="block text-xs mb-1 text-left">City *</label>
+                            <Select
+                              name="city"
+                              classNamePrefix="react-select"
+                              options={form.province && CANADA_CITIES[form.province] ? CANADA_CITIES[form.province].map(c => ({ value: c, label: c })) : []}
+                              value={form.city ? { value: form.city, label: form.city } : null}
+                              onChange={option => setForm(f => ({ ...f, city: option ? option.value : '' }))}
+                              placeholder={form.province ? 'Select City' : 'Select Province First'}
+                              isDisabled={!form.province}
+                              isClearable
+                              styles={{
+                                control: (base, state) => ({
+                                  ...base,
+                                  backgroundColor: "rgba(255,255,255,0.05)",
+                                  borderColor: state.isFocused ? "#a78bfa" : "#ffffff33",
+                                  boxShadow: "none",
+                                  color: "#fff",
+                                  minHeight: "40px",
+                                  borderRadius: "8px",
+                                  fontSize: "1rem",
+                                  fontFamily: "inherit",
+                                  transition: "border-color 0.2s",
+                                  textAlign: 'left',
+                                }),
+                                valueContainer: (base) => ({
+                                  ...base,
+                                  padding: "0 12px",
+                                  textAlign: 'left',
+                                }),
+                                placeholder: (base) => ({
+                                  ...base,
+                                  color: "#bdb4e6",
+                                  fontSize: "1rem",
+                                  textAlign: 'left',
+                                }),
+                                singleValue: (base) => ({
+                                  ...base,
+                                  color: "#fff",
+                                  fontSize: "1rem",
+                                  textAlign: 'left',
+                                }),
+                                menu: (base) => ({
+                                  ...base,
+                                  backgroundColor: "#2a2a72",
+                                  color: "#fff",
+                                  borderRadius: "8px",
+                                  marginTop: 2,
+                                  fontSize: "1rem",
+                                  textAlign: 'left',
+                                }),
+                                option: (base, state) => ({
+                                  ...base,
+                                  backgroundColor: state.isSelected
+                                    ? "#4f46e5"
+                                    : state.isFocused
+                                    ? "#3730a3"
+                                    : "#2a2a72",
+                                  color: "#fff",
+                                  cursor: "pointer",
+                                  fontSize: "1rem",
+                                  textAlign: 'left',
+                                }),
+                                dropdownIndicator: (base, state) => ({
+                                  ...base,
+                                  color: "#bdb4e6",
+                                  "&:hover": { color: "#fff" }
+                                }),
+                                indicatorSeparator: (base) => ({
+                                  ...base,
+                                  backgroundColor: "#ffffff33"
+                                }),
+                                input: (base) => ({
+                                  ...base,
+                                  color: "#fff",
+                                  fontSize: "1rem",
+                                  textAlign: 'left',
+                                }),
+                              }}
+                            />
                           </div>
                           <div>
                             <label className="block text-xs mb-1 text-left">Postal Code *</label>
@@ -534,9 +695,9 @@ function WinningPage() {
                   </Modal>
                   <Button
                     type="button"
-                    className="w-full mt-6"
-                    disabled={!(form.address && form.city && form.province && form.postal_code && !showEditAddress)}
-                    onClick={handleSubmit}
+                    className={`w-full mt-6 ${!(profile && profile.address) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!(profile && profile.address)}
+                    onClick={!(profile && profile.address) ? () => setToast({ show: true, message: 'Please add a shipping address', type: 'error' }) : handleSubmit}
                   >
                     Claim Order
                   </Button>

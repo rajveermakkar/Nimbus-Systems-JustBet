@@ -320,6 +320,9 @@ function AuctionPage() {
                   current_highest_bidder_id: currentId,
                 };
               });
+              if (data.timerEnd) {
+                setLiveBidTimerEnd(data.timerEnd);
+              }
             } else if (data.type === 'bid-update') {
               if (data.bids && Array.isArray(data.bids)) {
                 // Sort bids properly
