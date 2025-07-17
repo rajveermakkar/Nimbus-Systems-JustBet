@@ -95,6 +95,9 @@ function SellerDashboard() {
   const [sellerEarnings, setSellerEarnings] = useState(null);
   const tabRefs = useRef([]);
   const mobileTabRefs = useRef([]);
+  const [search, setSearch] = useState('');
+  const searchTimeout = useRef();
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -406,6 +409,13 @@ function SellerDashboard() {
     }
   };
 
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(searchTimeout.current);
+  }, [search]);
+
   // Helper function for LIVE_NOW
   function isLiveNow(listing) {
     return (
@@ -429,6 +439,11 @@ function SellerDashboard() {
       </div>
     );
   }
+
+  const filteredListings = listings.filter(listing =>
+    listing.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    listing.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
+  );
 
   return (
     <>
@@ -735,8 +750,37 @@ function SellerDashboard() {
                     </Button>
                   </div>
                 ) : (
+                  <div className="mb-4 max-w-md mx-auto flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Search your listings..."
+                      aria-label="Search listings"
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:outline-none bg-white/10 text-white placeholder-gray-400 transition"
+                    />
+                    {search && (
+                      <button
+                        type="button"
+                        onClick={() => setSearch('')}
+                        className="ml-2 px-2 py-1 rounded text-gray-300 hover:text-white focus:outline-none"
+                        aria-label="Clear search"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {filteredListings.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="text-6xl mb-4">📝</div>
+                    <h3 className="text-xl font-semibold mb-2">No Listings Found</h3>
+                    <p className="text-gray-400">No listings match your search criteria.</p>
+                  </div>
+                ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {listings
+                    {filteredListings
                       .filter(listing => listing.status !== 'closed')
                       .map((listing, idx) => (
                         <div key={`${listing.auction_type || 'listing'}-${listing.id}-${idx}`} className="bg-white/5 rounded-lg p-4 border border-white/20 relative">
