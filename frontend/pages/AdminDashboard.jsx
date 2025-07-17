@@ -500,7 +500,10 @@ function AdminDashboard() {
   useEffect(() => {
     // Log section change and what will be fetched
     console.log(`[AdminDashboard] Section changed to: ${section}`);
-    if (section === "dashboard") fetchStats();
+    if (section === "dashboard") {
+      fetchStats();
+      fetchEarnings(); // <-- Added: fetch earnings for dashboard stats
+    }
     if (section === "manage-users") {
       fetchPendingSellers();
       fetchAllUsers();

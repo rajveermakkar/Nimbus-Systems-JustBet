@@ -304,10 +304,23 @@ const User = {
 
   // Reactivate user (set status to 'active' and clear deletionScheduledAt)
   async reactivate(userId) {
-    const query = `
-      UPDATE users SET status = 'active', deletionScheduledAt = NULL WHERE id = $1 RETURNING *
-    `;
-    const result = await queryWithRetry(query, [userId]);
+    // First, get the user to check their role
+    const user = await this.findById(userId);
+    if (!user) throw new Error('User not found');
+    let query, params;
+    if (user.role === 'seller') {
+      // For sellers, also set is_approved to true
+      query = `
+        UPDATE users SET status = 'active', deletionScheduledAt = NULL, is_approved = true WHERE id = $1 RETURNING *
+      `;
+      params = [userId];
+    } else {
+      query = `
+        UPDATE users SET status = 'active', deletionScheduledAt = NULL WHERE id = $1 RETURNING *
+      `;
+      params = [userId];
+    }
+    const result = await queryWithRetry(query, params);
     return result.rows[0];
   }
 };

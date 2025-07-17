@@ -7,6 +7,7 @@ import apiService from '../src/services/apiService';
 import { UserContext } from "../src/context/UserContext";
 import axios from 'axios';
 import Select from 'react-select';
+import LoadingSpinner from '../src/components/LoadingSpinner';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -58,6 +59,7 @@ function UserProfile() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { setUser } = useContext(UserContext);
+  const [reactivating, setReactivating] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -69,8 +71,8 @@ function UserProfile() {
     setError('');
     try {
       const data = await apiService.get('/api/user/profile');
-      setProfile(data);
-      setForm({ ...data });
+      setProfile(data); // use the flat object
+      setForm({ ...data }); // use the flat object
     } catch (err) {
       setError('Failed to load profile data');
       setToast({ show: true, message: 'Failed to load profile data', type: 'error' });
@@ -184,6 +186,30 @@ function UserProfile() {
     }
   }
 
+  async function handleReactivateAccount() {
+    setReactivating(true);
+    setError('');
+    try {
+      await apiService.patch('/api/user/reactivate');
+      // Fetch latest profile after reactivation
+      const data = await apiService.get('/api/user/profile');
+      // Normalize is_approved to isApproved for context
+      const updatedUser = { ...data.user, isApproved: data.user.is_approved };
+      if (setUser) setUser(updatedUser);
+      localStorage.setItem('justbetUser', JSON.stringify(updatedUser));
+      // Redirect based on role
+      if (updatedUser.role === 'seller') {
+        window.location.href = '/seller/dashboard';
+      } else {
+        window.location.href = '/user/dashboard';
+      }
+    } catch (err) {
+      setError('Failed to reactivate account');
+      setToast({ show: true, message: 'Failed to reactivate account', type: 'error' });
+      setReactivating(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
@@ -193,6 +219,14 @@ function UserProfile() {
         </div>
       </div>
     );
+  }
+
+  if (reactivating) {
+    return <LoadingSpinner message="Reactivating..." />;
+  }
+
+  if (deleting) {
+    return <LoadingSpinner message="Deleting account..." />;
   }
 
   // Custom react-select styles (from CreateListing.jsx)
@@ -332,21 +366,26 @@ function UserProfile() {
           </form>
         </div>
         {/* Delete Account Confirmation Modal */}
+        {console.log('Profile in ConfirmModal:', profile)}
         {showDeleteModal && (
           <ConfirmModal
             open={showDeleteModal}
             title="Delete Account"
             message={
               <div>
-                <p className="mb-2">Are you sure you want to delete your account?</p>
-                <p className="text-red-300 text-sm mb-2">Your account will be scheduled for deletion in 30 days. You can reactivate by logging in before then. After 30 days, your account will be permanently deleted.</p>
-                <p className="text-yellow-200 text-xs">This action is reversible until the scheduled deletion date.</p>
+                <div className="mb-4">Are you sure you want to delete your account?</div>
+                {profile?.role === 'seller' && (
+                  <div className="mb-2 text-yellow-400 font-semibold">
+                    Note: All your auctions will be closed right now.
+                  </div>
+                )}
+                <div className="text-gray-300 text-sm">This action cannot be undone. You can reactivate your account within 30 days.</div>
               </div>
             }
             onCancel={() => setShowDeleteModal(false)}
             onConfirm={handleDeleteAccount}
             loading={deleting}
-            confirmText="Yes, Delete My Account"
+            confirmText="Delete"
             cancelText="Cancel"
             confirmColor="red"
           />

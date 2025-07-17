@@ -8,6 +8,7 @@ import Button from "../src/components/Button";
 import ConfirmModal from '../src/components/ConfirmModal';
 import apiService from '../src/services/apiService';
 import Toast from '../src/components/Toast';
+import LoadingSpinner from '../src/components/LoadingSpinner';
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -37,6 +38,7 @@ function Login({ showToast }) {
   const [showPassword, setShowPassword] = useState(false);
   const [reactivateModal, setReactivateModal] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
   const [reactivateUser, setReactivateUser] = useState(null);
   const [shake, setShake] = useState({ email: false, password: false });
   const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
@@ -210,23 +212,34 @@ function Login({ showToast }) {
 
   // Reactivate handler
   async function handleReactivate() {
-    setReactivateLoading(true);
+    setReactivating(true);
     try {
-      const res = await apiService.patch('/api/user/reactivate');
-      const user = { ...reactivateUser, status: 'active', deletionScheduledAt: null };
-      setUser(user);
-      localStorage.setItem('justbetUser', JSON.stringify(user));
+      await apiService.patch('/api/user/reactivate');
+      const data = await apiService.get('/api/user/profile');
+      console.log('Fetched user profile after reactivation:', data);
+      const updatedUser = { ...data, isApproved: data.is_approved, token: localStorage.getItem('justbetToken') };
+      console.log('Updated user after reactivation:', updatedUser);
+      setUser(updatedUser);
+      localStorage.setItem('justbetUser', JSON.stringify(updatedUser));
       setReactivateModal(false);
       showToast && showToast('Account reactivated successfully!', 'success');
-      navigate('/dashboard');
+      // Redirect based on role
+      if (updatedUser.role === 'seller') {
+        navigate('/seller/dashboard');
+      } else if (updatedUser.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setReactivateModal(false);
       setUser(null);
       localStorage.removeItem('justbetUser');
+      localStorage.removeItem('justbetToken');
       showToast && showToast('Failed to reactivate account. Please contact support.', 'error');
       navigate('/login');
     } finally {
-      setReactivateLoading(false);
+      setReactivating(false);
     }
   }
 
@@ -321,6 +334,10 @@ function Login({ showToast }) {
       </Link>
     </div>
   );
+
+  if (reactivating) {
+    return <LoadingSpinner message="Reactivating..." />;
+  }
 
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">

@@ -3,6 +3,10 @@ const router = express.Router();
 const { pool } = require('../db/init');
 const jwtauthMiddleware = require('../middleware/jwtauth');
 const User = require('../models/User');
+const LiveAuction = require('../models/LiveAuction');
+const SettledAuction = require('../models/SettledAuction');
+const LiveAuctionResult = require('../models/LiveAuctionResult');
+const SettledAuctionResult = require('../models/SettledAuctionResult');
 
 // Middleware: require authentication (assume req.user.id is set)
 function requireAuth(req, res, next) {
@@ -17,7 +21,7 @@ router.get('/profile', jwtauthMiddleware, requireAuth, async (req, res) => {
   try {
     // Get basic user info
     const userResult = await pool.query(
-      'SELECT id, first_name, last_name, email FROM users WHERE id = $1',
+      'SELECT id, first_name, last_name, email,role, is_approved, status FROM users WHERE id = $1',
       [req.user.id]
     );
     if (userResult.rows.length === 0) {
@@ -89,6 +93,25 @@ router.patch('/schedule-deletion', jwtauthMiddleware, requireAuth, async (req, r
     const gracePeriodDays = parseInt(process.env.ACCOUNT_DELETION_GRACE_DAYS, 10) || 30;
     const scheduledAt = new Date(Date.now() + gracePeriodDays * 24 * 60 * 60 * 1000);
     const user = await User.scheduleDeletion(req.user.id, scheduledAt);
+
+    // Finalize all active auctions for sellers
+    if (user.role === 'seller') {
+      // Finalize all active live auctions
+      const liveAuctions = await LiveAuction.findBySeller(req.user.id);
+      for (const auction of liveAuctions) {
+        if (auction.status !== 'closed') {
+          await LiveAuctionResult.finalizeAuction(auction.id);
+        }
+      }
+      // Finalize all active settled auctions
+      const settledAuctions = await SettledAuction.findBySeller(req.user.id);
+      for (const auction of settledAuctions) {
+        if (auction.status !== 'closed') {
+          await SettledAuctionResult.finalizeAuction(auction.id);
+        }
+      }
+    }
+
     res.json({
       message: `Account scheduled for deletion in ${gracePeriodDays} days.`,
       status: user.status,
