@@ -8,6 +8,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearchDollar, faFileInvoice, faBullseye } from "@fortawesome/free-solid-svg-icons";
 import { UserContext } from "../src/context/UserContext";
 import auctionComingImg from "./assets/Home/auctionComing.png";
+import { FaMobile } from "react-icons/fa";
+import { FaCircleDollarToSlot } from "react-icons/fa6";
+import { MdOutlinePayment } from "react-icons/md";
 
 function AnimatedNumber({ value, duration = 1200 }) {
   const [display, setDisplay] = useState(0);
@@ -185,7 +188,7 @@ export default function Home() {
           {/* Step 1 */}
           <div className="bg-white/5 rounded-2xl flex flex-col items-center p-8 shadow-md">
             <div className="bg-gradient-to-br from-purple-400 to-blue-500 rounded-full w-20 h-20 flex items-center justify-center mb-4">
-              <FontAwesomeIcon icon={faBullseye} className="text-white text-3xl" />
+              <FaMobile className="text-white text-3xl" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">Select the product</h3>
             <p className="text-gray-300 mb-4">Browse and choose the item you want to bid on from our live and settled auctions.</p>
@@ -194,7 +197,7 @@ export default function Home() {
           {/* Step 2 */}
           <div className="bg-white/5 rounded-2xl flex flex-col items-center p-8 shadow-md">
             <div className="bg-gradient-to-br from-purple-400 to-blue-500 rounded-full w-20 h-20 flex items-center justify-center mb-4">
-              <FontAwesomeIcon icon={faSearchDollar} className="text-white text-3xl" />
+              <FaCircleDollarToSlot className="text-white text-3xl" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">Bid amount</h3>
             <p className="text-gray-300 mb-4">Enter your bid and compete with others in real time. The highest bid wins!</p>
@@ -203,7 +206,7 @@ export default function Home() {
           {/* Step 3 */}
           <div className="bg-white/5 rounded-2xl flex flex-col items-center p-8 shadow-md">
             <div className="bg-gradient-to-br from-purple-400 to-blue-500 rounded-full w-20 h-20 flex items-center justify-center mb-4">
-              <FontAwesomeIcon icon={faFileInvoice} className="text-white text-3xl" />
+              <MdOutlinePayment className="text-white text-3xl" />
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">Pay the amount</h3>
             <p className="text-gray-300 mb-4">The amount is automatically deducted from winner's wallet. No manual payment needed!</p>

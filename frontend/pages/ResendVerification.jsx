@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AuthCard from "../src/components/AuthCard";
 import Button from "../src/components/Button";
 import Toast from "../src/components/Toast";
+import { ImHammer2 } from "react-icons/im";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -115,7 +116,7 @@ function ResendVerification() {
       )}
       <div className="w-full max-w-md bg-black/30 backdrop-blur-[16px] text-white shadow-2xl rounded-2xl border border-white/10 flex flex-col items-center p-8" style={{boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'}}>
         <div className="flex flex-col items-center gap-2 mb-6 select-none">
-          <i className="fa-solid fa-gavel text-3xl text-white drop-shadow-lg"></i>
+          <ImHammer2 className="text-3xl text-white drop-shadow-lg"></ImHammer2>
           <span className="text-2xl font-bold text-white tracking-wide drop-shadow-lg">JustBet</span>
         </div>
         <h2 className="text-2xl font-bold text-white text-center mb-2 drop-shadow-lg">Resend Verification Email</h2>

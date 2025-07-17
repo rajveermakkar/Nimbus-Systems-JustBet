@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { ImHammer2 } from "react-icons/im";
 
 const faqs = [
   {
@@ -35,7 +36,7 @@ export default function Footer() {
           {/* Logo/Brand */}
           <div className="flex-shrink-0 flex items-center justify-center md:justify-start md:items-start mb-8 md:mb-0 w-full md:w-auto">
             <Link to="/" className="flex items-center">
-              <i className="fa-solid fa-gavel text-2xl md:text-3xl text-[#adbdff] mr-2"></i>
+              <ImHammer2 className="text-4xl md:text-3xl text-[#adbdff] mr-2" />
               <span className="text-3xl md:text-4xl font-extrabold text-[#adbdff] tracking-wide select-none">JustBet</span>
             </Link>
           </div>

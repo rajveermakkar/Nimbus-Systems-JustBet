@@ -9,6 +9,7 @@ import ConfirmModal from '../src/components/ConfirmModal';
 import apiService from '../src/services/apiService';
 import Toast from '../src/components/Toast';
 import LoadingSpinner from '../src/components/LoadingSpinner';
+import { ImHammer2 } from "react-icons/im";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -366,7 +367,7 @@ function Login({ showToast }) {
       )}
       {isMobile ? (
         <AuthCard
-          icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+          icon={<ImHammer2 className="text-3xl text-white"></ImHammer2>}
           title="Welcome Back"
           subtitle="Sign in to your account"
           error={null}
@@ -390,7 +391,7 @@ function Login({ showToast }) {
           {/* Right side form */}
           <div className="w-1/2 flex flex-col justify-center py-8 px-8">
             <AuthCard
-              icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+              icon={<ImHammer2 className="text-3xl text-white"></ImHammer2>}
               title="Welcome Back"
               subtitle="Sign in to your account"
               error={null}

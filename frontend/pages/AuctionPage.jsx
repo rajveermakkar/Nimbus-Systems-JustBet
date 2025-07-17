@@ -8,6 +8,7 @@ import Button from '../src/components/Button';
 import Toast from '../src/components/Toast';
 import WinnerDeclaration from '../src/components/WinnerDeclaration';
 import EndpointSVG from './assets/Endpoint-amico.svg';
+import { ImHammer2 } from "react-icons/im";
 
 function AuctionPage() {
   const { id, type } = useParams();
@@ -925,7 +926,7 @@ function AuctionPage() {
                   
                   {recentBids.length === 0 ? (
                     <div className="text-center text-gray-400 py-8">
-                      <i className="fas fa-gavel text-3xl mb-2"></i>
+                      <ImHammer2 className="text-3xl mb-2" />
                       <p className="text-sm">No live bids yet</p>
                       <p className="text-xs">Be the first to place a bid!</p>
                     </div>
