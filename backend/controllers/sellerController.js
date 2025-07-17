@@ -24,6 +24,32 @@ const sellerController = {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      // Allow reapply if user is seller and not approved
+      if (user.role === 'seller' && user.is_approved === false) {
+        // Allow reapply: update business info and clear rejection reason
+        const businessDetails = {
+          businessName,
+          businessDescription,
+          businessAddress,
+          businessPhone
+        };
+        const updatedUser = await User.updateRoleAndApproval(userId, 'seller', false, businessDetails, null);
+        const token = generateToken(updatedUser);
+        return res.json({
+          message: 'Seller role request resubmitted successfully. Waiting for admin approval.',
+          user: {
+            ...updatedUser,
+            businessDetails: {
+              businessName: updatedUser.business_name,
+              businessDescription: updatedUser.business_description,
+              businessAddress: updatedUser.business_address,
+              businessPhone: updatedUser.business_phone
+            }
+          },
+          token
+        });
+      }
+
       // Check if user is already a seller
       if (user.role === 'seller') {
         return res.status(400).json({ error: 'User is already a seller' });

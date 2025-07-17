@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import apiService from '../src/services/apiService';
 import { UserContext } from "../src/context/UserContext";
 import axios from 'axios';
+import Select from 'react-select';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -194,6 +195,35 @@ function UserProfile() {
     );
   }
 
+  // Custom react-select styles (from CreateListing.jsx)
+  const selectStyles = {
+    control: (base, state) => ({
+      ...base,
+      backgroundColor: 'rgba(255,255,255,0.05)',
+      borderColor: state.isFocused ? '#a78bfa' : '#ffffff33',
+      boxShadow: 'none',
+      color: '#fff',
+      minHeight: '40px',
+      borderRadius: '8px',
+      fontSize: '1rem',
+      fontFamily: 'inherit',
+      transition: 'border-color 0.2s',
+    }),
+    singleValue: (base) => ({ ...base, color: '#fff' }),
+    menu: (base) => ({ ...base, background: '#2a2a72', color: '#fff' }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? '#4f46e5' // blue for selected
+        : state.isFocused
+        ? '#3730a3' // darker blue for focused
+        : '#2a2a72', // default background
+      color: '#fff',
+      cursor: 'pointer',
+      fontSize: '1rem'
+    }),
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white py-8">
       <button
@@ -255,32 +285,30 @@ function UserProfile() {
                 </div>
                 <div>
                   <label className="block text-xs mb-1 text-left">Province *</label>
-                  <select
+                  <Select
                     name="state"
-                    className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white focus:outline-none focus:border-blue-400 text-sm"
-                    value={form.state || ''}
-                    onChange={e => setForm(f => ({ ...f, state: e.target.value, city: '' }))}
-                  >
-                    <option value="">Select Province</option>
-                    {states.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                    classNamePrefix="react-select"
+                    options={states.map(s => ({ value: s, label: s }))}
+                    value={form.state ? { value: form.state, label: form.state } : null}
+                    onChange={option => setForm(f => ({ ...f, state: option ? option.value : '', city: '' }))}
+                    placeholder="Select Province"
+                    isClearable
+                    styles={selectStyles}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs mb-1 text-left">City *</label>
-                  <select
+                  <Select
                     name="city"
-                    className="w-full px-3 py-2 rounded bg-transparent border border-white/20 text-white focus:outline-none focus:border-blue-400 text-sm"
-                    value={form.city || ''}
-                    onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-                    disabled={!form.state}
-                  >
-                    <option value="">{form.state ? 'Select City' : 'Select Province First'}</option>
-                    {cities.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                    classNamePrefix="react-select"
+                    options={cities.map(c => ({ value: c, label: c }))}
+                    value={form.city ? { value: form.city, label: form.city } : null}
+                    onChange={option => setForm(f => ({ ...f, city: option ? option.value : '' }))}
+                    placeholder={form.state ? 'Select City' : 'Select Province First'}
+                    isDisabled={!form.state}
+                    isClearable
+                    styles={selectStyles}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs mb-1 text-left">Postal Code *</label>

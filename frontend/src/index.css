@@ -2,5 +2,19 @@
 
 body, #root {
     min-height: 100vh;
-    background-image: linear-gradient(to right in oklab, #000 0%, #2a2a72 90%);
+    background-image: linear-gradient(to right in oklab, #000 0%, #2a2a72 100%);
   }
+
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-8px); }
+  40%, 60% { transform: translateX(8px); }
+}
+.animate-shake {
+  animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+a, button, [role="button"], [tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+}

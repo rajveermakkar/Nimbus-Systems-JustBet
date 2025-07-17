@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import formImage from "./assets/forgot-password.png";
 import AuthCard from "../src/components/AuthCard";
+import Button from "../src/components/Button";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -21,6 +22,7 @@ function ForgotPassword({ showToast }) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [inputShake, setInputShake] = useState(false);
   const isMobile = useIsMobile();
 
   const validate = () => {
@@ -34,7 +36,11 @@ function ForgotPassword({ showToast }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      if (!email) setInputShake(true);
+      setTimeout(() => setInputShake(false), 500);
+      return;
+    }
     setLoading(true);
     setErrors({});
     setSuccessMsg("");
@@ -51,37 +57,49 @@ function ForgotPassword({ showToast }) {
         setSuccessMsg("");
         showToast && showToast("Reset link has been sent to your email!", "success");
       } else {
-        setErrors({ form: data.error || data.message || "Failed to send reset link" });
-        showToast && showToast(data.error || data.message || "Failed to send reset link", "error");
+        // Show toast only, no inline error
+        if ((data.error || data.message || "").toLowerCase().includes("user not found")) {
+          showToast && showToast("User not exist with this email", "error");
+        } else {
+          showToast && showToast(data.error || data.message || "Failed to send reset link", "error");
+        }
       }
     } catch (err) {
       setLoading(false);
-      setErrors({ form: "Network error. Please try again." });
       showToast && showToast("Network error. Please try again.", "error");
     }
   };
 
   const form = !isSubmitted ? (
     <form onSubmit={handleSubmit} noValidate className="space-y-4 w-full mt-2">
-      <input
-        type="email"
-        className={`w-full px-3 py-2 rounded bg-transparent border-2 border-gray-400 focus:border-blue-500 text-white placeholder-gray-400 focus:outline-none text-base ${errors.email ? "border-red-500" : ""}`}
-        placeholder="Email address"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        disabled={loading}
-        autoComplete="email"
-      />
-      {errors.email && (
-        <p className="text-xs text-red-400 mt-1">{errors.email}</p>
-      )}
-      <button
+      <div className="relative w-full">
+        <input
+          type="email"
+          className={`w-full px-3 py-2 rounded bg-transparent border-2 ${(errors.email || inputShake) ? "border-red-500 placeholder-red-400" : "border-gray-400 focus:border-purple-400"} text-white placeholder-gray-400 focus:outline-none text-base pr-10${inputShake ? ' animate-shake' : ''}`}
+          placeholder={errors.email ? "Email Required" : "Email address"}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={loading}
+          autoComplete="email"
+          aria-invalid={!!errors.email}
+          aria-describedby="email-error"
+          onAnimationEnd={e => setInputShake(false)}
+        />
+        {(errors.email || inputShake) && (
+          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-red-500 opacity-60 pointer-events-none${inputShake ? ' animate-shake' : ''}`}>
+            <i className="fa-solid fa-circle-exclamation"></i>
+          </span>
+        )}
+        {/* No error message below input */}
+      </div>
+      <Button
         type="submit"
-        className="w-full py-2 mt-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
+        variant="primary"
+        className="w-full py-2 mt-2 rounded-lg font-semibold text-base text-white shadow-md transition-all duration-200"
         disabled={loading}
       >
         {loading ? "Sending..." : "Send Reset Link"}
-      </button>
+      </Button>
     </form>
   ) : null;
 
@@ -89,7 +107,7 @@ function ForgotPassword({ showToast }) {
     <div className="text-center mt-4">
       <Link
         to="/login"
-        className="text-blue-300 hover:text-blue-400 font-semibold underline transition"
+        className="text-purple-300 hover:text-purple-700 font-semibold underline transition"
       >
         Back to Login
       </Link>
@@ -103,7 +121,7 @@ function ForgotPassword({ showToast }) {
         Remember your password?{' '}
         <Link
           to="/login"
-          className="text-blue-300 hover:underline font-medium"
+          className="text-purple-300 font-medium hover:text-[#efe6dd] no-underline"
         >
           Sign in
         </Link>
@@ -125,7 +143,7 @@ function ForgotPassword({ showToast }) {
           {form}
         </AuthCard>
       ) : (
-        <div className="w-full max-w-3xl bg-white/10 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex animate-fade-in">
+        <div className="w-full max-w-3xl bg-black/30 backdrop-blur-md text-white shadow-2xl rounded-2xl overflow-hidden border border-white/20 flex animate-fade-in">
           {/* Left side image */}
           <div className="w-1/2 flex items-center justify-center bg-gradient-to-b from-[#23235b] to-[#63e] p-6">
             <img

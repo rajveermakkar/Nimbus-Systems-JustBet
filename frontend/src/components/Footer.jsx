@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 
 const faqs = [
   {
@@ -26,7 +27,7 @@ export default function Footer() {
 
   return (
     <footer
-      className="w-full min-h-[180px] bg-[#0B0B2C]/70 backdrop-blur-md border-t-1 border-purple-400/60 relative z-10 py-10 flex items-center"
+      className="w-full min-h-[180px] bg-[#0B0B2C]/70 backdrop-blur-md border-t-1 border-purple-400/60 relative py-10 flex items-center"
     >
       <div className="max-w-6xl mx-auto px-4 flex flex-col gap-8 w-full">
         {/* Top Row: Logo left, links right */}
@@ -77,7 +78,7 @@ export default function Footer() {
         {/* Bottom Row: Copyright, Terms, Back to top */}
         <div className="flex flex-col md:flex-row items-center justify-between border-t border-white/10 pt-4 text-[#adbdff] text-sm gap-2 w-full">
           <div>&copy; {new Date().getFullYear()} JustBet</div>
-          <div><a href="#" className="hover:underline text-[#adbdff ]">Terms of Service</a></div>
+          <Link to="/terms" className="hover:underline text-[#adbdff]">Terms of Service</Link>
           <a href="#top" className="flex items-center gap-1 hover:underline text-grey-200" onClick={handleScrollToTop}><span>Back to top</span> <i className="fas fa-arrow-up text-xs"></i></a>
         </div>
       </div>
