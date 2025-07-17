@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import formImage from "./assets/auction_online.jpg";
 import Toast from "../src/components/Toast";
+import { ImHammer2 } from "react-icons/im";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -68,7 +69,7 @@ function VerifyEmail() {
         {/* Right side */}
         <div className="flex-1 flex flex-col justify-center p-12 items-center">
           <div className="flex flex-col items-center gap-2 mb-6 select-none">
-            <i className="fa-solid fa-gavel text-3xl text-white drop-shadow-lg"></i>
+            <ImHammer2 className="text-3xl text-white drop-shadow-lg"></ImHammer2>
             <span className="text-2xl font-bold text-white tracking-wide drop-shadow-lg">JustBet</span>
           </div>
           <h2 className="text-2xl font-bold text-white text-center mb-2 drop-shadow-lg">Email Verification</h2>

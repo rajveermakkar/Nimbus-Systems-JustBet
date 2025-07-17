@@ -32,6 +32,9 @@ router.get('/live/:id/bids', liveAuctionController.getLiveAuctionBids);
 // GET result for a live auction (public)
 router.get('/live/:id/result', userController.getLiveAuctionResult);
 
+// GET all closed auctions (public)
+router.get('/closed', require('../controllers/auctionController').getAllClosedAuctions);
+
 // Bidding and admin routes (require authentication)
 router.use(jwtauthMiddleware);
 

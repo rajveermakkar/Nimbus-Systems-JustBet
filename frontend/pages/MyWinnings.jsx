@@ -4,6 +4,8 @@ import Toast from '../src/components/Toast';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../src/services/apiService';
 import LoadingSpinner from '../src/components/LoadingSpinner';
+import { FcDiploma1 } from "react-icons/fc";
+import { LiaFileInvoiceDollarSolid } from "react-icons/lia";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const STATUS_LABELS = {
@@ -21,12 +23,9 @@ function MyWinnings() {
   const navigate = useNavigate();
 
   // Pagination settings
-  const CARDS_PER_PAGE = 3;
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const totalPages = isMobile ? Math.ceil(winnings.length / CARDS_PER_PAGE) : 1;
-  const paginatedWinnings = isMobile
-    ? winnings.slice((page - 1) * CARDS_PER_PAGE, page * CARDS_PER_PAGE)
-    : winnings;
+  const CARDS_PER_PAGE = typeof window !== 'undefined' && window.innerWidth < 768 ? 3 : 8;
+  const totalPages = Math.ceil(winnings.length / CARDS_PER_PAGE);
+  const paginatedWinnings = winnings.slice((page - 1) * CARDS_PER_PAGE, page * CARDS_PER_PAGE);
 
   useEffect(() => {
     fetchWinningsAndOrders();
@@ -109,8 +108,8 @@ function MyWinnings() {
           <div className="text-center py-8 text-gray-400">You have not won any auctions yet.</div>
         ) : (
           <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {(isMobile ? paginatedWinnings : winnings).map(win => {
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {paginatedWinnings.map(win => {
               const order = ordersByAuction[win.auction_id];
               let buttonLabel = 'Enter Shipping Details';
               if (order) {
@@ -123,7 +122,7 @@ function MyWinnings() {
               return (
                 <div
                   key={win.auction_id}
-                  className="backdrop-blur-md bg-white/10 rounded-2xl shadow-lg p-0 flex flex-col overflow-hidden hover:scale-[1.025] transition-transform duration-200 relative w-[90%] mx-auto md:w-auto md:mx-0"
+                  className="backdrop-blur-md bg-white/10 rounded-2xl shadow-lg p-0 flex flex-col overflow-hidden hover:scale-[1.025] transition-transform duration-200 relative w-[96%] sm:w-[320px] mx-auto md:mx-0"
                 >
                   {win.image_url && (
                     <div className="relative w-full h-48">
@@ -140,31 +139,36 @@ function MyWinnings() {
                       </span>
                     </div>
                   )}
-                  <div className="flex-1 flex flex-col p-6 gap-2">
-                    <div className="font-bold text-xl mb-1 truncate" title={win.title}>{win.title}</div>
-                    <div className="text-gray-300 text-sm mb-1">Seller: <span className="text-white font-semibold">{win.seller_name}</span></div>
-                    <div className="text-gray-300 text-sm mb-1">End Time: <span className="text-white">{new Date(win.end_time).toLocaleString()}</span></div>
-                    <div className="text-gray-300 text-sm mb-1">Winning Bid: <span className="text-green-400 font-bold">{formatPrice(win.final_bid)}</span></div>
+                  <div className="flex-1 flex flex-col p-4 gap-2">
+                    <div className="font-bold text-base mb-1 truncate" title={win.title}>{win.title}</div>
+                    <div className="text-gray-300 text-xs mb-1">Seller: <span className="text-white font-semibold">{
+                      win.seller?.business_name
+                        || (win.seller?.first_name && win.seller?.last_name
+                          ? `${win.seller.first_name} ${win.seller.last_name}`
+                          : 'Not available')
+                    }</span></div>
+                    <div className="text-gray-300 text-xs mb-1">End Time: <span className="text-white">{new Date(win.end_time).toLocaleString()}</span></div>
+                    <div className="text-gray-300 text-xs mb-1">Winning Bid: <span className="text-green-400 font-bold">{formatPrice(win.final_bid)}</span></div>
                     {order && (
                       <div className="text-gray-300 text-xs mb-1">
                         <span className="font-semibold text-white">Shipping:</span> {order.shipping_address}, {order.shipping_city}, {order.shipping_state}, {order.shipping_postal_code}, {order.shipping_country}
                       </div>
                     )}
-                    <div className="text-gray-300 text-sm mb-1">Status: <span className="font-bold text-white">{order ? (STATUS_LABELS[order.status] || order.status) : 'Not Claimed'}</span></div>
+                    <div className="text-gray-300 text-xs mb-1">Status: <span className="font-bold text-white">{order ? (STATUS_LABELS[order.status] || order.status) : 'Not Claimed'}</span></div>
                     {!order && (
                       <div className="text-yellow-300 text-xs mb-1 italic">Invoice and certificate will be available after claiming your order.</div>
                     )}
                     <div className="flex justify-center mt-4 gap-2">
-                      <Button className="w-fit" onClick={() => navigate(`/winning/${win.auction_id}`, { state: { auctionType: win.auction_type } })}>{buttonLabel}</Button>
+                      <Button className="w-fit text-xs px-4 py-2" onClick={() => navigate(`/winning/${win.auction_id}`, { state: { auctionType: win.auction_type } })}>{buttonLabel}</Button>
                       {order && order.invoiceUrl && (
                         <a
                           href={order.invoiceUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-400 underline text-sm ml-2"
+                          className="ml-2 flex items-center justify-center w-9 h-9 rounded-full bg-white text-black text-lg shadow hover:bg-gray-200 transition"
                           title="Download Invoice PDF"
                         >
-                          Invoice
+                          <LiaFileInvoiceDollarSolid />
                         </a>
                       )}
                       {order && order.certificateUrl && (
@@ -172,10 +176,10 @@ function MyWinnings() {
                           href={order.certificateUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-green-400 underline text-sm ml-2"
+                          className="ml-2 flex items-center justify-center w-9 h-9 rounded-full bg-purple-500 text-white text-lg shadow hover:bg-purple-600 transition"
                           title="Download Ownership Certificate PDF"
                         >
-                          Certificate
+                          <FcDiploma1 />
                         </a>
                       )}
                     </div>
@@ -184,24 +188,26 @@ function MyWinnings() {
               );
             })}
           </div>
-          {/* Mobile Pagination Controls */}
-          {isMobile && totalPages > 1 && (
-            <div className="flex justify-center items-center gap-4 mt-6">
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-2 mt-8">
               <button
-                className="px-4 py-2 rounded bg-white/10 text-white disabled:opacity-40"
-                onClick={() => setPage(page - 1)}
+                className="px-3 py-1 rounded bg-white/10 text-white disabled:opacity-40"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-              >
-                Previous
-              </button>
-              <span className="text-white/80 text-sm">Page {page} of {totalPages}</span>
+              >Prev</button>
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  className={`px-3 py-1 rounded ${page === i + 1 ? 'bg-purple-500 text-white' : 'bg-white/10 text-white hover:bg-purple-400/30'} transition`}
+                  onClick={() => setPage(i + 1)}
+                >{i + 1}</button>
+              ))}
               <button
-                className="px-4 py-2 rounded bg-white/10 text-white disabled:opacity-40"
-                onClick={() => setPage(page + 1)}
+                className="px-3 py-1 rounded bg-white/10 text-white disabled:opacity-40"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-              >
-                Next
-              </button>
+              >Next</button>
             </div>
           )}
           </>

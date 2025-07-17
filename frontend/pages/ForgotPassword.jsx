@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import formImage from "./assets/forgot-password.png";
 import AuthCard from "../src/components/AuthCard";
 import Button from "../src/components/Button";
+import { ImHammer2 } from "react-icons/im";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -133,7 +134,7 @@ function ForgotPassword({ showToast }) {
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e]">
       {isMobile ? (
         <AuthCard
-          icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+          icon={<ImHammer2 className="text-3xl text-white"></ImHammer2>}
           title="Forgot your password?"
           subtitle="Enter your email and we'll send you a link to reset your password."
           error={errors.form}
@@ -156,7 +157,7 @@ function ForgotPassword({ showToast }) {
           {/* Right side form */}
           <div className="w-1/2 flex flex-col justify-center p-12">
             <AuthCard
-              icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+              icon={<ImHammer2 className="text-3xl text-white"></ImHammer2>}
               title="Forgot your password?"
               subtitle="Enter your email and we'll send you a link to reset your password."
               error={errors.form}

@@ -7,6 +7,7 @@ import Button from "../src/components/Button";
 import Modal from "../src/components/Modal";
 import LoadingSpinner from "../src/components/LoadingSpinner";
 import Toast from "../src/components/Toast";
+import { ImHammer2 } from "react-icons/im";
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 function useIsMobile() {
@@ -386,7 +387,7 @@ function Register({ showToast }) {
       </Modal>
       {isMobile ? (
         <AuthCard
-          icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+          icon={<ImHammer2 className="text-3xl text-white" />}
           title="Create your account"
           subtitle="Join our community!"
           error={errors.form}
@@ -410,7 +411,7 @@ function Register({ showToast }) {
           {/* Right side form */}
           <div className="w-1/2 flex flex-col justify-center py-8 px-8">
             <AuthCard
-              icon={<i className="fa-solid fa-gavel text-3xl text-white"></i>}
+              icon={<ImHammer2 className="text-3xl text-white" />}
               title="Create your account"
               subtitle="Join our community!"
               error={errors.form}

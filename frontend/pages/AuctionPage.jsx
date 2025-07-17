@@ -8,6 +8,7 @@ import Button from '../src/components/Button';
 import Toast from '../src/components/Toast';
 import WinnerDeclaration from '../src/components/WinnerDeclaration';
 import EndpointSVG from './assets/Endpoint-amico.svg';
+import { ImHammer2 } from "react-icons/im";
 
 function AuctionPage() {
   const { id, type } = useParams();
@@ -320,6 +321,9 @@ function AuctionPage() {
                   current_highest_bidder_id: currentId,
                 };
               });
+              if (data.timerEnd) {
+                setLiveBidTimerEnd(data.timerEnd);
+              }
             } else if (data.type === 'bid-update') {
               if (data.bids && Array.isArray(data.bids)) {
                 // Sort bids properly
@@ -600,7 +604,7 @@ function AuctionPage() {
       }
     } catch (err) {
       console.error('[AuctionPage] Error placing bid:', err);
-      const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Failed to place bid. Please try again.';
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to place bid. Please try again.';
       setBidError(errorMsg);
       setToast({ show: true, message: errorMsg, type: 'error' });
       setPlacingBid(false);
@@ -893,7 +897,12 @@ function AuctionPage() {
             <div className="rounded-lg bg-white/10 shadow p-4">
               <h1 className="text-lg font-bold mb-1 text-left mb-2">{auction.title}</h1>
               <div className="mb-1 text-xs text-gray-300 text-left mt-2">
-                Seller: <span className="font-semibold text-white">{auction.seller?.first_name + ' ' + auction.seller?.last_name + (auction.seller?.business_name ? ` (${auction.seller.business_name})` : '')}</span>
+                Seller: <span className="font-semibold text-white">{
+                  auction.seller?.business_name
+                  || (auction.seller?.first_name && auction.seller?.last_name
+                    ? `${auction.seller.first_name} ${auction.seller.last_name}`
+                    : 'Not available')
+                }</span>
               </div>
               <div className="text-sm text-gray-200 whitespace-pre-line text-left mt-2">
                 {auction.description}
@@ -917,7 +926,7 @@ function AuctionPage() {
                   
                   {recentBids.length === 0 ? (
                     <div className="text-center text-gray-400 py-8">
-                      <i className="fas fa-gavel text-3xl mb-2"></i>
+                      <ImHammer2 className="text-3xl mb-2" />
                       <p className="text-sm">No live bids yet</p>
                       <p className="text-xs">Be the first to place a bid!</p>
                     </div>
