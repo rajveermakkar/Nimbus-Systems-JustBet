@@ -104,7 +104,13 @@ const sellerController = {
       // Determine status
       let status = 'not_requested';
       if (user.role === 'seller') {
-        status = user.is_approved ? 'approved' : 'pending';
+        if (user.is_approved) {
+          status = 'approved';
+        } else if (user.seller_rejection_reason && user.seller_rejection_reason.trim() !== '') {
+          status = 'rejected';
+        } else {
+          status = 'pending';
+        }
       }
 
       // Prepare business details if user is a seller
@@ -122,6 +128,7 @@ const sellerController = {
         role: user.role,
         isApproved: user.is_approved,
         status: status,
+        seller_rejection_reason: user.seller_rejection_reason,
         businessDetails: businessDetails,
         token
       };

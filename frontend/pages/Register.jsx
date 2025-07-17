@@ -193,68 +193,68 @@ function Register({ showToast }) {
         <div className="flex-1">
           <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="firstName">First Name *</label>
           <div className="relative">
-            <input
-              type="text"
-              name="firstName"
-              id="firstName"
+          <input
+            type="text"
+            name="firstName"
+            id="firstName"
               maxLength={30}
               className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm${errors.firstName ? " border-red-500 pr-10" : ""}${shake.firstName ? " animate-shake" : ""}`}
-              placeholder="First name"
-              value={form.firstName}
-              onChange={handleChange}
+            placeholder="First name"
+            value={form.firstName}
+            onChange={handleChange}
               onBlur={e => { setTouched(t => ({ ...t, firstName: true })); validateNameField('firstName', e.target.value.replace(/\s+/g, ' ').trim()); }}
-              autoComplete="given-name"
-            />
-            {errors.firstName && (
+            autoComplete="given-name"
+          />
+          {errors.firstName && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 opacity-70 pointer-events-none">
                 <i className="fa-solid fa-circle-exclamation"></i>
               </span>
-            )}
+          )}
           </div>
         </div>
         <div className="flex-1">
           <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="lastName">Last Name *</label>
           <div className="relative">
-            <input
-              type="text"
-              name="lastName"
-              id="lastName"
+          <input
+            type="text"
+            name="lastName"
+            id="lastName"
               maxLength={30}
               className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm${errors.lastName ? " border-red-500 pr-10" : ""}${shake.lastName ? " animate-shake" : ""}`}
-              placeholder="Last name"
-              value={form.lastName}
-              onChange={handleChange}
+            placeholder="Last name"
+            value={form.lastName}
+            onChange={handleChange}
               onBlur={e => { setTouched(t => ({ ...t, lastName: true })); validateNameField('lastName', e.target.value.replace(/\s+/g, ' ').trim()); }}
-              autoComplete="family-name"
-            />
-            {errors.lastName && (
+            autoComplete="family-name"
+          />
+          {errors.lastName && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 opacity-70 pointer-events-none">
                 <i className="fa-solid fa-circle-exclamation"></i>
               </span>
-            )}
+          )}
           </div>
         </div>
       </div>
       <div>
         <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="email">Email *</label>
         <div className="relative">
-          <input
-            type="email"
-            name="email"
-            id="email"
+        <input
+          type="email"
+          name="email"
+          id="email"
             className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm${emailInvalid ? " border-red-500 pr-10" : ""}${shake.email ? " animate-shake" : ""}`}
-            placeholder="Email address"
-            value={form.email}
-            onChange={handleChange}
-            autoComplete="email"
+          placeholder="Email address"
+          value={form.email}
+          onChange={handleChange}
+          autoComplete="email"
             onBlur={() => setTouched(t => ({ ...t, email: true }))}
             aria-invalid={emailInvalid}
-          />
+        />
           {emailInvalid && (
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 opacity-70 pointer-events-none">
               <i className="fa-solid fa-circle-exclamation"></i>
             </span>
-          )}
+        )}
         </div>
       </div>
       <div>
@@ -422,68 +422,68 @@ function Register({ showToast }) {
                   <div className="flex-1">
                     <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="firstName">First Name *</label>
                     <div className="relative">
-                      <input
-                        type="text"
-                        name="firstName"
-                        id="firstName"
+                    <input
+                      type="text"
+                      name="firstName"
+                      id="firstName"
                         maxLength={30}
                         className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm${errors.firstName ? " border-red-500 pr-10" : ""}${shake.firstName ? " animate-shake" : ""}`}
-                        placeholder="First name"
-                        value={form.firstName}
-                        onChange={handleChange}
+                      placeholder="First name"
+                      value={form.firstName}
+                      onChange={handleChange}
                         onBlur={e => { setTouched(t => ({ ...t, firstName: true })); validateNameField('firstName', e.target.value.replace(/\s+/g, ' ').trim()); }}
-                        autoComplete="given-name"
-                      />
-                      {errors.firstName && (
+                      autoComplete="given-name"
+                    />
+                    {errors.firstName && (
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 opacity-70 pointer-events-none">
                           <i className="fa-solid fa-circle-exclamation"></i>
                         </span>
-                      )}
+                    )}
                     </div>
                   </div>
                   <div className="flex-1">
                     <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="lastName">Last Name *</label>
                     <div className="relative">
-                      <input
-                        type="text"
-                        name="lastName"
-                        id="lastName"
+                    <input
+                      type="text"
+                      name="lastName"
+                      id="lastName"
                         maxLength={30}
                         className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm${errors.lastName ? " border-red-500 pr-10" : ""}${shake.lastName ? " animate-shake" : ""}`}
-                        placeholder="Last name"
-                        value={form.lastName}
-                        onChange={handleChange}
+                      placeholder="Last name"
+                      value={form.lastName}
+                      onChange={handleChange}
                         onBlur={e => { setTouched(t => ({ ...t, lastName: true })); validateNameField('lastName', e.target.value.replace(/\s+/g, ' ').trim()); }}
-                        autoComplete="family-name"
-                      />
-                      {errors.lastName && (
+                      autoComplete="family-name"
+                    />
+                    {errors.lastName && (
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 opacity-70 pointer-events-none">
                           <i className="fa-solid fa-circle-exclamation"></i>
                         </span>
-                      )}
+                    )}
                     </div>
                   </div>
                 </div>
                 <div>
                   <label className="block text-gray-200 text-xs mb-1 text-left" htmlFor="email">Email *</label>
                   <div className="relative">
-                    <input
-                      type="email"
-                      name="email"
-                      id="email"
+                  <input
+                    type="email"
+                    name="email"
+                    id="email"
                       className={`w-full px-3 py-2 rounded-lg bg-transparent border-2 focus:border-purple-400 border-gray-400 text-white placeholder-gray-400 focus:outline-none transition text-sm${emailInvalid ? " border-red-500 pr-10" : ""}${shake.email ? " animate-shake" : ""}`}
-                      placeholder="Email address"
-                      value={form.email}
-                      onChange={handleChange}
-                      autoComplete="email"
+                    placeholder="Email address"
+                    value={form.email}
+                    onChange={handleChange}
+                    autoComplete="email"
                       onBlur={() => setTouched(t => ({ ...t, email: true }))}
                       aria-invalid={emailInvalid}
-                    />
+                  />
                     {emailInvalid && (
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 opacity-70 pointer-events-none">
                         <i className="fa-solid fa-circle-exclamation"></i>
                       </span>
-                    )}
+                  )}
                   </div>
                 </div>
                 <div>

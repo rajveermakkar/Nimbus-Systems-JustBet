@@ -190,7 +190,7 @@ const User = {
              business_name, business_description, business_address, 
              business_phone
       FROM users
-      WHERE role = 'seller' AND is_approved = false
+      WHERE role = 'seller' AND is_approved = false AND (seller_rejection_reason IS NULL OR seller_rejection_reason = '')
     `;
     const result = await queryWithRetry(query);
     return result.rows;
