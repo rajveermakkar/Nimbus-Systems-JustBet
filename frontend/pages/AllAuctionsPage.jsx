@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import auctionService from '../src/services/auctionService';
 import AuctionCard from '../src/components/auctions/AuctionCard';
 import Button from '../src/components/Button';
+import { useRef } from 'react';
 
 function AllAuctionsPage() {
   const [liveAuctions, setLiveAuctions] = useState([]);
@@ -9,6 +10,16 @@ function AllAuctionsPage() {
   const [loading, setLoading] = useState(true);
   const [showInitialLoading, setShowInitialLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+  const searchTimeout = useRef();
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(searchTimeout.current);
+  }, [search]);
 
   useEffect(() => {
     let intervalId;
@@ -33,6 +44,15 @@ function AllAuctionsPage() {
     return () => clearInterval(intervalId);
   }, []);
 
+  const filteredLive = liveAuctions.filter(a =>
+    a.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    a.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
+  );
+  const filteredSettled = settledAuctions.filter(a =>
+    a.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    a.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#000] via-[#2a2a72] to-[#63e] text-white">
       <div className="container mx-auto px-4 py-8">
@@ -53,6 +73,27 @@ function AllAuctionsPage() {
           </div>
         ) : (
           <>
+            {/* Search Bar */}
+            <div className="mb-6 max-w-md mx-auto flex items-center gap-2">
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search all auctions..."
+                aria-label="Search auctions"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:outline-none bg-white/10 text-white placeholder-gray-400 transition"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="ml-2 px-2 py-1 rounded text-gray-300 hover:text-white focus:outline-none"
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
             {/* Live Auctions Section */}
             <div className="mb-12">
               <div className="flex items-center justify-between mb-4">
@@ -65,9 +106,9 @@ function AllAuctionsPage() {
                   <i className="fas fa-arrow-right text-xs"></i>
                 </button>
               </div>
-              {liveAuctions.length > 0 ? (
+              {filteredLive.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {liveAuctions.slice(0, 4).map(auction => (
+                  {filteredLive.slice(0, 4).map(auction => (
                     <AuctionCard key={auction.id} auction={auction} actionLabel="Join Live Auction" />
                   ))}
                 </div>
@@ -88,9 +129,9 @@ function AllAuctionsPage() {
                   <i className="fas fa-arrow-right text-xs"></i>
                 </button>
               </div>
-              {settledAuctions.length > 0 ? (
+              {filteredSettled.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {settledAuctions.slice(0, 4).map(auction => (
+                  {filteredSettled.slice(0, 4).map(auction => (
                     <AuctionCard key={auction.id} auction={auction} actionLabel="Bid Now" />
                   ))}
                 </div>
