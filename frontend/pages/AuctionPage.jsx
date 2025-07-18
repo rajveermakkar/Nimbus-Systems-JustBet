@@ -458,7 +458,7 @@ function AuctionPage() {
       stopPolling = auctionService.startAuctionPolling(id, (response) => {
         setAuction(response.auction || response);
         setRecentBids(response.bids || response.recentBids || []);
-      }, 5000); // 5 seconds
+      }, 1000); // 5 seconds
     } else if (type === 'live') {
       setLoading(true);
       setError(null);
