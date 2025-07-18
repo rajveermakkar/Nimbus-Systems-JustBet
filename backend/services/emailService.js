@@ -38,7 +38,7 @@ const sendVerificationEmail = async (email, token) => {
       to: email,
       subject: 'Verify your JustBet account',
       html: `
-       <div style="font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background: #f0f0f5; color: #202020; padding: 20px 0; margin: 0; min-height: 100vh;">
+       <div style="font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background: #f0f0f5; color: #202020; padding: 20px 0; margin: 0;">
   <center> <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
       <tr>
         <td align="center" style="padding: 20px 0;">
@@ -109,7 +109,7 @@ const sendPasswordResetEmail = async (email, token) => {
       to: email,
       subject: 'Reset your JustBet password',
       html: `
-        <div style="font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background: #f0f0f5; color: #202020; padding: 20px 0; margin: 0; min-height: 100vh;">
+        <div style="font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background: #f0f0f5; color: #202020; padding: 20px 0; margin: 0;">
   <center>
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
       <tr>

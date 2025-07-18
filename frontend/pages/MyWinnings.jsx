@@ -100,7 +100,7 @@ function MyWinnings() {
           onClose={() => setToast(t => ({ ...t, show: false }))}
         />
       )}
-      <div className="w-full max-w-5xl mx-auto">
+      <div className="w-full max-w-7xl mx-auto px-2">
         <h2 className="text-3xl font-bold mb-8 text-center">My Winnings</h2>
         {loading ? (
           <div className="text-center py-8">Loading...</div>
@@ -108,7 +108,7 @@ function MyWinnings() {
           <div className="text-center py-8 text-gray-400">You have not won any auctions yet.</div>
         ) : (
           <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {paginatedWinnings.map(win => {
               const order = ordersByAuction[win.auction_id];
               let buttonLabel = 'Enter Shipping Details';
@@ -122,7 +122,7 @@ function MyWinnings() {
               return (
                 <div
                   key={win.auction_id}
-                  className="backdrop-blur-md bg-white/10 rounded-2xl shadow-lg p-0 flex flex-col overflow-hidden hover:scale-[1.025] transition-transform duration-200 relative w-[96%] sm:w-[320px] mx-auto md:mx-0"
+                  className="backdrop-blur-md bg-white/10 rounded-2xl shadow-lg p-0 flex flex-col overflow-hidden hover:scale-[1.025] transition-transform duration-200 relative w-full"
                 >
                   {win.image_url && (
                     <div className="relative w-full h-48">
