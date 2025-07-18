@@ -7,6 +7,7 @@ import { getStatusBadgeClass } from '../src/utils/statusBadgeUtils';
 import ConfirmModal from "../src/components/ConfirmModal";
 import apiService from "../src/services/apiService";
 import { walletService } from '../src/services/walletService';
+import AuctionFiltersDropdown from '../src/components/auctions/AuctionFiltersDropdown';
 
 // Tooltip component for rejection reason
 function Tooltip({ children, text }) {
@@ -98,6 +99,7 @@ function SellerDashboard() {
   const [search, setSearch] = useState('');
   const searchTimeout = useRef();
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterValues, setFilterValues] = useState({});
 
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -750,25 +752,21 @@ function SellerDashboard() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="mb-4 max-w-md mx-auto flex items-center gap-2">
+                  <div className="mb-6 max-w-2xl mx-auto flex items-center gap-2 relative">
                     <input
                       type="text"
                       value={search}
                       onChange={e => setSearch(e.target.value)}
                       placeholder="Search your listings..."
-                      aria-label="Search listings"
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:outline-none bg-white/10 text-white placeholder-gray-400 transition"
+                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400"
                     />
-                    {search && (
-                      <button
-                        type="button"
-                        onClick={() => setSearch('')}
-                        className="ml-2 px-2 py-1 rounded text-gray-300 hover:text-white focus:outline-none"
-                        aria-label="Clear search"
-                      >
-                        ×
-                      </button>
-                    )}
+                    <AuctionFiltersDropdown
+                      showCurrentPrice={true}
+                      showStartingSoon={true}
+                      showEndingSoon={true}
+                      values={filterValues}
+                      onChange={setFilterValues}
+                    />
                   </div>
                 )}
 
