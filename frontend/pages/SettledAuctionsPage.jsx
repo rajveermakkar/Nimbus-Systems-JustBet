@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import auctionService from '../src/services/auctionService';
 import AuctionCard from '../src/components/auctions/AuctionCard';
 import Button from '../src/components/Button';
+import AuctionFiltersDropdown from '../src/components/auctions/AuctionFiltersDropdown';
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -19,6 +20,7 @@ function SettledAuctionsPage() {
   const [showInitialLoading, setShowInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [filterValues, setFilterValues] = useState({});
   const isMobile = useIsMobile();
   const cardsPerPage = isMobile ? 6 : 12;
   const [page, setPage] = useState(1);
@@ -54,13 +56,20 @@ function SettledAuctionsPage() {
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-2">Settled Auctions</h1>
         <p className="text-gray-300 mb-8">Browse and bid on traditional settled auctions.</p>
-        <div className="mb-6 max-w-md mx-auto">
+        <div className="mb-6 max-w-2xl mx-auto flex items-center gap-2 relative">
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search settled auctions..."
             className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400"
+          />
+          <AuctionFiltersDropdown
+            showCurrentPrice={true}
+            showStartingSoon={true}
+            showEndingSoon={false}
+            values={filterValues}
+            onChange={setFilterValues}
           />
         </div>
         {error && (
