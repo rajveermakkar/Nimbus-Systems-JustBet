@@ -100,6 +100,8 @@ function SellerDashboard() {
   const searchTimeout = useRef();
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterValues, setFilterValues] = useState({});
+  // Add auctionSearch state for Auction Results tab
+  const [auctionSearch, setAuctionSearch] = useState('');
 
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 

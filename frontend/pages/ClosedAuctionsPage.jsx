@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import auctionService from '../src/services/auctionService';
 import AuctionCard from '../src/components/auctions/AuctionCard';
+import { useNavigate } from 'react-router-dom';
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -22,6 +23,7 @@ function ClosedAuctionsPage() {
   const isMobile = useIsMobile();
   const cardsPerPage = isMobile ? 6 : 12;
   const [page, setPage] = useState(1);
+  const navigate = useNavigate();
 
   // Debounce search input
   useEffect(() => {
@@ -95,7 +97,18 @@ function ClosedAuctionsPage() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {paginatedClosed.map(auction => (
-                <AuctionCard key={auction.id} auction={auction} actionLabel="View Result" />
+                <AuctionCard
+                  key={auction.id}
+                  auction={auction}
+                  actionLabel="View Result"
+                  onClick={() => {
+                    if (auction.type === 'settled') {
+                      navigate(`/auction/settled/${auction.id}`);
+                    } else if (auction.type === 'live') {
+                      navigate(`/auction/live/${auction.id}`);
+                    }
+                  }}
+                />
               ))}
             </div>
             {totalPages > 1 && (
