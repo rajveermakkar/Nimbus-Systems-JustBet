@@ -126,15 +126,8 @@ export default function ContactUs() {
       setToast({ show: true, message: 'Please fill all required fields correctly.', type: 'error' });
       return;
     }
-    // Use Formspree submission
-    handleSubmit({
-      target: {
-        name: { value: form.name },
-        email: { value: form.email },
-        message: { value: form.message }
-      },
-      preventDefault: () => {},
-    });
+    // Use Formspree submission with the real event
+    handleSubmit(e);
   }
 
   return (

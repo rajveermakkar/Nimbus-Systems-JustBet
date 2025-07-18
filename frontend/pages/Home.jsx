@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Button from "../src/components/Button";
 import heroImg from "./assets/Home/Hero1.png";
 import React, { useEffect, useState, useContext } from "react";
@@ -71,6 +71,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user } = useContext(UserContext);
+  const navigate = useNavigate();
 
   // Hero section animation state
   const [heroVisible, setHeroVisible] = useState(false);
@@ -259,7 +260,21 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {allCards.map(auction => (
-              <AuctionCard key={auction.id} auction={auction} actionLabel={auction.id.startsWith('placeholder') ? undefined : "View Auction"} badge={auction.badge} />
+              <AuctionCard
+                key={auction.id}
+                auction={auction}
+                actionLabel={auction.id.startsWith('placeholder') ? undefined : "View Auction"}
+                badge={auction.badge}
+                onClick={() => {
+                  if (!auction.id.startsWith('placeholder')) {
+                    if (auction.type === 'settled') {
+                      navigate(`/ended-auction/${auction.id}`, { state: { auctionType: auction.type } });
+                    } else if (auction.type === 'live') {
+                      navigate(`/auction/live/${auction.id}`);
+                    }
+                  }
+                }}
+              />
             ))}
           </div>
         )}

@@ -544,10 +544,10 @@ function AuctionPage() {
 
   // After setting auction, redirect if closed live auction
   useEffect(() => {
-    if (auction && auction.type === 'live' && auction.status === 'closed') {
-      navigate(`/ended-auction/${auction.id}`, { replace: true });
-    }
-  }, [auction, navigate]);
+  if (auction && auction.status === 'closed') {
+    navigate(`/ended-auction/${auction.id}`, { replace: true });
+  }
+}, [auction, navigate]);
 
   // Handle bid submission
   const handlePlaceBid = async (e) => {
