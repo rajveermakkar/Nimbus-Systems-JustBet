@@ -72,6 +72,13 @@ export default function Home() {
   const [error, setError] = useState(null);
   const { user } = useContext(UserContext);
 
+  // Hero section animation state
+  const [heroVisible, setHeroVisible] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setHeroVisible(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     async function fetchAuctions() {
@@ -109,7 +116,11 @@ export default function Home() {
   return (
     <div className="min-h-screen w-full flex flex-col relative overflow-hidden bg-gradient-to-r from-[#000000] to-[#2A2A72]">
       {/* Hero Section - center aligned text and buttons, purplish highlight */}
-      <section className="w-full flex flex-col-reverse md:flex-row items-center justify-between px-16 py-4 gap-10 md:gap-0">
+      <section
+        className={`w-full flex flex-col-reverse md:flex-row items-center justify-between px-16 py-4 gap-10 md:gap-0
+        transition-all duration-700 ease-out
+        ${heroVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+      >
         {/* Left: Text & CTA */}
         <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center">
           <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-2">
@@ -141,7 +152,7 @@ export default function Home() {
         </div>
         {/* Right: Hero Image - NO shadow, NO border, NO nested card */}
         <div className="flex-1 flex items-center justify-center">
-          <img src={heroImg} alt="Auction Hero" className="w-full max-w-lg md:max-w-2xl hidden sm:block" />
+          <img src={heroImg} alt="Auction Hero" className="w-full max-w-xs sm:max-w-lg md:max-w-2xl" />
         </div>
       </section>
       {/* Stats Row */}

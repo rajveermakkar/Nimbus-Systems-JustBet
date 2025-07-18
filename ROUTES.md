@@ -218,6 +218,9 @@
   - Only the seller for the order can update the status.
   - Returns: The updated order object.
 
+- **GET /api/orders/:orderId/invoice** — Get the invoice PDF for an order. (Authenticated)
+- **GET /api/orders/:orderId/certificate** — Get the certificate PDF for an order. (Authenticated)
+
 **Notes:**
 - All order endpoints require authentication (JWT in Authorization header or cookie).
 - Only the winner of an auction can submit shipping details for that auction.
@@ -300,4 +303,8 @@
 
 ### User Profile
 - **PATCH /api/user/profile** — Update the authenticated user's profile.
+
+### Auctions (Other)
+
+- **GET /api/auctions/closed** — Get all closed auctions (public or admin, check access).
 
