@@ -7,6 +7,7 @@ import { getStatusBadgeClass } from '../src/utils/statusBadgeUtils';
 import ConfirmModal from "../src/components/ConfirmModal";
 import apiService from "../src/services/apiService";
 import { walletService } from '../src/services/walletService';
+import AuctionFiltersDropdown from '../src/components/auctions/AuctionFiltersDropdown';
 
 // Tooltip component for rejection reason
 function Tooltip({ children, text }) {
@@ -98,6 +99,7 @@ function SellerDashboard() {
   const [search, setSearch] = useState('');
   const searchTimeout = useRef();
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterValues, setFilterValues] = useState({});
 
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -653,83 +655,116 @@ function SellerDashboard() {
             {activeTab === 'results' && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">🏆 Auction Results</h2>
-                
-                {auctionResults.length === 0 ? (
+                {/* Auction Results Search Bar */}
+                <div className="mb-4 max-w-md mx-auto flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={auctionSearch}
+                    onChange={e => setAuctionSearch(e.target.value)}
+                    placeholder="Search auction results..."
+                    aria-label="Search auction results"
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:outline-none bg-white/10 text-white placeholder-gray-400 transition"
+                  />
+                  {auctionSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setAuctionSearch('')}
+                      className="ml-2 px-2 py-1 rounded text-gray-300 hover:text-white focus:outline-none"
+                      aria-label="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                {/* Filter auctionResults by search */}
+                {auctionResults.length === 0 && !loading ? (
                   <div className="text-center py-8">
                     <div className="text-6xl mb-4">🎯</div>
                     <h3 className="text-xl font-semibold mb-2">No Completed Auctions</h3>
                     <p className="text-gray-400">You haven't completed any auctions yet.</p>
                   </div>
+                ) : auctionResults.filter(result =>
+                        result.title?.toLowerCase().includes(auctionSearch.toLowerCase()) ||
+                        result.description?.toLowerCase().includes(auctionSearch.toLowerCase())
+                      ).length === 0 && !loading ? (
+                  <div className="text-center py-8">
+                    <div className="text-6xl mb-4">🎯</div>
+                    <h3 className="text-xl font-semibold mb-2">No Auction Results Found</h3>
+                    <p className="text-gray-400">No auction results match your search criteria.</p>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {auctionResults.map((result, idx) => {
-                      const isSold = result.result_type === 'sold' || (result.status === 'closed' && result.winner_id);
-                      const isNoBids = result.result_type === 'no_bids' || (!result.winner_id && !isSold);
-                      // Use a more unique key
-                      const key = `${result.type || result.auction_type || 'settled'}-${result.id || result.auction_id}-${idx}`;
-                      return (
-                        <div 
-                          key={key}
-                          className="bg-white/5 rounded-lg p-4 hover:bg-white/10 transition-colors relative"
-                        >
-                          {/* Auction Type Badge */}
-                          <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[11px] font-bold border shadow z-10
-                            ${result.type === 'settled' ? 'bg-blue-500/20 text-blue-400 border-blue-400/30' : 'bg-red-500/20 text-red-400 border-red-400/30'}`}
+                    {auctionResults
+                      .filter(result =>
+                        result.title?.toLowerCase().includes(auctionSearch.toLowerCase()) ||
+                        result.description?.toLowerCase().includes(auctionSearch.toLowerCase())
+                      )
+                      .map((result, idx) => {
+                        const isSold = result.result_type === 'sold' || (result.status === 'closed' && result.winner_id);
+                        const isNoBids = result.result_type === 'no_bids' || (!result.winner_id && !isSold);
+                        // Use a more unique key
+                        const key = `${result.type || result.auction_type || 'settled'}-${result.id || result.auction_id}-${idx}`;
+                        return (
+                          <div 
+                            key={key}
+                            className="bg-white/5 rounded-lg p-4 hover:bg-white/10 transition-colors relative"
                           >
-                            {result.type === 'settled' ? 'Settled' : 'Live'}
-                          </span>
-                          {/* Auction Image */}
-                          <div className="mb-3 h-32 bg-white/5 rounded-lg flex items-center justify-center overflow-hidden">
-                            {result.image_url ? (
-                              <img
-                                src={result.image_url}
-                                alt={result.title}
-                                className="w-full h-full object-cover"
-                              />
+                            {/* Auction Type Badge */}
+                            <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[11px] font-bold border shadow z-10
+                              ${result.type === 'settled' ? 'bg-blue-500/20 text-blue-400 border-blue-400/30' : 'bg-red-500/20 text-red-400 border-red-400/30'}`}
+                            >
+                              {result.type === 'settled' ? 'Settled' : 'Live'}
+                            </span>
+                            {/* Auction Image */}
+                            <div className="mb-3 h-32 bg-white/5 rounded-lg flex items-center justify-center overflow-hidden">
+                              {result.image_url ? (
+                                <img
+                                  src={result.image_url}
+                                  alt={result.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <i className="fa-solid fa-image text-gray-400 text-2xl"></i>
+                              )}
+                            </div>
+                            {/* Auction Info */}
+                            <h3 className="font-semibold text-lg mb-2 line-clamp-2">{result.title}</h3>
+                            <div className="space-y-1 text-sm mb-3">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(result.status || result.result_type)}`}>
+                                  {isSold ? 'Sold' : isNoBids ? 'No Bids' : result.status === 'reserve_not_met' ? 'Reserve Not Met' : result.status}
+                                </span>
+                              </div>
+                              <p className="text-gray-400">Ended: {formatDate(result.end_time)}</p>
+                            </div>
+                            {/* Result Info */}
+                            {isSold ? (
+                              <div className="bg-green-900/20 border border-green-500/30 rounded p-3 mb-3">
+                                <div className="text-center">
+                                  <p className="text-sm text-gray-300">Sold for</p>
+                                  <p className="text-lg font-bold text-green-400">{formatPrice(result.final_bid)}</p>
+                                 
+                                </div>
+                              </div>
                             ) : (
-                              <i className="fa-solid fa-image text-gray-400 text-2xl"></i>
+                              <div className="bg-red-900/20 border border-red-500/30 rounded p-3 mb-3">
+                                <div className="text-center">
+                                  <p className="text-sm text-gray-300">No bids placed</p>
+                                  <p className="text-xs text-gray-400">Starting: {formatPrice(result.starting_price)}</p>
+                                  <p className="text-xs text-gray-400 mt-1">&nbsp;</p>
+                                </div>
+                              </div>
                             )}
+                            {/* Action Button */}
+                            <Button
+                              onClick={() => handleViewAuction(result)}
+                              className="w-full text-sm"
+                            >
+                              View Details
+                            </Button>
                           </div>
-                          {/* Auction Info */}
-                          <h3 className="font-semibold text-lg mb-2 line-clamp-2">{result.title}</h3>
-                          <div className="space-y-1 text-sm mb-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(result.status || result.result_type)}`}>
-                                {isSold ? 'Sold' : isNoBids ? 'No Bids' : result.status === 'reserve_not_met' ? 'Reserve Not Met' : result.status}
-                              </span>
-                            </div>
-                            <p className="text-gray-400">Ended: {formatDate(result.end_time)}</p>
-                          </div>
-                          {/* Result Info */}
-                          {isSold ? (
-                            <div className="bg-green-900/20 border border-green-500/30 rounded p-3 mb-3">
-                              <div className="text-center">
-                                <p className="text-sm text-gray-300">Sold for</p>
-                                <p className="text-lg font-bold text-green-400">{formatPrice(result.final_bid)}</p>
-                                <p className="text-xs text-gray-400">
-                                  Winner: {result.winner_name ? result.winner_name : (result.winner_first_name && result.winner_last_name ? `${result.winner_first_name} ${result.winner_last_name}` : 'No Winner')}
-                                </p>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="bg-red-900/20 border border-red-500/30 rounded p-3 mb-3">
-                              <div className="text-center">
-                                <p className="text-sm text-gray-300">No bids placed</p>
-                                <p className="text-xs text-gray-400">Starting: {formatPrice(result.starting_price)}</p>
-                                <p className="text-xs text-gray-400 mt-1">Winner: No Winner</p>
-                              </div>
-                            </div>
-                          )}
-                          {/* Action Button */}
-                          <Button
-                            onClick={() => handleViewAuction(result)}
-                            className="w-full text-sm"
-                          >
-                            View Details
-                          </Button>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 )}
               </div>
@@ -750,43 +785,56 @@ function SellerDashboard() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="mb-4 max-w-md mx-auto flex items-center gap-2">
+                  <div className="mb-6 max-w-2xl mx-auto flex items-center gap-2 relative">
                     <input
                       type="text"
                       value={search}
                       onChange={e => setSearch(e.target.value)}
                       placeholder="Search your listings..."
-                      aria-label="Search listings"
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:outline-none bg-white/10 text-white placeholder-gray-400 transition"
+                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400"
                     />
-                    {search && (
-                      <button
-                        type="button"
-                        onClick={() => setSearch('')}
-                        className="ml-2 px-2 py-1 rounded text-gray-300 hover:text-white focus:outline-none"
-                        aria-label="Clear search"
-                      >
-                        ×
-                      </button>
-                    )}
+                    <AuctionFiltersDropdown
+                      showCurrentPrice={true}
+                      showStartingSoon={true}
+                      showEndingSoon={true}
+                      values={filterValues}
+                      onChange={setFilterValues}
+                    />
                   </div>
                 )}
-
-                {filteredListings.length === 0 ? (
+                {/* Show empty state if no listings at all */}
+                {!loading && listings.length === 0 && (
+                  <div className="text-center py-8">
+                    <div className="text-6xl mb-4">📝</div>
+                    <h3 className="text-xl font-semibold mb-2">No Listings</h3>
+                    <p className="text-gray-400 mb-2">Create listings. All auctions that are not ended show here.</p>
+                    <Button onClick={() => navigate("/seller/create-listing")}>Create Your First Auction</Button>
+                  </div>
+                )}
+                {/* Show empty state if search yields no results */}
+                {!loading && listings.length > 0 && filteredListings.length === 0 && (
                   <div className="text-center py-8">
                     <div className="text-6xl mb-4">📝</div>
                     <h3 className="text-xl font-semibold mb-2">No Listings Found</h3>
-                    <p className="text-gray-400">No listings match your search criteria.</p>
+                    <p className="text-gray-400 mb-2">No listings match your search criteria.</p>
                   </div>
-                ) : (
+                )}
+                {/* Show listings if there are results */}
+                {filteredListings.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredListings
                       .filter(listing => listing.status !== 'closed')
                       .map((listing, idx) => (
                         <div key={`${listing.auction_type || 'listing'}-${listing.id}-${idx}`} className="bg-white/5 rounded-lg p-4 border border-white/20 relative">
-                          {/* LIVE_NOW badge - now top left */}
+                          {/* Auction Type Badge */}
+                          <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[11px] font-bold border shadow z-10
+                            ${listing.auction_type === 'settled' ? 'bg-blue-500/20 text-blue-400 border-blue-400/30' : 'bg-red-500/20 text-red-400 border-red-400/30'}`}
+                          >
+                            {listing.auction_type === 'settled' ? 'Settled' : 'Live'}
+                          </span>
+                          {/* LIVE_NOW badge - offset if both badges */}
                           {isLiveNow(listing) && (
-                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold animate-pulse">
+                            <span className="absolute top-2 left-[70px] px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold animate-pulse z-10">
                               LIVE_NOW
                             </span>
                           )}
@@ -818,17 +866,7 @@ function SellerDashboard() {
                                   {listing.status === 'won' || (listing.status === 'closed' && listing.winner_id) ? 'Sold' : listing.status === 'no_bids' ? 'No Bids' : listing.status === 'reserve_not_met' ? 'Reserve Not Met' : listing.status}
                                 </span>
                               )}
-                            </div>
-                            {/* Only show winner info for closed auctions with winners */}
-                            {listing.status === 'closed' && listing.winner && (
-                              <div className="text-xs text-gray-400 mt-1">
-                                <span className="text-green-400">Winner: </span>
-                                {listing.winner.first_name && listing.winner.last_name ? 
-                                  `${listing.winner.first_name} ${listing.winner.last_name}` : 
-                                  'Unknown'
-                                }
-                              </div>
-                            )}
+                            </div>                           
                           </div>
                           <div className="flex gap-2">
                             <Button

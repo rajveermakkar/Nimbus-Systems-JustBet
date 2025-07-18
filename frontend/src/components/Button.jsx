@@ -1,9 +1,9 @@
 import React from "react";
 
 function Button({ variant = "primary", size = "default", className = "", children, ...props }) {
-  const base = "inline-flex items-center justify-center gap-1 rounded-md font-semibold text-white transition focus:outline-none focus:ring-0 focus:ring-offset-0";
+  const base = "inline-flex items-center justify-center gap-1 rounded-md font-semibold text-white transition-all duration-200 transform-gpu focus:outline-none focus:ring-0 focus:ring-offset-0 will-change-transform";
   const variants = {
-    primary: "bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 hover:ring-2 hover:ring-blue-400/40 hover:scale-105",
+    primary: "bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 border-transparent hover:shadow-[0_0_12px_2px_rgba(42,42,114,0.6)] hover:scale-105",
     secondary: "bg-transparent border border-white/40 text-white hover:bg-white/10",
     outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
     ghost: "hover:bg-accent hover:text-accent-foreground",

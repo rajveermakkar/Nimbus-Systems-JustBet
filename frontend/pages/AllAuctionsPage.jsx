@@ -3,6 +3,7 @@ import auctionService from '../src/services/auctionService';
 import AuctionCard from '../src/components/auctions/AuctionCard';
 import Button from '../src/components/Button';
 import { useRef } from 'react';
+import AuctionFiltersDropdown from '../src/components/auctions/AuctionFiltersDropdown';
 
 function AllAuctionsPage() {
   const [liveAuctions, setLiveAuctions] = useState([]);
@@ -14,6 +15,7 @@ function AllAuctionsPage() {
   const searchTimeout = useRef();
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [closedAuctions, setClosedAuctions] = useState([]);
+  const [filterValues, setFilterValues] = useState({});
 
   // Debounce search input
   useEffect(() => {
@@ -81,7 +83,7 @@ function AllAuctionsPage() {
         ) : (
           <>
             {/* Search Bar */}
-            <div className="mb-6 max-w-md mx-auto flex items-center gap-2">
+            <div className="mb-6 max-w-2xl mx-auto flex items-center gap-2 relative">
               <input
                 type="text"
                 value={search}
@@ -89,6 +91,13 @@ function AllAuctionsPage() {
                 placeholder="Search all auctions..."
                 aria-label="Search auctions"
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:outline-none bg-white/10 text-white placeholder-gray-400 transition"
+              />
+              <AuctionFiltersDropdown
+                showCurrentPrice={true}
+                showStartingSoon={true}
+                showEndingSoon={true}
+                values={filterValues}
+                onChange={setFilterValues}
               />
               {search && (
                 <button

@@ -262,16 +262,10 @@ export default function ContactUs() {
         {/* Info Section */}
         <div className="w-full flex flex-col items-center justify-center gap-4 mt-12 text-gray-300 text-base">
           <div className="font-semibold text-white">Visit us</div>
-          <div>121 Auction Lane, Facebook City, 12345</div>
+          <div>121 Brunel Road, Mississauga,ON  A1A 2B3</div>
           <div className="font-semibold text-white mt-4">Talk to us</div>
           <div>+1 234 567 8901</div>
           <a href="mailto:support@justbet.com" className="text-purple-300 hover:underline">support@justbet.com</a>
-          <div className="flex gap-6 mt-4 text-2xl">
-            <a href="#" className="hover:text-purple-400" aria-label="Twitter"><i className="fab fa-twitter"></i></a>
-            <a href="#" className="hover:text-purple-400" aria-label="LinkedIn"><i className="fab fa-linkedin"></i></a>
-            <a href="#" className="hover:text-purple-400" aria-label="Instagram"><i className="fab fa-instagram"></i></a>
-            <a href="#" className="hover:text-purple-400" aria-label="Dribbble"><i className="fab fa-dribbble"></i></a>
-          </div>
         </div>
       </div>
       {toast.show && (

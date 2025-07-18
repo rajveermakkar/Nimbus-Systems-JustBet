@@ -265,9 +265,12 @@ function Navbar() {
           <hr className="w-full border-t border-white/20 mt-2" />
         </div>
         <div className="flex flex-col gap-6 w-full max-w-xs">
-          <Link to="/auctions" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><ImHammer2 className="mr-2" />Auctions</Link>
-          <Link to="/about" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-users mr-2"></i>About</Link>
-          <Link to="/contact" className="text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-envelope mr-2"></i>Contact</Link>
+          <Link to="/auctions" className="flex items-center gap-3 text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}>
+            <ImHammer2 className="text-xl self-center" />
+            <span>Auctions</span>
+          </Link>
+          <Link to="/about" className="flex items-center gap-3 text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-users text-xl"></i><span>About</span></Link>
+          <Link to="/contact" className="flex items-center gap-3 text-white text-xl font-medium py-2 w-full text-left border-b border-white/10" onClick={() => setMobileMenuOpen(false)}><i className="fa-solid fa-envelope text-xl"></i><span>Contact</span></Link>
           {user && (
             <>
               {/* Dashboard logic based on role */}
