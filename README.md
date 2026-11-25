@@ -1,5 +1,7 @@
 # JustBet - Auction Platform
 
+https://justbet.netlify.app/
+
 A modern auction bidding platform built with Express.js and PostgreSQL with role-based authentication and seller approval system.
 
 ## Project Structure
